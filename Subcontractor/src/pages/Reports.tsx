@@ -14,6 +14,7 @@ interface AttendanceRecord {
   contact: string
   idType: string
   idNumber: string
+  physicalCardId?: string
   date: string
   checkIn?: string
   checkOut?: string
@@ -41,6 +42,7 @@ const mockAttendance: AttendanceRecord[] = mockWorkers.slice(0, 12).map((w, idx)
     contact: idx % 2 === 0 ? w.phone : w.whatsapp,
     idType: idTypes[idx % idTypes.length],
     idNumber: w.idCard,
+    physicalCardId: w.physicalCardId,
     date: dayjs().subtract(idx % 7, 'day').format('YYYY-MM-DD'),
     checkIn: dayjs().hour(8).minute(30 + (idx % 10)).format('HH:mm'),
     checkOut: idx % 4 === 0 ? undefined : dayjs().hour(17 + (idx % 2)).minute(10).format('HH:mm')
@@ -115,7 +117,8 @@ const Reports: React.FC = () => {
       filtered = filtered.filter(record => 
         record.name.toLowerCase().includes(keyword) ||
         record.workerId.toLowerCase().includes(keyword) ||
-        record.idNumber.toLowerCase().includes(keyword)
+        record.idNumber.toLowerCase().includes(keyword) ||
+        (record.physicalCardId && record.physicalCardId.toLowerCase().includes(keyword))
       )
     }
     
@@ -208,6 +211,7 @@ const Reports: React.FC = () => {
     { title: '联系方式', dataIndex: 'contact', key: 'contact', width: 140 },
     { title: '证件类型', dataIndex: 'idType', key: 'idType', width: 120 },
     { title: '证件号码', dataIndex: 'idNumber', key: 'idNumber', width: 180 },
+    { title: '实体卡ID', dataIndex: 'physicalCardId', key: 'physicalCardId', width: 120 },
     { 
       title: '进场时间', 
       key: 'checkIn', 
@@ -394,7 +398,7 @@ const Reports: React.FC = () => {
           <Col span={6}>
             <div style={{ marginBottom: 8 }}>搜索工人</div>
             <Input.Search
-              placeholder="姓名、工号或身份证号码"
+              placeholder="姓名、工号、身份证号码或实体卡ID"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               onSearch={setSearchKeyword}

@@ -220,29 +220,16 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       render: (age?: number) => (typeof age === 'number' ? age : '-'),
     },
     {
-      title: t('worker.physicalCardId'),
-      dataIndex: 'physicalCardId',
-      key: 'physicalCardId',
-      width: 140,
-      render: (val?: string) => val || '-',
-    },
-    {
       title: t('worker.idCard'),
       dataIndex: 'idCard',
       key: 'idCard',
       width: 180,
-      render: (idCard: string) => {
-        if (idCard.length > 8) {
-          return `${idCard.substring(0, 4)}****${idCard.substring(idCard.length - 4)}`;
-        }
-        return idCard;
-      },
     },
     {
       title: t('worker.region'),
       dataIndex: 'region',
       key: 'region',
-      width: 120,
+      width: 100,
     },
     {
       title: t('worker.distributor'),
@@ -263,34 +250,34 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       dataIndex: 'phone',
       key: 'phone',
       width: 130,
-      render: (phone: string) => {
-        if (phone.length > 7) {
-          return `${phone.substring(0, 3)}****${phone.substring(phone.length - 4)}`;
-        }
-        return phone;
-      },
     },
     {
       title: t('worker.email'),
       dataIndex: 'email',
       key: 'email',
       width: 180,
-      render: (email: string) => {
-        const [username, domain] = email.split('@');
-        if (username.length > 3) {
-          return `${username.substring(0, 3)}***@${domain}`;
-        }
-        return email;
-      },
     },
     {
       title: t('worker.whatsapp'),
       dataIndex: 'whatsapp',
       key: 'whatsapp',
       width: 130,
+      render: (whatsapp: string) => {
+        if (!whatsapp) return '-';
+        const parts = whatsapp.split(' ');
+        if (parts.length === 2) {
+          return (
+            <div style={{ lineHeight: '1.2' }}>
+              <div style={{ color: '#666' }}>{parts[0]}</div>
+              <div>{parts[1]}</div>
+            </div>
+          );
+        }
+        return whatsapp;
+      },
     },
     {
-      title: t('worker.status'),
+      title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 100,
@@ -299,7 +286,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     {
       title: t('common.actions'),
       key: 'actions',
-      width: 280,
+      width: 200,
       fixed: 'right' as const,
       render: (_: any, record: Worker) => (
         <Space size="small">
@@ -418,6 +405,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           defaultPageSize: 20,
         }}
         size="middle"
+        style={{ fontSize: '14px' }}
       />
 
       {/* 工人详情模态框 */}
@@ -448,7 +436,6 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                 <p><strong>{t('worker.phone')}:</strong> {selectedWorker.phone}</p>
                 <p><strong>{t('worker.email')}:</strong> {selectedWorker.email}</p>
                 <p><strong>{t('worker.whatsapp')}:</strong> {selectedWorker.whatsapp}</p>
-                <p><strong>{t('worker.physicalCardId')}:</strong> {selectedWorker.physicalCardId || '-'}</p>
                 <p><strong>{t('worker.status')}:</strong> {getStatusTag(selectedWorker.status)}</p>
               </Col>
             </Row>

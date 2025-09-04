@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Space, Input, Select, Row, Col, message, Modal, Typography, Statistic } from 'antd';
-import { PlusOutlined, SearchOutlined, ReloadOutlined, UserOutlined, TeamOutlined, ClockCircleOutlined, FileExcelOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { Card, Button, Space, Input, Select, Row, Col, message, Modal } from 'antd';
+import { PlusOutlined, SearchOutlined, ReloadOutlined, FileExcelOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import WorkerForm from '../components/WorkerForm';
 import WorkerTable from '../components/WorkerTable';
 import QRCodeModal from '../components/QRCodeModal';
@@ -11,7 +11,6 @@ import { useLocale } from '../contexts/LocaleContext';
 
 const { Search } = Input;
 const { Option } = Select;
-const { Title } = Typography;
 
 const WorkerManagement: React.FC = () => {
   const { t } = useLocale();
@@ -183,68 +182,28 @@ const WorkerManagement: React.FC = () => {
     setEditingWorker(null);
   };
 
-  // 统计信息
-  const getStatistics = () => {
-    const total = workers.length;
-    const active = workers.filter(w => w.status === 'active').length;
-    const suspended = workers.filter(w => w.status === 'suspended').length;
-    const inactive = workers.filter(w => w.status === 'inactive').length;
-
-    return { total, active, suspended, inactive };
+  // 下载模板
+  const handleDownloadTemplate = () => {
+    // TODO: 实现实际的模板下载逻辑
+    message.success('工人导入模板已下载');
   };
-
-  const stats = getStatistics();
 
   return (
     <div style={{ padding: '24px' }}>
-      <Title level={2}>{t('worker.title')}</Title>
-      
-      {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title={t('worker.totalWorkers')}
-              value={stats.total}
-              prefix={<TeamOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title={t('worker.activeWorkers')}
-              value={stats.active}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title={t('worker.suspendedWorkers')}
-              value={stats.suspended}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title={t('worker.inactiveWorkers')}
-              value={stats.inactive}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
       {/* 操作栏 */}
-      <Card style={{ marginBottom: '24px' }}>
+      <Card 
+        title={`${t('worker.title')} (${workers.length})`} 
+        extra={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setFormVisible(true)}
+          >
+            {t('worker.addWorker')}
+          </Button>
+        }
+        style={{ marginBottom: '24px' }}
+      >
         <Row gutter={16} align="middle">
           <Col span={4}>
             <Search
@@ -299,11 +258,10 @@ const WorkerManagement: React.FC = () => {
           <Col span={8}>
             <Space>
               <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setFormVisible(true)}
+                icon={<DownloadOutlined />}
+                onClick={handleDownloadTemplate}
               >
-                {t('worker.addWorker')}
+                下载模板
               </Button>
               <Button
                 icon={<UploadOutlined />}
