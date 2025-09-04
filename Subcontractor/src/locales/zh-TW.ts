@@ -112,7 +112,7 @@ export default {
     overview: '資料概覽',
     workerManagement: '工人資料管理',
     logout: '登出',
-    system: '分判商系統',
+    system: '工地訪客管理系統',
   },
   pagination: {
     showTotal: '第 {start}-{end} 條/共 {total} 條',

@@ -5,61 +5,161 @@ export const mockDistributors: Distributor[] = [
   {
     id: '1',
     name: '北京建筑公司',
-    code: 'BJ001',
     contactName: '刘强',
     phone: '010-88888888',
     email: 'contact-bj@corp.com',
     accountUsername: 'bjadmin',
+    siteId: '1',
     accountStatus: 'active'
   },
   {
     id: '2',
     name: '上海工程集团',
-    code: 'SH001',
     contactName: '王芳',
     phone: '021-66666666',
     email: 'contact-sh@corp.com',
     accountUsername: 'shadmin',
+    siteId: '2',
     accountStatus: 'active'
   },
   {
     id: '3',
     name: '广州建设有限公司',
-    code: 'GZ001',
     contactName: '李明',
     phone: '020-77777777',
     email: 'contact-gz@corp.com',
     accountUsername: 'gzadmin',
+    siteId: '3',
     accountStatus: 'disabled'
   },
   {
     id: '4',
     name: '深圳建筑集团',
-    code: 'SZ001',
     contactName: '周婷',
     phone: '0755-12345678',
     email: 'contact-sz@corp.com',
     accountUsername: 'szadmin',
+    siteId: '4',
     accountStatus: 'active'
   },
   {
     id: '5',
     name: '杭州城建集团',
-    code: 'HZ001',
     contactName: '钱勇',
     phone: '0571-99999999',
     email: 'contact-hz@corp.com',
     accountUsername: 'hzadmin',
+    siteId: '5',
     accountStatus: 'active'
   },
   {
     id: '6',
     name: '成都建工集团',
-    code: 'CD001',
     contactName: '孙伟',
     phone: '028-55555555',
     email: 'contact-cd@corp.com',
     accountUsername: 'cdadmin',
+    siteId: '6',
+    accountStatus: 'active'
+  },
+  {
+    id: '7',
+    name: '武汉建设集团',
+    contactName: '陈华',
+    phone: '027-44444444',
+    email: 'contact-wh@corp.com',
+    accountUsername: 'whadmin',
+    siteId: '7',
+    accountStatus: 'active'
+  },
+  {
+    id: '8',
+    name: '西安建筑公司',
+    contactName: '张伟',
+    phone: '029-33333333',
+    email: 'contact-xa@corp.com',
+    accountUsername: 'xaadmin',
+    siteId: '8',
+    accountStatus: 'active'
+  },
+  {
+    id: '9',
+    name: '南京工程集团',
+    contactName: '李敏',
+    phone: '025-22222222',
+    email: 'contact-nj@corp.com',
+    accountUsername: 'njadmin',
+    siteId: '9',
+    accountStatus: 'disabled'
+  },
+  {
+    id: '10',
+    name: '重庆建设有限公司',
+    contactName: '王刚',
+    phone: '023-11111111',
+    email: 'contact-cq@corp.com',
+    accountUsername: 'cqadmin',
+    siteId: '10',
+    accountStatus: 'active'
+  },
+  {
+    id: '11',
+    name: '天津建筑集团',
+    contactName: '赵敏',
+    phone: '022-00000000',
+    email: 'contact-tj@corp.com',
+    accountUsername: 'tjadmin',
+    siteId: '11',
+    accountStatus: 'active'
+  },
+  {
+    id: '12',
+    name: '青岛建设公司',
+    contactName: '刘芳',
+    phone: '0532-99999999',
+    email: 'contact-qd@corp.com',
+    accountUsername: 'qdadmin',
+    siteId: '12',
+    accountStatus: 'active'
+  },
+  {
+    id: '13',
+    name: '大连工程集团',
+    contactName: '孙华',
+    phone: '0411-88888888',
+    email: 'contact-dl@corp.com',
+    accountUsername: 'dladmin',
+    siteId: '13',
+    accountStatus: 'disabled'
+  },
+  {
+    id: '14',
+    name: '厦门建筑有限公司',
+    contactName: '陈伟',
+    phone: '0592-77777777',
+    email: 'contact-xm@corp.com',
+    accountUsername: 'xmadmin',
+    siteId: '14',
+    accountStatus: 'active'
+  },
+  {
+    id: '15',
+    name: '苏州建设集团',
+    contactName: '李强',
+    phone: '0512-66666666',
+    email: 'contact-sz2@corp.com',
+    accountUsername: 'sz2admin',
+    siteId: '15',
+    accountStatus: 'active'
+  },
+  {
+    id: '16',
+    name: '无锡工程公司',
+    contactName: '王敏',
+    phone: '0510-55555555',
+    email: 'contact-wx@corp.com',
+    accountUsername: 'wxadmin',
+    siteId: '16',
     accountStatus: 'active'
   }
 ];
@@ -118,6 +218,96 @@ export const mockSites: Site[] = [
     code: 'CD-TF-001',
     manager: '陈刚',
     phone: '028-12344321',
+    status: 'active'
+  },
+  {
+    id: '7',
+    name: '武汉光谷项目',
+    address: '武汉市东湖新技术开发区光谷大道',
+    code: 'WH-GG-001',
+    manager: '刘华',
+    phone: '027-44446666',
+    status: 'active'
+  },
+  {
+    id: '8',
+    name: '西安高新区项目',
+    address: '西安市高新区科技路',
+    code: 'XA-GX-001',
+    manager: '张伟',
+    phone: '029-33335555',
+    status: 'active'
+  },
+  {
+    id: '9',
+    name: '南京江北项目',
+    address: '南京市江北新区浦口大道',
+    code: 'NJ-JB-001',
+    manager: '李敏',
+    phone: '025-22224444',
+    status: 'suspended'
+  },
+  {
+    id: '10',
+    name: '重庆两江项目',
+    address: '重庆市两江新区金开大道',
+    code: 'CQ-LJ-001',
+    manager: '王刚',
+    phone: '023-11113333',
+    status: 'active'
+  },
+  {
+    id: '11',
+    name: '天津滨海项目',
+    address: '天津市滨海新区滨海大道',
+    code: 'TJ-BH-001',
+    manager: '赵敏',
+    phone: '022-00002222',
+    status: 'active'
+  },
+  {
+    id: '12',
+    name: '青岛崂山项目',
+    address: '青岛市崂山区崂山路',
+    code: 'QD-LS-001',
+    manager: '刘芳',
+    phone: '0532-99998888',
+    status: 'active'
+  },
+  {
+    id: '13',
+    name: '大连星海项目',
+    address: '大连市沙河口区星海广场',
+    code: 'DL-XH-001',
+    manager: '孙华',
+    phone: '0411-88887777',
+    status: 'inactive'
+  },
+  {
+    id: '14',
+    name: '厦门集美项目',
+    address: '厦门市集美区集美大道',
+    code: 'XM-JM-001',
+    manager: '陈伟',
+    phone: '0592-77776666',
+    status: 'active'
+  },
+  {
+    id: '15',
+    name: '苏州工业园区项目',
+    address: '苏州市工业园区星湖街',
+    code: 'SZ-GY-001',
+    manager: '李强',
+    phone: '0512-66665555',
+    status: 'active'
+  },
+  {
+    id: '16',
+    name: '无锡太湖项目',
+    address: '无锡市滨湖区太湖大道',
+    code: 'WX-TH-001',
+    manager: '王敏',
+    phone: '0510-55554444',
     status: 'active'
   }
 ];
@@ -293,6 +483,23 @@ export const mockWorkers: Worker[] = [
     status: 'active',
     createdAt: '2024-01-10T00:00:00Z',
     updatedAt: '2024-01-10T00:00:00Z',
+  },
+  {
+    id: '11',
+    workerId: 'WK011',
+    name: '王十三',
+    gender: 'female',
+    idCard: '440301199010101234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '4',
+    siteId: '4',
+    phone: '13800138010',
+    email: 'wangshier@example.com',
+    whatsapp: '+886 13800138010',
+    status: 'active',
+    createdAt: '2024-01-10T00:00:00Z',
+    updatedAt: '2024-01-10T00:00:00Z',
   }
 ];
 
@@ -328,3 +535,71 @@ export const getWorkerCountByDistributor = (distributorId: string): number => {
 export const getWorkerCountBySite = (siteId: string): number => {
   return mockWorkers.filter(worker => worker.siteId === siteId).length;
 };
+
+// 模拟借用物品分类数据
+export const mockItemCategories = [
+  {
+    id: '1',
+    name: '门禁卡',
+    description: '用于进出工地、办公室等场所的门禁卡',
+    status: 'active',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '2',
+    name: '钥匙',
+    description: '各种门锁、柜子、工具箱等的钥匙',
+    status: 'active',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '3',
+    name: '梯子',
+    description: '各种高度和类型的梯子，用于高空作业',
+    status: 'active',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '4',
+    name: '安全帽',
+    description: '工地安全防护用品，各种颜色和尺寸',
+    status: 'active',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '5',
+    name: '工具',
+    description: '各种手动和电动工具，如扳手、电钻等',
+    status: 'active',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '6',
+    name: '防护用品',
+    description: '安全眼镜、手套、口罩等个人防护用品',
+    status: 'active',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '7',
+    name: '测量设备',
+    description: '卷尺、水平仪、激光测距仪等测量工具',
+    status: 'active',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '8',
+    name: '通信设备',
+    description: '对讲机、电话、平板电脑等通信工具',
+    status: 'inactive',
+    createTime: '2024-01-01T00:00:00Z',
+    updateTime: '2024-01-01T00:00:00Z'
+  }
+];

@@ -44,10 +44,11 @@ export interface UpdateWorkerRequest extends Partial<CreateWorkerRequest> {
 export interface Distributor {
   id: string;
   name: string;
-  code: string;
+  siteId?: string; // 归属工地
   contactName?: string; // 联系人
   phone?: string; // 联系电话
   email?: string; // 邮箱
+  whatsapp?: string; // WhatsApp号码
   accountUsername?: string; // 账号
   accountStatus?: 'active' | 'disabled'; // 账号状态
 }

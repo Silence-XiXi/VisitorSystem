@@ -44,7 +44,7 @@ const Admin: React.FC = () => {
   ]
 
   const distColumns = [
-    { title: '分配商ID', dataIndex: 'id', key: 'id', width: 100 },
+            { title: '分判商ID', dataIndex: 'id', key: 'id', width: 100 },
     { title: '名称', dataIndex: 'name', key: 'name', width: 160 },
     { title: '联系人', dataIndex: 'contactName', key: 'contactName', width: 120 },
     { title: '电话', dataIndex: 'phone', key: 'phone', width: 140 },
@@ -80,11 +80,11 @@ const Admin: React.FC = () => {
     const v = await form.validateFields()
     if (editingDist) {
       setDists(prev => prev.map(d => d.id === editingDist.id ? { ...editingDist, ...v } : d))
-      message.success('分配商已更新')
+              message.success('分判商已更新')
     } else {
       const newItem: Distributor = { id: (Date.now()).toString(), code: v.code || '', name: v.name, contactName: v.contactName, phone: v.phone, email: v.email, accountUsername: v.accountUsername, accountStatus: v.accountStatus }
       setDists(prev => [newItem, ...prev])
-      message.success('分配商已新增')
+              message.success('分判商已新增')
     }
     resetAndClose()
   }
@@ -99,9 +99,9 @@ const Admin: React.FC = () => {
             </Space>
             <Table rowKey="id" columns={siteColumns} dataSource={sites} pagination={{ pageSize: 10, showSizeChanger: true }} />
           </TabPane>
-          <TabPane tab="分配商管理" key="dists">
+          <TabPane tab="分判商管理" key="dists">
             <Space style={{ marginBottom: 12 }}>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDist(null); form.resetFields(); setDistModalOpen(true) }}>新增分配商</Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDist(null); form.resetFields(); setDistModalOpen(true) }}>新增分判商</Button>
             </Space>
             <Table rowKey="id" columns={distColumns} dataSource={dists} pagination={{ pageSize: 10, showSizeChanger: true }} />
           </TabPane>
@@ -131,10 +131,10 @@ const Admin: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title={editingDist ? '编辑分配商' : '新增分配商'} open={distModalOpen} onCancel={resetAndClose} onOk={onSubmitDist} destroyOnClose>
+      <Modal title={editingDist ? '编辑分判商' : '新增分判商'} open={distModalOpen} onCancel={resetAndClose} onOk={onSubmitDist} destroyOnClose>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input placeholder="请输入分配商名称" />
+            <Input placeholder="请输入分判商名称" />
           </Form.Item>
           <Form.Item name="code" label="编码">
             <Input placeholder="例如：BJ001" />

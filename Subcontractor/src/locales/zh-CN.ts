@@ -117,7 +117,7 @@ export default {
     workerManagement: '工人信息管理',
     reports: '数据报告',
     logout: '退出登录',
-    system: '分判商系统',
+    system: '工地访客管理系统',
   },
   pagination: {
     showTotal: '第 {start}-{end} 条/共 {total} 条',

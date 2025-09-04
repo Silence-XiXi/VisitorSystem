@@ -292,3 +292,377 @@ export const generateImportTemplate = () => {
   // 下载文件
   XLSX.writeFile(workbook, fileName);
 };
+
+// 工地Excel列映射配置
+export const SITE_EXCEL_COLUMNS = {
+  id: '工地ID',
+  code: '编码',
+  name: '名称',
+  address: '地址',
+  manager: '负责人',
+  phone: '联系电话',
+  status: '状态'
+};
+
+// 分判商Excel列映射配置
+export const DISTRIBUTOR_EXCEL_COLUMNS = {
+  id: '分判商ID',
+  name: '名称',
+  contactName: '联系人',
+  phone: '电话',
+  email: '邮箱',
+  siteId: '归属工地',
+  accountUsername: '账号',
+  accountStatus: '账号状态'
+};
+
+// 工地状态映射
+export const SITE_STATUS_MAP = {
+  '启用': 'active',
+  '暂停': 'suspended',
+  '停用': 'inactive',
+  'active': 'active',
+  'suspended': 'suspended',
+  'inactive': 'inactive'
+};
+
+// 分判商账号状态映射
+export const DISTRIBUTOR_STATUS_MAP = {
+  '启用': 'active',
+  '禁用': 'disabled',
+  'active': 'active',
+  'disabled': 'disabled'
+};
+
+// 验证工地必填字段
+export const validateSiteRequiredFields = (data: any): string[] => {
+  const errors: string[] = [];
+  const requiredFields = ['name', 'address'];
+  
+  requiredFields.forEach(field => {
+    if (!data[field] || data[field].toString().trim() === '') {
+      errors.push(`${SITE_EXCEL_COLUMNS[field as keyof typeof SITE_EXCEL_COLUMNS]}不能为空`);
+    }
+  });
+  
+  return errors;
+};
+
+// 验证分判商必填字段
+export const validateDistributorRequiredFields = (data: any): string[] => {
+  const errors: string[] = [];
+  const requiredFields = ['name', 'accountUsername'];
+  
+  requiredFields.forEach(field => {
+    if (!data[field] || data[field].toString().trim() === '') {
+      errors.push(`${DISTRIBUTOR_EXCEL_COLUMNS[field as keyof typeof DISTRIBUTOR_EXCEL_COLUMNS]}不能为空`);
+    }
+  });
+  
+  return errors;
+};
+
+// 转换Excel数据为工地对象
+export const convertExcelToSite = (row: any, rowIndex: number): { data: any; errors: string[] } => {
+  const errors: string[] = [];
+  
+  const siteData = {
+    id: String(row.id || '').trim() || (Date.now() + Math.random()).toString(),
+    code: String(row.code || '').trim(),
+    name: String(row.name || '').trim(),
+    address: String(row.address || '').trim(),
+    manager: String(row.manager || '').trim(),
+    phone: String(row.phone || '').trim(),
+    status: SITE_STATUS_MAP[row.status as keyof typeof SITE_STATUS_MAP] || 'active'
+  };
+  
+  const requiredErrors = validateSiteRequiredFields(siteData);
+  errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  
+  return { data: siteData, errors };
+};
+
+// 转换Excel数据为分判商对象
+export const convertExcelToDistributor = (row: any, rowIndex: number): { data: any; errors: string[] } => {
+  const errors: string[] = [];
+  
+  const distributorData = {
+    id: String(row.id || '').trim() || (Date.now() + Math.random()).toString(),
+    name: String(row.name || '').trim(),
+    contactName: String(row.contactName || '').trim(),
+    phone: String(row.phone || '').trim(),
+    email: String(row.email || '').trim(),
+    siteId: String(row.siteId || '').trim(),
+    accountUsername: String(row.accountUsername || '').trim(),
+    accountStatus: DISTRIBUTOR_STATUS_MAP[row.accountStatus as keyof typeof DISTRIBUTOR_STATUS_MAP] || 'active'
+  };
+  
+  const requiredErrors = validateDistributorRequiredFields(distributorData);
+  errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  
+  return { data: distributorData, errors };
+};
+
+// 读取工地Excel文件
+export const readSiteExcelFile = (file: File): Promise<{ sites: any[]; errors: string[] }> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (jsonData.length < 2) {
+          resolve({ sites: [], errors: ['Excel文件至少需要包含标题行和一行数据'] });
+          return;
+        }
+        
+        const headers = jsonData[0] as string[];
+        const dataRows = jsonData.slice(1);
+        
+        const sites: any[] = [];
+        const allErrors: string[] = [];
+        
+        dataRows.forEach((row: any, index) => {
+          if (row.some((cell: any) => cell !== null && cell !== undefined && cell !== '')) {
+            const rowData: any = {};
+            headers.forEach((header, colIndex) => {
+              if (header && row[colIndex] !== undefined) {
+                rowData[header] = row[colIndex];
+              }
+            });
+            
+            const { data, errors } = convertExcelToSite(rowData, index + 1);
+            if (errors.length === 0) {
+              sites.push(data);
+            } else {
+              allErrors.push(...errors);
+            }
+          }
+        });
+        
+        resolve({ sites, errors: allErrors });
+      } catch (error) {
+        reject(new Error('Excel文件读取失败'));
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+// 读取分判商Excel文件
+export const readDistributorExcelFile = (file: File): Promise<{ distributors: any[]; errors: string[] }> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (jsonData.length < 2) {
+          resolve({ distributors: [], errors: ['Excel文件至少需要包含标题行和一行数据'] });
+          return;
+        }
+        
+        const headers = jsonData[0] as string[];
+        const dataRows = jsonData.slice(1);
+        
+        const distributors: any[] = [];
+        const allErrors: string[] = [];
+        
+        dataRows.forEach((row: any, index) => {
+          if (row.some((cell: any) => cell !== null && cell !== undefined && cell !== '')) {
+            const rowData: any = {};
+            headers.forEach((header, colIndex) => {
+              if (header && row[colIndex] !== undefined) {
+                rowData[header] = row[colIndex];
+              }
+            });
+            
+            const { data, errors } = convertExcelToDistributor(rowData, index + 1);
+            if (errors.length === 0) {
+              distributors.push(data);
+            } else {
+              allErrors.push(...errors);
+            }
+          }
+        });
+        
+        resolve({ distributors, errors: allErrors });
+      } catch (error) {
+        reject(new Error('Excel文件读取失败'));
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+// 导出工地数据到Excel
+export const exportSitesToExcel = (sites: any[]) => {
+  const exportData = sites.map(site => ({
+    [SITE_EXCEL_COLUMNS.id]: site.id,
+    [SITE_EXCEL_COLUMNS.code]: site.code,
+    [SITE_EXCEL_COLUMNS.name]: site.name,
+    [SITE_EXCEL_COLUMNS.address]: site.address,
+    [SITE_EXCEL_COLUMNS.manager]: site.manager,
+    [SITE_EXCEL_COLUMNS.phone]: site.phone,
+    [SITE_EXCEL_COLUMNS.status]: site.status === 'active' ? '启用' : site.status === 'suspended' ? '暂停' : '停用'
+  }));
+  
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  
+  const colWidths = [
+    { wch: 15 }, // 工地ID
+    { wch: 15 }, // 编码
+    { wch: 20 }, // 名称
+    { wch: 30 }, // 地址
+    { wch: 15 }, // 负责人
+    { wch: 15 }, // 联系电话
+    { wch: 10 }  // 状态
+  ];
+  worksheet['!cols'] = colWidths;
+  
+  XLSX.utils.book_append_sheet(workbook, worksheet, '工地信息');
+  
+  const fileName = `工地信息_${new Date().toISOString().split('T')[0]}.xlsx`;
+  XLSX.writeFile(workbook, fileName);
+};
+
+// 导出分判商数据到Excel
+export const exportDistributorsToExcel = (distributors: any[], sites: any[]) => {
+  const exportData = distributors.map(distributor => {
+    const site = sites.find(s => s.id === distributor.siteId);
+    return {
+      [DISTRIBUTOR_EXCEL_COLUMNS.id]: distributor.id,
+      [DISTRIBUTOR_EXCEL_COLUMNS.name]: distributor.name,
+      [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: distributor.contactName,
+      [DISTRIBUTOR_EXCEL_COLUMNS.phone]: distributor.phone,
+      [DISTRIBUTOR_EXCEL_COLUMNS.email]: distributor.email,
+      [DISTRIBUTOR_EXCEL_COLUMNS.siteId]: site?.name || distributor.siteId,
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: distributor.accountUsername,
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: distributor.accountStatus === 'active' ? '启用' : '禁用'
+    };
+  });
+  
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  
+  const colWidths = [
+    { wch: 15 }, // 分判商ID
+    { wch: 20 }, // 名称
+    { wch: 15 }, // 联系人
+    { wch: 15 }, // 电话
+    { wch: 25 }, // 邮箱
+    { wch: 20 }, // 归属工地
+    { wch: 15 }, // 账号
+    { wch: 10 }  // 账号状态
+  ];
+  worksheet['!cols'] = colWidths;
+  
+  XLSX.utils.book_append_sheet(workbook, worksheet, '分判商信息');
+  
+  const fileName = `分判商信息_${new Date().toISOString().split('T')[0]}.xlsx`;
+  XLSX.writeFile(workbook, fileName);
+};
+
+// 生成工地导入模板
+export const generateSiteImportTemplate = () => {
+  const templateData = [
+    {
+      [SITE_EXCEL_COLUMNS.id]: 'SITE001',
+      [SITE_EXCEL_COLUMNS.code]: 'BJ-CBD-001',
+      [SITE_EXCEL_COLUMNS.name]: '北京CBD工地',
+      [SITE_EXCEL_COLUMNS.address]: '北京市朝阳区建国门外大街1号',
+      [SITE_EXCEL_COLUMNS.manager]: '张三',
+      [SITE_EXCEL_COLUMNS.phone]: '13800138001',
+      [SITE_EXCEL_COLUMNS.status]: '启用'
+    },
+    {
+      [SITE_EXCEL_COLUMNS.id]: 'SITE002',
+      [SITE_EXCEL_COLUMNS.code]: 'SH-PD-001',
+      [SITE_EXCEL_COLUMNS.name]: '上海浦东工地',
+      [SITE_EXCEL_COLUMNS.address]: '上海市浦东新区陆家嘴环路1000号',
+      [SITE_EXCEL_COLUMNS.manager]: '李四',
+      [SITE_EXCEL_COLUMNS.phone]: '13800138002',
+      [SITE_EXCEL_COLUMNS.status]: '启用'
+    }
+  ];
+  
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(templateData);
+  
+  const colWidths = [
+    { wch: 15 }, // 工地ID
+    { wch: 15 }, // 编码
+    { wch: 20 }, // 名称
+    { wch: 30 }, // 地址
+    { wch: 15 }, // 负责人
+    { wch: 15 }, // 联系电话
+    { wch: 10 }  // 状态
+  ];
+  worksheet['!cols'] = colWidths;
+  
+  XLSX.utils.book_append_sheet(workbook, worksheet, '工地信息导入模板');
+  
+  const fileName = '工地信息导入模板.xlsx';
+  XLSX.writeFile(workbook, fileName);
+};
+
+// 生成分判商导入模板
+export const generateDistributorImportTemplate = () => {
+  const templateData = [
+    {
+      [DISTRIBUTOR_EXCEL_COLUMNS.id]: 'DIST001',
+      [DISTRIBUTOR_EXCEL_COLUMNS.name]: '北京分判商A',
+      [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: '王五',
+      [DISTRIBUTOR_EXCEL_COLUMNS.phone]: '13800138003',
+      [DISTRIBUTOR_EXCEL_COLUMNS.email]: 'wangwu@example.com',
+      [DISTRIBUTOR_EXCEL_COLUMNS.siteId]: '北京CBD工地',
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: 'bj001',
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: '启用'
+    },
+    {
+      [DISTRIBUTOR_EXCEL_COLUMNS.id]: 'DIST002',
+      [DISTRIBUTOR_EXCEL_COLUMNS.name]: '上海分判商B',
+      [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: '赵六',
+      [DISTRIBUTOR_EXCEL_COLUMNS.phone]: '13800138004',
+      [DISTRIBUTOR_EXCEL_COLUMNS.email]: 'zhaoliu@example.com',
+      [DISTRIBUTOR_EXCEL_COLUMNS.siteId]: '上海浦东工地',
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: 'sh001',
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: '启用'
+    }
+  ];
+  
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(templateData);
+  
+  const colWidths = [
+    { wch: 15 }, // 分判商ID
+    { wch: 20 }, // 名称
+    { wch: 15 }, // 联系人
+    { wch: 15 }, // 电话
+    { wch: 25 }, // 邮箱
+    { wch: 20 }, // 归属工地
+    { wch: 15 }, // 账号
+    { wch: 10 }  // 账号状态
+  ];
+  worksheet['!cols'] = colWidths;
+  
+  XLSX.utils.book_append_sheet(workbook, worksheet, '分判商信息导入模板');
+  
+  const fileName = '分判商信息导入模板.xlsx';
+  XLSX.writeFile(workbook, fileName);
+};

@@ -112,7 +112,7 @@ export default {
     overview: 'Data Overview',
     workerManagement: 'Worker Management',
     logout: 'Logout',
-    system: 'Subcontractor System',
+    system: 'Construction Site Visitor Management System',
   },
   pagination: {
     showTotal: 'Showing {start}-{end} of {total} items',
