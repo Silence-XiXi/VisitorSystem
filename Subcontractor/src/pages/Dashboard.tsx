@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Space, Typography, Button } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Space, Typography, Button, message } from 'antd'
 import {
   UserOutlined,
   TeamOutlined,
@@ -18,6 +18,7 @@ import WorkerManagement from './WorkerManagement'
 
 import AdminSites from './AdminSites'
 import ItemCategoryManagement from './ItemCategoryManagement'
+import ItemBorrowRecords from './ItemBorrowRecords'
 
 import AccountSettings from './AccountSettings'
 
@@ -52,12 +53,14 @@ const Dashboard: React.FC = () => {
     if (path === '/dashboard/workers') return 'workers'
     if (path === '/dashboard/admin-sites') return 'admin-sites'
     if (path === '/dashboard/item-categories') return 'item-categories'
+    if (path === '/dashboard/item-borrow-records') return 'item-borrow-records'
     if (path === '/dashboard/account') return 'account'
     return 'reports'
   }
 
   const handleLogout = () => {
     logout()
+    message.success('已退出登录')
     navigate('/login')
   }
 
@@ -66,7 +69,6 @@ const Dashboard: React.FC = () => {
       case 'reports':
         navigate('/dashboard/reports')
         break
-
       case 'workers':
         navigate('/dashboard/workers')
         break
@@ -75,6 +77,9 @@ const Dashboard: React.FC = () => {
         break
       case 'item-categories':
         navigate('/dashboard/item-categories')
+        break
+      case 'item-borrow-records':
+        navigate('/dashboard/item-borrow-records')
         break
       case 'account':
         navigate('/dashboard/account')
@@ -99,6 +104,11 @@ const Dashboard: React.FC = () => {
       key: 'item-categories',
       icon: <AppstoreOutlined />,
       label: '借用物品分类管理'
+    },
+    {
+      key: 'item-borrow-records',
+      icon: <ClockCircleOutlined />,
+      label: '物品借用记录'
     },
     {
       key: 'workers',
@@ -250,6 +260,7 @@ const Dashboard: React.FC = () => {
             <Route path="/workers" element={<WorkerManagement />} />
             <Route path="/admin-sites" element={<AdminSites />} />
             <Route path="/item-categories" element={<ItemCategoryManagement />} />
+            <Route path="/item-borrow-records" element={<ItemBorrowRecords />} />
             <Route path="/account" element={<AccountSettings />} />
             <Route path="*" element={<Navigate to="/reports" replace />} />
           </Routes>

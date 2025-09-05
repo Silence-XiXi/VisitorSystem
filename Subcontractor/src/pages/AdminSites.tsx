@@ -175,6 +175,21 @@ const AdminSites: React.FC = () => {
       const cfg = map[s || 'active']
       return <Tag color={cfg.color}>{cfg.text}</Tag>
     } },
+    { title: '关联分判商', dataIndex: 'distributorIds', key: 'distributorIds', width: 200, render: (distributorIds?: string[]) => {
+      if (!distributorIds || distributorIds.length === 0) return '-'
+      return (
+        <div>
+          {distributorIds.map(distributorId => {
+            const distributor = distributors.find(d => d.id === distributorId)
+            return distributor ? (
+              <Tag key={distributorId} color="purple" style={{ marginBottom: 2 }}>
+                {distributor.name}
+              </Tag>
+            ) : null
+          })}
+        </div>
+      )
+    } },
     { title: '操作', key: 'actions', width: 180, render: (_: any, record: Site) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
@@ -208,7 +223,21 @@ const AdminSites: React.FC = () => {
     { title: '联系人', dataIndex: 'contactName', key: 'contactName', width: 120 },
     { title: '电话', dataIndex: 'phone', key: 'phone', width: 140 },
     { title: '邮箱', dataIndex: 'email', key: 'email', width: 200 },
-    { title: '归属工地', dataIndex: 'siteId', key: 'siteId', width: 160, render: (v?: string) => (sites.find(s => s.id === v)?.name || '-') },
+    { title: '服务工地', dataIndex: 'siteIds', key: 'siteIds', width: 200, render: (siteIds?: string[]) => {
+      if (!siteIds || siteIds.length === 0) return '-'
+      return (
+        <div>
+          {siteIds.map(siteId => {
+            const site = sites.find(s => s.id === siteId)
+            return site ? (
+              <Tag key={siteId} color="blue" style={{ marginBottom: 2 }}>
+                {site.name}
+              </Tag>
+            ) : null
+          })}
+        </div>
+      )
+    } },
     { title: '账号', dataIndex: 'accountUsername', key: 'accountUsername', width: 140 },
     { title: '账号状态', dataIndex: 'accountStatus', key: 'accountStatus', width: 100, render: (s?: string) => {
       const map: any = { active: { color: 'green', text: '启用' }, disabled: { color: 'red', text: '禁用' } }
@@ -272,7 +301,7 @@ const AdminSites: React.FC = () => {
   const filteredDistributors = useMemo(() => {
     return distributors.filter(d => {
       if (distributorStatusFilters.length > 0 && !distributorStatusFilters.includes(d.accountStatus || 'active')) return false
-      if (distributorSiteFilters.length > 0 && (!d.siteId || !distributorSiteFilters.includes(d.siteId))) return false
+      if (distributorSiteFilters.length > 0 && (!d.siteIds || !d.siteIds.some(siteId => distributorSiteFilters.includes(siteId)))) return false
       if (distributorKeyword.trim()) {
         const k = distributorKeyword.trim().toLowerCase()
         const text = `${d.name || ''} ${d.contactName || ''}`.toLowerCase()
@@ -377,7 +406,7 @@ const AdminSites: React.FC = () => {
       setSites(prev => prev.map(s => s.id === editingSite.id ? { ...editingSite, ...v } : s))
       message.success('工地已更新')
     } else {
-      const newItem: Site = { id: (Date.now()).toString(), code: v.code || '', name: v.name, address: v.address, manager: v.manager, phone: v.phone, status: v.status }
+      const newItem: Site = { id: (Date.now()).toString(), code: v.code || '', name: v.name, address: v.address, manager: v.manager, phone: v.phone, status: v.status, distributorIds: v.distributorIds }
       setSites(prev => [newItem, ...prev])
       message.success('工地已新增')
     }
@@ -394,7 +423,7 @@ const AdminSites: React.FC = () => {
       message.success('分判商已更新')
     } else {
       const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
-      const newItem: Distributor = { id: (Date.now()).toString(), name: v.name, siteId: v.siteId, contactName: v.contactName, phone: v.phone, email: v.email, whatsapp: v.whatsapp, accountUsername: v.accountUsername, accountStatus: v.accountStatus }
+      const newItem: Distributor = { id: (Date.now()).toString(), name: v.name, siteIds: v.siteIds, contactName: v.contactName, phone: v.phone, email: v.email, whatsapp: v.whatsapp, accountUsername: v.accountUsername, accountStatus: v.accountStatus }
       setDistributors(prev => [newItem, ...prev])
       // 显示发送方式选择对话框
       showSendMethodModal(newItem, defaultPwd)
@@ -414,7 +443,7 @@ const AdminSites: React.FC = () => {
       return
     }
     
-    exportSitesToExcel(dataToExport)
+    exportSitesToExcel(dataToExport, distributors)
     message.success(`已导出 ${dataToExport.length} 条工地信息`)
   }
 
@@ -607,7 +636,7 @@ const AdminSites: React.FC = () => {
           <Select
             mode="multiple"
             style={{ width: '100%' }}
-            placeholder="归属工地（可多选）"
+            placeholder="服务工地（可多选）"
             value={distributorSiteFilters}
             onChange={setDistributorSiteFilters}
             options={sites.map(s => ({ value: s.id, label: s.name }))}
@@ -786,6 +815,13 @@ const AdminSites: React.FC = () => {
           <Form.Item name="status" label="状态" initialValue={'active'}>
             <Select options={[{ value: 'active', label: '启用' }, { value: 'suspended', label: '暂停' }, { value: 'inactive', label: '停用' }]} />
           </Form.Item>
+          <Form.Item name="distributorIds" label="关联分判商">
+            <Select 
+              mode="multiple" 
+              placeholder="请选择分判商（可多选）" 
+              options={distributors.map(d => ({ value: d.id, label: d.name }))} 
+            />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -798,8 +834,12 @@ const AdminSites: React.FC = () => {
           <Form.Item name="contactName" label="联系人">
             <Input placeholder="联系人姓名" />
           </Form.Item>
-          <Form.Item name="siteId" label="归属工地">
-            <Select placeholder="请选择工地" options={sites.map(s => ({ value: s.id, label: s.name }))} />
+          <Form.Item name="siteIds" label="服务工地">
+            <Select 
+              mode="multiple" 
+              placeholder="请选择工地（可多选）" 
+              options={sites.map(s => ({ value: s.id, label: s.name }))} 
+            />
           </Form.Item>
           <Form.Item name="phone" label="电话">
             <Input placeholder="联系电话" />

@@ -9,7 +9,7 @@ export const mockDistributors: Distributor[] = [
     phone: '010-88888888',
     email: 'contact-bj@corp.com',
     accountUsername: 'bjadmin',
-    siteId: '1',
+    siteIds: ['1', '2'],
     accountStatus: 'active'
   },
   {
@@ -19,7 +19,7 @@ export const mockDistributors: Distributor[] = [
     phone: '021-66666666',
     email: 'contact-sh@corp.com',
     accountUsername: 'shadmin',
-    siteId: '2',
+    siteIds: ['2', '3'],
     accountStatus: 'active'
   },
   {
@@ -29,7 +29,7 @@ export const mockDistributors: Distributor[] = [
     phone: '020-77777777',
     email: 'contact-gz@corp.com',
     accountUsername: 'gzadmin',
-    siteId: '3',
+    siteIds: ['3', '4'],
     accountStatus: 'disabled'
   },
   {
@@ -39,7 +39,7 @@ export const mockDistributors: Distributor[] = [
     phone: '0755-12345678',
     email: 'contact-sz@corp.com',
     accountUsername: 'szadmin',
-    siteId: '4',
+    siteIds: ['4', '5'],
     accountStatus: 'active'
   },
   {
@@ -49,7 +49,7 @@ export const mockDistributors: Distributor[] = [
     phone: '0571-99999999',
     email: 'contact-hz@corp.com',
     accountUsername: 'hzadmin',
-    siteId: '5',
+    siteIds: ['5', '6'],
     accountStatus: 'active'
   },
   {
@@ -59,7 +59,7 @@ export const mockDistributors: Distributor[] = [
     phone: '028-55555555',
     email: 'contact-cd@corp.com',
     accountUsername: 'cdadmin',
-    siteId: '6',
+    siteIds: ['6', '7'],
     accountStatus: 'active'
   },
   {
@@ -69,7 +69,7 @@ export const mockDistributors: Distributor[] = [
     phone: '027-44444444',
     email: 'contact-wh@corp.com',
     accountUsername: 'whadmin',
-    siteId: '7',
+    siteIds: ['7', '8'],
     accountStatus: 'active'
   },
   {
@@ -79,7 +79,7 @@ export const mockDistributors: Distributor[] = [
     phone: '029-33333333',
     email: 'contact-xa@corp.com',
     accountUsername: 'xaadmin',
-    siteId: '8',
+    siteIds: ['8', '9'],
     accountStatus: 'active'
   },
   {
@@ -89,7 +89,7 @@ export const mockDistributors: Distributor[] = [
     phone: '025-22222222',
     email: 'contact-nj@corp.com',
     accountUsername: 'njadmin',
-    siteId: '9',
+    siteIds: ['9', '10'],
     accountStatus: 'disabled'
   },
   {
@@ -99,7 +99,7 @@ export const mockDistributors: Distributor[] = [
     phone: '023-11111111',
     email: 'contact-cq@corp.com',
     accountUsername: 'cqadmin',
-    siteId: '10',
+    siteIds: ['10', '11'],
     accountStatus: 'active'
   },
   {
@@ -109,7 +109,7 @@ export const mockDistributors: Distributor[] = [
     phone: '022-00000000',
     email: 'contact-tj@corp.com',
     accountUsername: 'tjadmin',
-    siteId: '11',
+    siteIds: ['11', '12'],
     accountStatus: 'active'
   },
   {
@@ -119,7 +119,7 @@ export const mockDistributors: Distributor[] = [
     phone: '0532-99999999',
     email: 'contact-qd@corp.com',
     accountUsername: 'qdadmin',
-    siteId: '12',
+    siteIds: ['12', '13'],
     accountStatus: 'active'
   },
   {
@@ -129,7 +129,7 @@ export const mockDistributors: Distributor[] = [
     phone: '0411-88888888',
     email: 'contact-dl@corp.com',
     accountUsername: 'dladmin',
-    siteId: '13',
+    siteIds: ['13', '14'],
     accountStatus: 'disabled'
   },
   {
@@ -139,7 +139,7 @@ export const mockDistributors: Distributor[] = [
     phone: '0592-77777777',
     email: 'contact-xm@corp.com',
     accountUsername: 'xmadmin',
-    siteId: '14',
+    siteIds: ['14', '15'],
     accountStatus: 'active'
   },
   {
@@ -149,7 +149,7 @@ export const mockDistributors: Distributor[] = [
     phone: '0512-66666666',
     email: 'contact-sz2@corp.com',
     accountUsername: 'sz2admin',
-    siteId: '15',
+    siteIds: ['15', '16'],
     accountStatus: 'active'
   },
   {
@@ -159,7 +159,7 @@ export const mockDistributors: Distributor[] = [
     phone: '0510-55555555',
     email: 'contact-wx@corp.com',
     accountUsername: 'wxadmin',
-    siteId: '16',
+    siteIds: ['16', '1'],
     accountStatus: 'active'
   }
 ];
@@ -173,7 +173,8 @@ export const mockSites: Site[] = [
     code: 'BJ-CBD-001',
     manager: '赵强',
     phone: '010-88886666',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['1', '16']
   },
   {
     id: '2',
@@ -182,7 +183,8 @@ export const mockSites: Site[] = [
     code: 'SH-PD-001',
     manager: '钱恒',
     phone: '021-68686868',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['1', '2']
   },
   {
     id: '3',
@@ -191,7 +193,8 @@ export const mockSites: Site[] = [
     code: 'GZ-TH-001',
     manager: '孙丽',
     phone: '020-78787878',
-    status: 'suspended'
+    status: 'suspended',
+    distributorIds: ['2', '3']
   },
   {
     id: '4',
@@ -200,7 +203,8 @@ export const mockSites: Site[] = [
     code: 'SZ-NS-001',
     manager: '李雷',
     phone: '0755-13579246',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['3', '4']
   },
   {
     id: '5',
@@ -209,7 +213,8 @@ export const mockSites: Site[] = [
     code: 'HZ-XH-001',
     manager: '王芳',
     phone: '0571-24681357',
-    status: 'inactive'
+    status: 'inactive',
+    distributorIds: ['4', '5']
   },
   {
     id: '6',
@@ -218,7 +223,8 @@ export const mockSites: Site[] = [
     code: 'CD-TF-001',
     manager: '陈刚',
     phone: '028-12344321',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['5', '6']
   },
   {
     id: '7',
@@ -227,7 +233,8 @@ export const mockSites: Site[] = [
     code: 'WH-GG-001',
     manager: '刘华',
     phone: '027-44446666',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['6', '7']
   },
   {
     id: '8',
@@ -236,7 +243,8 @@ export const mockSites: Site[] = [
     code: 'XA-GX-001',
     manager: '张伟',
     phone: '029-33335555',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['7', '8']
   },
   {
     id: '9',
@@ -245,7 +253,8 @@ export const mockSites: Site[] = [
     code: 'NJ-JB-001',
     manager: '李敏',
     phone: '025-22224444',
-    status: 'suspended'
+    status: 'suspended',
+    distributorIds: ['8', '9']
   },
   {
     id: '10',
@@ -254,7 +263,8 @@ export const mockSites: Site[] = [
     code: 'CQ-LJ-001',
     manager: '王刚',
     phone: '023-11113333',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['9', '10']
   },
   {
     id: '11',
@@ -263,7 +273,8 @@ export const mockSites: Site[] = [
     code: 'TJ-BH-001',
     manager: '赵敏',
     phone: '022-00002222',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['10', '11']
   },
   {
     id: '12',
@@ -272,7 +283,8 @@ export const mockSites: Site[] = [
     code: 'QD-LS-001',
     manager: '刘芳',
     phone: '0532-99998888',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['11', '12']
   },
   {
     id: '13',
@@ -281,7 +293,8 @@ export const mockSites: Site[] = [
     code: 'DL-XH-001',
     manager: '孙华',
     phone: '0411-88887777',
-    status: 'inactive'
+    status: 'inactive',
+    distributorIds: ['12', '13']
   },
   {
     id: '14',
@@ -290,7 +303,8 @@ export const mockSites: Site[] = [
     code: 'XM-JM-001',
     manager: '陈伟',
     phone: '0592-77776666',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['13', '14']
   },
   {
     id: '15',
@@ -299,7 +313,8 @@ export const mockSites: Site[] = [
     code: 'SZ-GY-001',
     manager: '李强',
     phone: '0512-66665555',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['14', '15']
   },
   {
     id: '16',
@@ -308,7 +323,8 @@ export const mockSites: Site[] = [
     code: 'WX-TH-001',
     manager: '王敏',
     phone: '0510-55554444',
-    status: 'active'
+    status: 'active',
+    distributorIds: ['15', '16']
   }
 ];
 
@@ -530,6 +546,167 @@ export const mockWorkers: Worker[] = [
     status: 'active',
     createdAt: '2024-01-10T00:00:00Z',
     updatedAt: '2024-01-10T00:00:00Z',
+  },
+  // 北京建筑公司新增工人数据
+  {
+    id: '12',
+    workerId: 'WK012',
+    name: '刘建国',
+    gender: 'male',
+    idCard: '110101198501151234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '1',
+    phone: '13800138012',
+    email: 'liujianguo@bjcorp.com',
+    whatsapp: '+86 13800138012',
+    birthDate: '1985-01-15',
+    age: 39,
+    physicalCardId: 'CARD012',
+    status: 'active',
+    createdAt: '2024-01-12T00:00:00Z',
+    updatedAt: '2024-01-12T00:00:00Z',
+  },
+  {
+    id: '13',
+    workerId: 'WK013',
+    name: '陈美丽',
+    gender: 'female',
+    idCard: '110101198803201234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '1',
+    phone: '13800138013',
+    email: 'chenmeili@bjcorp.com',
+    whatsapp: '+86 13800138013',
+    birthDate: '1988-03-20',
+    age: 36,
+    physicalCardId: 'CARD013',
+    status: 'active',
+    createdAt: '2024-01-13T00:00:00Z',
+    updatedAt: '2024-01-13T00:00:00Z',
+  },
+  {
+    id: '14',
+    workerId: 'WK014',
+    name: '张伟强',
+    gender: 'male',
+    idCard: '110101199205101234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '2',
+    phone: '13800138014',
+    email: 'zhangweiqiang@bjcorp.com',
+    whatsapp: '+86 13800138014',
+    birthDate: '1992-05-10',
+    age: 32,
+    physicalCardId: 'CARD014',
+    status: 'active',
+    createdAt: '2024-01-14T00:00:00Z',
+    updatedAt: '2024-01-14T00:00:00Z',
+  },
+  {
+    id: '15',
+    workerId: 'WK015',
+    name: '李小红',
+    gender: 'female',
+    idCard: '110101199007251234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '1',
+    phone: '13800138015',
+    email: 'lixiaohong@bjcorp.com',
+    whatsapp: '+86 13800138015',
+    birthDate: '1990-07-25',
+    age: 34,
+    physicalCardId: 'CARD015',
+    status: 'suspended',
+    createdAt: '2024-01-15T00:00:00Z',
+    updatedAt: '2024-01-15T00:00:00Z',
+  },
+  {
+    id: '16',
+    workerId: 'WK016',
+    name: '王大力',
+    gender: 'male',
+    idCard: '110101198612051234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '2',
+    phone: '13800138016',
+    email: 'wangdali@bjcorp.com',
+    whatsapp: '+86 13800138016',
+    birthDate: '1986-12-05',
+    age: 38,
+    physicalCardId: 'CARD016',
+    status: 'active',
+    createdAt: '2024-01-16T00:00:00Z',
+    updatedAt: '2024-01-16T00:00:00Z',
+  },
+  {
+    id: '17',
+    workerId: 'WK017',
+    name: '赵敏',
+    gender: 'female',
+    idCard: '110101199308151234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '1',
+    phone: '13800138017',
+    email: 'zhaomin@bjcorp.com',
+    whatsapp: '+86 13800138017',
+    birthDate: '1993-08-15',
+    age: 31,
+    physicalCardId: 'CARD017',
+    status: 'active',
+    createdAt: '2024-01-17T00:00:00Z',
+    updatedAt: '2024-01-17T00:00:00Z',
+  },
+  {
+    id: '18',
+    workerId: 'WK018',
+    name: '孙志强',
+    gender: 'male',
+    idCard: '110101198904201234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '2',
+    phone: '13800138018',
+    email: 'sunzhiqiang@bjcorp.com',
+    whatsapp: '+86 13800138018',
+    birthDate: '1989-04-20',
+    age: 35,
+    physicalCardId: 'CARD018',
+    status: 'active',
+    createdAt: '2024-01-18T00:00:00Z',
+    updatedAt: '2024-01-18T00:00:00Z',
+  },
+  {
+    id: '19',
+    workerId: 'WK019',
+    name: '周丽华',
+    gender: 'female',
+    idCard: '110101199111101234',
+    region: '中国大陆',
+    photo: '',
+    distributorId: '1',
+    siteId: '1',
+    phone: '13800138019',
+    email: 'zhoulihua@bjcorp.com',
+    whatsapp: '+86 13800138019',
+    birthDate: '1991-11-10',
+    age: 33,
+    physicalCardId: 'CARD019',
+    status: 'inactive',
+    createdAt: '2024-01-19T00:00:00Z',
+    updatedAt: '2024-01-19T00:00:00Z',
   }
 ];
 

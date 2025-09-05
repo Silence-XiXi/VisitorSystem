@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { Card, DatePicker, Table, Space, Button, Row, Col, Statistic, message, Progress, Select, Tabs, Input } from 'antd'
-import { TeamOutlined, DownloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Card, DatePicker, Table, Space, Button, Row, Col, Statistic, message, Progress, Select, Tabs, Input, Tooltip, Modal, List, Tag } from 'antd'
+import { TeamOutlined, DownloadOutlined, SearchOutlined, QuestionCircleOutlined, ShoppingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { useLocale } from '../contexts/LocaleContext'
 import { mockWorkers, mockSites, mockDistributors } from '../data/mockData'
@@ -18,6 +18,8 @@ interface AttendanceRecord {
   date: string
   checkIn?: string
   checkOut?: string
+  borrowedItems: number
+  returnedItems: number
 }
 
 interface SiteSummary {
@@ -33,6 +35,8 @@ const mockAttendance: AttendanceRecord[] = mockWorkers.slice(0, 12).map((w, idx)
   const siteIndex = idx % mockSites.length
   const distIndex = idx % mockDistributors.length
   const idTypes = ['身份证', '护照', '港澳通行证', '台湾通行证']
+  const borrowedItems = Math.floor(Math.random() * 5) + 1 // 1-5个借用物品
+  const returnedItems = Math.floor(Math.random() * (borrowedItems + 1)) // 0到借用数量的已归还数量
   return {
     key: w.id,
     workerId: w.workerId,
@@ -45,7 +49,9 @@ const mockAttendance: AttendanceRecord[] = mockWorkers.slice(0, 12).map((w, idx)
     physicalCardId: w.physicalCardId,
     date: dayjs().subtract(idx % 7, 'day').format('YYYY-MM-DD'),
     checkIn: dayjs().hour(8).minute(30 + (idx % 10)).format('HH:mm'),
-    checkOut: idx % 4 === 0 ? undefined : dayjs().hour(17 + (idx % 2)).minute(10).format('HH:mm')
+    checkOut: idx % 4 === 0 ? undefined : dayjs().hour(17 + (idx % 2)).minute(10).format('HH:mm'),
+    borrowedItems,
+    returnedItems
   }
 })
 
@@ -54,10 +60,39 @@ const Reports: React.FC = () => {
   const [dateType, setDateType] = useState<'single' | 'range'>('single')
   const [singleDate, setSingleDate] = useState<Dayjs>(dayjs())
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('week'), dayjs().endOf('week')])
-  const [selectedSites, setSelectedSites] = useState<string[]>([])
+  const [selectedSite, setSelectedSite] = useState<string>(mockSites[0]?.id || '')
   const [selectedDistributors, setSelectedDistributors] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('visitor-records')
   const [searchKeyword, setSearchKeyword] = useState<string>('')
+  const [itemDetailModalVisible, setItemDetailModalVisible] = useState<boolean>(false)
+  const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
+
+  // 生成物品数据
+  const generateItemData = (record: AttendanceRecord) => {
+    const itemTypes = ['门禁卡', '钥匙', '梯子', '安全帽', '工具包', '防护服', '手套', '护目镜']
+    const items = []
+    
+    for (let i = 0; i < record.borrowedItems; i++) {
+      const itemType = itemTypes[i % itemTypes.length]
+      const isReturned = i < record.returnedItems
+      items.push({
+        id: `${record.key}-item-${i}`,
+        name: `${itemType} #${i + 1}`,
+        type: itemType,
+        borrowedTime: record.checkIn || '08:30',
+        returnedTime: isReturned ? (record.checkOut || '17:00') : null,
+        status: isReturned ? 'returned' : 'borrowed'
+      })
+    }
+    
+    return items
+  }
+
+  // 显示物品详情
+  const showItemDetail = (record: AttendanceRecord) => {
+    setSelectedRecord(record)
+    setItemDetailModalVisible(true)
+  }
 
   // 生成工地汇总数据
   const siteSummaries = useMemo((): SiteSummary[] => {
@@ -100,12 +135,12 @@ const Reports: React.FC = () => {
   const filteredSiteSummaries = useMemo(() => {
     let filtered = siteSummaries
     
-    if (selectedSites.length > 0) {
-      filtered = filtered.filter(site => selectedSites.includes(site.siteId))
+    if (selectedSite) {
+      filtered = filtered.filter(site => site.siteId === selectedSite)
     }
     
     return filtered
-  }, [siteSummaries, selectedSites])
+  }, [siteSummaries, selectedSite])
 
   // 筛选后的出勤数据
   const filteredData = useMemo(() => {
@@ -122,13 +157,11 @@ const Reports: React.FC = () => {
       )
     }
     
-    if (selectedSites.length > 0) {
-      filtered = filtered.filter(record => 
-        selectedSites.some(siteId => {
-          const site = mockSites.find(s => s.id === siteId)
-          return site && record.siteName === site.name
-        })
-      )
+    if (selectedSite) {
+      const site = mockSites.find(s => s.id === selectedSite)
+      if (site) {
+        filtered = filtered.filter(record => record.siteName === site.name)
+      }
     }
     
     if (selectedDistributors.length > 0) {
@@ -141,12 +174,24 @@ const Reports: React.FC = () => {
     }
     
     return filtered
-  }, [searchKeyword, selectedSites, selectedDistributors])
+  }, [searchKeyword, selectedSite, selectedDistributors])
 
-  // 计算各种统计数据
-  const pending = filteredData.filter(r => !r.checkOut) // 未离场人数
-  const totalEntered = filteredData.filter(r => !!r.checkIn).length // 当日进场人数
-  const currentOnSite = filteredData.filter(r => !!r.checkIn && !r.checkOut).length // 当前在场人数
+  // 计算各种统计数据 - 只与工地筛选框联动
+  const siteOnlyFilteredData = useMemo(() => {
+    if (!selectedSite) return []
+    const site = mockSites.find(s => s.id === selectedSite)
+    if (!site) return []
+    return mockAttendance.filter(record => record.siteName === site.name)
+  }, [selectedSite])
+
+  const pending = siteOnlyFilteredData.filter(r => !r.checkOut) // 未离场人数
+  const totalEntered = siteOnlyFilteredData.filter(r => !!r.checkIn).length // 当日进场人数
+  const currentOnSite = siteOnlyFilteredData.filter(r => !!r.checkIn && !r.checkOut).length // 当前在场人数
+  
+  // 物品统计数据
+  const totalBorrowedItems = siteOnlyFilteredData.reduce((sum, r) => sum + r.borrowedItems, 0) // 已借出物品总数
+  const totalReturnedItems = siteOnlyFilteredData.reduce((sum, r) => sum + r.returnedItems, 0) // 已归还物品总数
+  const totalUnreturnedItems = totalBorrowedItems - totalReturnedItems // 未归还物品总数
 
   // Excel下载功能
   const downloadExcel = () => {
@@ -204,10 +249,8 @@ const Reports: React.FC = () => {
 
   const attendanceColumns = [
     { title: '日期', dataIndex: 'date', key: 'date', width: 100 },
-    { title: t('worker.workerId'), dataIndex: 'workerId', key: 'workerId', width: 120 },
     { title: t('worker.name'), dataIndex: 'name', key: 'name', width: 120 },
     { title: t('reports.distributor'), dataIndex: 'distributorName', key: 'distributorName', width: 140 },
-    { title: t('reports.site'), dataIndex: 'siteName', key: 'siteName', width: 120 },
     { title: '联系方式', dataIndex: 'contact', key: 'contact', width: 140 },
     { title: '证件类型', dataIndex: 'idType', key: 'idType', width: 120 },
     { title: '证件号码', dataIndex: 'idNumber', key: 'idNumber', width: 180 },
@@ -226,6 +269,114 @@ const Reports: React.FC = () => {
       width: 120,
       render: (_: any, record: AttendanceRecord) => {
         return record.checkOut || '-'
+      }
+    },
+    { 
+      title: '借用物品数量', 
+      key: 'borrowedItems', 
+      width: 120,
+      render: (_: any, record: AttendanceRecord) => {
+        return (
+          <span 
+            style={{ 
+              color: '#1890ff', 
+              fontWeight: 'bold',
+              backgroundColor: '#e6f7ff',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: '1px solid #91d5ff',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onClick={() => showItemDetail(record)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#bae7ff'
+              e.currentTarget.style.borderColor = '#69c0ff'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#e6f7ff'
+              e.currentTarget.style.borderColor = '#91d5ff'
+            }}
+          >
+            {record.borrowedItems}
+          </span>
+        )
+      }
+    },
+    { 
+      title: (
+        <span>
+          已归还数量
+          <Tooltip 
+            title={
+              <div>
+                <div>绿色：✅ 完全归还</div>
+                <div>橙色：⚠️ 部分归还</div>
+                <div>红色：❌ 未归还</div>
+              </div>
+            }
+            placement="top"
+          >
+            <QuestionCircleOutlined 
+              style={{ 
+                marginLeft: 4, 
+                color: '#1890ff', 
+                cursor: 'help',
+                fontSize: '12px'
+              }} 
+            />
+          </Tooltip>
+        </span>
+      ), 
+      key: 'returnedItems', 
+      width: 120,
+      render: (_: any, record: AttendanceRecord) => {
+        const isPartiallyReturned = record.returnedItems > 0 && record.returnedItems < record.borrowedItems
+        const isNotReturned = record.returnedItems === 0
+        
+        let color = '#52c41a' // 绿色 - 完全归还
+        let backgroundColor = '#f6ffed'
+        let borderColor = '#b7eb8f'
+        
+        if (isPartiallyReturned) {
+          color = '#faad14' // 橙色 - 部分归还
+          backgroundColor = '#fffbe6'
+          borderColor = '#ffe58f'
+        } else if (isNotReturned) {
+          color = '#ff4d4f' // 红色 - 未归还
+          backgroundColor = '#fff2f0'
+          borderColor = '#ffccc7'
+        }
+        
+        return (
+          <span 
+            style={{ 
+              color, 
+              fontWeight: 'bold',
+              backgroundColor,
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: `1px solid ${borderColor}`,
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onClick={() => showItemDetail(record)}
+            onMouseEnter={(e) => {
+              const currentBg = e.currentTarget.style.backgroundColor
+              const currentBorder = e.currentTarget.style.borderColor
+              e.currentTarget.style.backgroundColor = currentBg === 'rgb(246, 255, 237)' ? '#d9f7be' : 
+                                                   currentBg === 'rgb(255, 251, 230)' ? '#ffe58f' : '#ffccc7'
+              e.currentTarget.style.borderColor = currentBorder === 'rgb(183, 235, 143)' ? '#95de64' :
+                                                currentBorder === 'rgb(255, 229, 143)' ? '#ffd666' : '#ffa39e'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = backgroundColor
+              e.currentTarget.style.borderColor = borderColor
+            }}
+          >
+            {record.returnedItems}
+          </span>
+        )
       }
     }
   ]
@@ -249,9 +400,40 @@ const Reports: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      {/* 工地筛选 */}
+      <Card style={{ marginBottom: 16 }}>
+        <Row gutter={16} align="middle">
+          <Col span={6}>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>选择工地</div>
+            <Select
+              placeholder="请选择工地"
+              value={selectedSite}
+              onChange={setSelectedSite}
+              style={{ width: '100%' }}
+              options={mockSites.map(site => ({ label: site.name, value: site.id }))}
+              allowClear
+            />
+          </Col>
+          <Col span={18}>
+            <div style={{ color: '#666', fontSize: '14px' }}>
+              {selectedSite ? (
+                <>
+                  已选择工地：<strong>{mockSites.find(s => s.id === selectedSite)?.name}</strong>
+                  <span style={{ marginLeft: 16 }}>
+                    以下统计数据仅显示该工地的数据
+                  </span>
+                </>
+              ) : (
+                '请选择工地查看统计数据'
+              )}
+            </div>
+          </Col>
+        </Row>
+      </Card>
+
       {/* 统计数据卡片 */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
               title="当日进场人数"
@@ -261,7 +443,7 @@ const Reports: React.FC = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
               title="当前在场人数"
@@ -271,7 +453,7 @@ const Reports: React.FC = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
               title="未离场人数"
@@ -281,13 +463,42 @@ const Reports: React.FC = () => {
             />
           </Card>
         </Col>
-
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card>
+            <Statistic
+              title="已借出物品总数"
+              value={totalBorrowedItems}
+              prefix={<ShoppingOutlined />}
+              valueStyle={{ color: '#1890ff', fontWeight: 700 }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card>
+            <Statistic
+              title="已归还物品总数"
+              value={totalReturnedItems}
+              prefix={<CheckCircleOutlined />}
+              valueStyle={{ color: '#52c41a', fontWeight: 700 }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card>
+            <Statistic
+              title="未归还物品总数"
+              value={totalUnreturnedItems}
+              prefix={<ExclamationCircleOutlined />}
+              valueStyle={{ color: totalUnreturnedItems > 0 ? '#fa541c' : '#52c41a', fontWeight: 700 }}
+            />
+          </Card>
+        </Col>
       </Row>
 
       {/* 筛选器 */}
       <Card style={{ marginBottom: 16 }}>
         <Row gutter={16} align="middle">
-          <Col span={6}>
+          <Col span={8}>
             <div style={{ marginBottom: 8 }}>日期选择</div>
             {dateType === 'single' ? (
               <DatePicker 
@@ -395,7 +606,7 @@ const Reports: React.FC = () => {
               </div>
             )}
           </Col>
-          <Col span={6}>
+          <Col span={8}>
             <div style={{ marginBottom: 8 }}>搜索工人</div>
             <Input.Search
               placeholder="姓名、工号、身份证号码或实体卡ID"
@@ -407,19 +618,7 @@ const Reports: React.FC = () => {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col span={6}>
-            <div style={{ marginBottom: 8 }}>选择工地</div>
-            <Select
-              mode="multiple"
-              placeholder="全部工地"
-              value={selectedSites}
-              onChange={setSelectedSites}
-              style={{ width: '100%' }}
-              options={mockSites.map(site => ({ label: site.name, value: site.id }))}
-              allowClear
-            />
-          </Col>
-          <Col span={6}>
+          <Col span={8}>
             <div style={{ marginBottom: 8 }}>选择分判商</div>
             <Select
               mode="multiple"
@@ -508,6 +707,66 @@ const Reports: React.FC = () => {
           ]}
         />
       </Card>
+
+      {/* 物品详情弹窗 */}
+      <Modal
+        title={`${selectedRecord?.name} - 借用物品详情`}
+        open={itemDetailModalVisible}
+        onCancel={() => setItemDetailModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setItemDetailModalVisible(false)}>
+            关闭
+          </Button>
+        ]}
+        width={600}
+      >
+        {selectedRecord && (
+          <div>
+            <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <strong>工人姓名：</strong>{selectedRecord.name}
+                </Col>
+                <Col span={12}>
+                  <strong>分判商：</strong>{selectedRecord.distributorName}
+                </Col>
+                <Col span={12} style={{ marginTop: 8 }}>
+                  <strong>进场时间：</strong>{selectedRecord.checkIn || '-'}
+                </Col>
+                <Col span={12} style={{ marginTop: 8 }}>
+                  <strong>离场时间：</strong>{selectedRecord.checkOut || '-'}
+                </Col>
+              </Row>
+            </div>
+            
+            <List
+              dataSource={generateItemData(selectedRecord)}
+              renderItem={(item: any) => (
+                <List.Item>
+                  <List.Item.Meta
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>{item.name}</span>
+                        <Tag color={item.status === 'returned' ? 'green' : 'orange'}>
+                          {item.status === 'returned' ? '已归还' : '未归还'}
+                        </Tag>
+                      </div>
+                    }
+                    description={
+                      <div>
+                        <div><strong>借用时间：</strong>{item.borrowedTime}</div>
+                        {item.returnedTime && (
+                          <div><strong>归还时间：</strong>{item.returnedTime}</div>
+                        )}
+                      </div>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

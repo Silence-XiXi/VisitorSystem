@@ -238,13 +238,14 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       width: 120,
       render: (distributorId: string) => getDistributorName(distributorId),
     },
-    {
-      title: t('worker.site'),
-      dataIndex: 'siteId',
-      key: 'siteId',
-      width: 120,
-      render: (siteId: string) => getSiteName(siteId),
-    },
+    // 隐藏所属工地字段
+    // {
+    //   title: t('worker.site'),
+    //   dataIndex: 'siteId',
+    //   key: 'siteId',
+    //   width: 120,
+    //   render: (siteId: string) => getSiteName(siteId),
+    // },
     {
       title: t('worker.phone'),
       dataIndex: 'phone',

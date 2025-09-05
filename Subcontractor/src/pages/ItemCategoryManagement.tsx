@@ -178,22 +178,17 @@ const ItemCategoryManagement: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-             <Card 
-         title={`借用物品分类管理 (${categories.length})`}
-         extra={
-           <Button 
-             type="primary" 
-             icon={<PlusOutlined />} 
-             onClick={() => { 
-               setEditingCategory(null)
-               form.resetFields()
-               setModalOpen(true) 
-             }}
-           >
-             新增分类
-           </Button>
-         }
-       >
+      {/* 页面标题 */}
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>
+          借用物品分类管理
+        </h2>
+        <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '14px' }}>
+          管理物品分类信息，共 {categories.length} 个分类
+        </p>
+      </div>
+
+      <Card>
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={8}>
             <Input placeholder="搜索分类名称或描述" allowClear />
@@ -211,6 +206,17 @@ const ItemCategoryManagement: React.FC = () => {
                 onClick={() => handleExport(selectedCategoryIds.length === 0)}
               >
                 {selectedCategoryIds.length === 0 ? '导出全部' : `导出已选(${selectedCategoryIds.length})`}
+              </Button>
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />} 
+                onClick={() => { 
+                  setEditingCategory(null)
+                  form.resetFields()
+                  setModalOpen(true) 
+                }}
+              >
+                新增分类
               </Button>
             </Space>
           </Col>

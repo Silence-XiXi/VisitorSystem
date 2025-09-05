@@ -1,25 +1,36 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Form, Input, Button, Select, message, Space, Typography } from 'antd'
-import { UserOutlined, LockOutlined, TeamOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Button, message, Space, Typography } from 'antd'
+import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 
 const { Title } = Typography
-const { Option } = Select
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuth()
 
-  const onFinish = async (values: { username: string; password: string; role: string }) => {
+  const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true)
     try {
-      const success = await login(values.username, values.password, values.role)
-      if (success) {
+      const result = await login(values.username, values.password)
+      console.log('Login result:', result)
+      if (result.success) {
         message.success('登录成功！')
-        navigate('/dashboard')
+        // 添加小延迟确保状态更新
+        setTimeout(() => {
+          // 根据识别出的角色跳转到不同页面
+          if (result.role === 'subcontractor') {
+            console.log('Navigating to distributor workers page')
+            navigate('/distributor/workers')
+          } else {
+            console.log('Navigating to dashboard')
+            navigate('/dashboard')
+          }
+        }, 100)
       } else {
+        console.log('Login failed')
         message.error('登录失败，请检查您的凭据')
       }
     } catch (error) {
@@ -88,21 +99,6 @@ const Login: React.FC = () => {
             requiredMark={false}
             size="large"
           >
-            <Form.Item
-              name="role"
-              label="角色"
-              rules={[{ required: true, message: '请选择您的角色!' }]}
-            >
-              <Select
-                prefix={<TeamOutlined />}
-                placeholder="请选择角色"
-                style={{ textAlign: 'left' }}
-              >
-                <Option value="subcontractor">分判商</Option>
-                <Option value="admin">管理员</Option>
-                <Option value="supervisor">监督员</Option>
-              </Select>
-            </Form.Item>
 
             <Form.Item
               name="username"

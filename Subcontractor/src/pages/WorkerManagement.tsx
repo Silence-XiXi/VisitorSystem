@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Space, Input, Select, Row, Col, message, Modal } from 'antd';
-import { PlusOutlined, SearchOutlined, ReloadOutlined, FileExcelOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { PlusOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
+import Draggable from 'react-draggable';
 import WorkerForm from '../components/WorkerForm';
 import WorkerTable from '../components/WorkerTable';
 import QRCodeModal from '../components/QRCodeModal';
@@ -14,6 +15,7 @@ const { Option } = Select;
 
 const WorkerManagement: React.FC = () => {
   const { t } = useLocale();
+  const draggleRef = useRef<HTMLDivElement>(null);
   
   // 状态管理
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -31,7 +33,9 @@ const WorkerManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [distributorFilters, setDistributorFilters] = useState<string[]>([]);
-  const [siteFilters, setSiteFilters] = useState<string[]>([]);
+  
+  // 工地筛选状态（单选）
+  const [selectedSite, setSelectedSite] = useState<string>(mockSites[0]?.id || '');
 
   // 加载模拟数据
   useEffect(() => {
@@ -48,6 +52,11 @@ const WorkerManagement: React.FC = () => {
   // 搜索和筛选
   useEffect(() => {
     let result = workers;
+
+    // 工地筛选（单选，优先筛选）
+    if (selectedSite) {
+      result = result.filter(worker => worker.siteId === selectedSite);
+    }
 
     // 文本搜索
     if (searchText) {
@@ -69,13 +78,8 @@ const WorkerManagement: React.FC = () => {
       result = result.filter(worker => distributorFilters.includes(worker.distributorId));
     }
 
-    // 工地筛选（多选，空表示不过滤）
-    if (siteFilters.length > 0) {
-      result = result.filter(worker => siteFilters.includes(worker.siteId));
-    }
-
     setFilteredWorkers(result);
-  }, [workers, searchText, statusFilters, distributorFilters, siteFilters]);
+  }, [workers, selectedSite, searchText, statusFilters, distributorFilters]);
 
   // 处理新增工人
   const handleCreateWorker = async (values: CreateWorkerRequest) => {
@@ -190,22 +194,37 @@ const WorkerManagement: React.FC = () => {
 
   return (
     <div style={{ padding: '24px' }}>
+      {/* 页面标题和工地筛选 */}
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>
+            {t('worker.title')}
+          </h2>
+          <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '14px' }}>
+            管理工人信息，共 {workers.length} 个工人
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div>
+            <div style={{ marginBottom: 4, fontSize: '14px', color: '#666' }}>工地选择</div>
+            <Select
+              placeholder="请选择工地"
+              value={selectedSite}
+              onChange={setSelectedSite}
+              style={{ width: 200 }}
+            >
+              {sites.map(site => (
+                <Option key={site.id} value={site.id}>{site.name}</Option>
+              ))}
+            </Select>
+          </div>
+        </div>
+      </div>
+
       {/* 操作栏 */}
-      <Card 
-        title={`${t('worker.title')} (${workers.length})`} 
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setFormVisible(true)}
-          >
-            {t('worker.addWorker')}
-          </Button>
-        }
-        style={{ marginBottom: '24px' }}
-      >
+      <Card style={{ marginBottom: '24px' }}>
         <Row gutter={16} align="middle">
-          <Col span={4}>
+          <Col span={6}>
             <Search
               placeholder={t('worker.searchPlaceholder')}
               value={searchText}
@@ -213,7 +232,7 @@ const WorkerManagement: React.FC = () => {
               allowClear
             />
           </Col>
-          <Col span={4}>
+          <Col span={6}>
             <Select
               mode="multiple"
               placeholder={t('worker.statusFilter')}
@@ -227,7 +246,7 @@ const WorkerManagement: React.FC = () => {
               <Option value="inactive">{t('worker.inactive')}</Option>
             </Select>
           </Col>
-          <Col span={4}>
+          <Col span={6}>
             <Select
               mode="multiple"
               placeholder={t('worker.distributorFilter')}
@@ -241,45 +260,36 @@ const WorkerManagement: React.FC = () => {
               ))}
             </Select>
           </Col>
-          <Col span={4}>
-            <Select
-              mode="multiple"
-              placeholder={t('worker.siteFilter')}
-              value={siteFilters}
-              onChange={(vals) => setSiteFilters(vals)}
-              style={{ width: '100%' }}
-              allowClear
-            >
-              {sites.map(site => (
-                <Option key={site.id} value={site.id}>{site.name}</Option>
-              ))}
-            </Select>
-          </Col>
-          <Col span={8}>
-            <Space>
+          <Col span={6}>
+            <Space wrap>
               <Button
                 icon={<DownloadOutlined />}
                 onClick={handleDownloadTemplate}
+                size="small"
               >
                 下载模板
               </Button>
               <Button
                 icon={<UploadOutlined />}
                 onClick={() => setExcelModalVisible(true)}
+                size="small"
               >
-                Excel导入
+                导入
               </Button>
               <Button
                 icon={<DownloadOutlined />}
                 onClick={() => setExcelModalVisible(true)}
+                size="small"
               >
-                Excel导出
+                导出
               </Button>
               <Button
-                icon={<ReloadOutlined />}
-                onClick={loadMockData}
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setFormVisible(true)}
+                size="small"
               >
-                {t('common.refresh')}
+                新增
               </Button>
             </Space>
           </Col>
@@ -301,12 +311,68 @@ const WorkerManagement: React.FC = () => {
 
       {/* 新增/编辑表单模态框 */}
       <Modal
-        title={editingWorker ? t('worker.editWorker') : t('worker.addWorker')}
+        title={
+          <div
+            style={{ width: '100%', cursor: 'move' }}
+            onMouseOver={() => {
+              if (draggleRef.current) {
+                draggleRef.current.style.cursor = 'move';
+              }
+            }}
+            onMouseOut={() => {
+              if (draggleRef.current) {
+                draggleRef.current.style.cursor = 'default';
+              }
+            }}
+          >
+            {editingWorker ? t('worker.editWorker') : t('worker.addWorker')}
+          </div>
+        }
         open={formVisible}
         onCancel={handleCancelForm}
-        footer={null}
-        width={800}
+        footer={[
+          <Button key="cancel" onClick={handleCancelForm}>
+            {t('common.cancel')}
+          </Button>,
+          <Button 
+            key="submit" 
+            type="primary" 
+            loading={loading}
+            onClick={() => {
+              // 触发表单提交
+              const formElement = document.querySelector('.worker-form .ant-form') as HTMLFormElement;
+              if (formElement) {
+                formElement.requestSubmit();
+              }
+            }}
+          >
+            {editingWorker ? t('common.save') : t('common.add')}
+          </Button>
+        ]}
+        width="90vw"
+        style={{ 
+          top: 20, 
+          maxWidth: '1200px',
+          minWidth: '600px'
+        }}
+        bodyStyle={{ 
+          height: 'calc(100vh - 280px)', 
+          overflowY: 'auto',
+          padding: '20px'
+        }}
         destroyOnClose
+        maskClosable={false}
+        closable={true}
+        centered={false}
+        modalRender={(modal) => (
+          <Draggable
+            nodeRef={draggleRef}
+            bounds="parent"
+            handle=".ant-modal-header"
+          >
+            <div ref={draggleRef}>{modal}</div>
+          </Draggable>
+        )}
       >
         <WorkerForm
           worker={editingWorker}
@@ -315,6 +381,7 @@ const WorkerManagement: React.FC = () => {
           onSubmit={editingWorker ? handleUpdateWorker : handleCreateWorker}
           onCancel={handleCancelForm}
           loading={loading}
+          showButtons={false}
         />
       </Modal>
 

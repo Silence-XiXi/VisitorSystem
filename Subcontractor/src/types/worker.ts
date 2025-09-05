@@ -44,7 +44,7 @@ export interface UpdateWorkerRequest extends Partial<CreateWorkerRequest> {
 export interface Distributor {
   id: string;
   name: string;
-  siteId?: string; // 归属工地
+  siteIds?: string[]; // 服务的工地ID列表（多对多关系）
   contactName?: string; // 联系人
   phone?: string; // 联系电话
   email?: string; // 邮箱
@@ -61,4 +61,5 @@ export interface Site {
   manager?: string; // 负责人
   phone?: string; // 联系电话
   status?: 'active' | 'inactive' | 'suspended'; // 状态
+  distributorIds?: string[]; // 关联的分判商ID列表（多对多关系）
 }

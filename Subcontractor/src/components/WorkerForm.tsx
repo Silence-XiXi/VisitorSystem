@@ -15,6 +15,7 @@ interface WorkerFormProps {
   onSubmit: (values: CreateWorkerRequest | UpdateWorkerRequest) => void;
   onCancel: () => void;
   loading?: boolean;
+  showButtons?: boolean;
 }
 
 const calcAgeFromBirth = (birthDate: string): number => {
@@ -34,7 +35,8 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
   sites,
   onSubmit,
   onCancel,
-  loading = false
+  loading = false,
+  showButtons = true
 }) => {
   const { t } = useLocale();
   const [form] = Form.useForm();
@@ -108,6 +110,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
       layout="vertical"
       onFinish={handleSubmit}
       initialValues={{ status: 'active', gender: 'male' }}
+      className="worker-form"
     >
       <Row gutter={16}>
         <Col span={12}>
@@ -166,7 +169,8 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
             <DatePicker style={{ width: '100%' }} placeholder={t('form.selectPlaceholder') + t('worker.birthDate')} suffixIcon={<CalendarOutlined />} format="YYYY-MM-DD" />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        {/* 隐藏实体卡编号字段 */}
+        {/* <Col span={12}>
           <Form.Item
             name="physicalCardId"
             label={t('worker.physicalCardId')}
@@ -174,7 +178,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
           >
             <Input placeholder={t('form.inputPlaceholder') + t('worker.physicalCardId')} prefix={<CreditCardOutlined />} />
           </Form.Item>
-        </Col>
+        </Col> */}
       </Row>
 
       <Row gutter={16}>
@@ -288,12 +292,14 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
         </Upload>
       </Form.Item>
 
-      <Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading} style={{ marginRight: 8 }}>
-          {isEdit ? t('common.save') : t('common.add')}
-        </Button>
-        <Button onClick={onCancel}>{t('common.cancel')}</Button>
-      </Form.Item>
+      {showButtons && (
+        <Form.Item>
+          <Button type="primary" htmlType="submit" loading={loading} style={{ marginRight: 8 }}>
+            {isEdit ? t('common.save') : t('common.add')}
+          </Button>
+          <Button onClick={onCancel}>{t('common.cancel')}</Button>
+        </Form.Item>
+      )}
     </Form>
   );
 };
