@@ -180,6 +180,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       key: 'workerId',
       width: 120,
       fixed: 'left' as const,
+      sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId),
     },
     {
       title: t('worker.name'),
@@ -187,6 +188,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       key: 'name',
       width: 100,
       fixed: 'left' as const,
+      sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name),
       render: (name: string, record: Worker) => (
         <Space>
           <Avatar 
@@ -203,6 +205,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       dataIndex: 'gender',
       key: 'gender',
       width: 80,
+      sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender),
       render: (gender: string) => getGenderTag(gender),
     },
     {
@@ -210,6 +213,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       dataIndex: 'birthDate',
       key: 'birthDate',
       width: 120,
+      sorter: (a: Worker, b: Worker) => (a.birthDate || '').localeCompare(b.birthDate || ''),
       render: (d?: string) => d || '-',
     },
     {
@@ -217,6 +221,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       dataIndex: 'age',
       key: 'age',
       width: 80,
+      sorter: (a: Worker, b: Worker) => (a.age || 0) - (b.age || 0),
       render: (age?: number) => (typeof age === 'number' ? age : '-'),
     },
     {
@@ -224,18 +229,21 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       dataIndex: 'idCard',
       key: 'idCard',
       width: 180,
+      sorter: (a: Worker, b: Worker) => a.idCard.localeCompare(b.idCard),
     },
     {
       title: t('worker.region'),
       dataIndex: 'region',
       key: 'region',
       width: 100,
+      sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region),
     },
     {
       title: t('worker.distributor'),
       dataIndex: 'distributorId',
       key: 'distributorId',
       width: 120,
+      sorter: (a: Worker, b: Worker) => getDistributorName(a.distributorId).localeCompare(getDistributorName(b.distributorId)),
       render: (distributorId: string) => getDistributorName(distributorId),
     },
     // 隐藏所属工地字段
@@ -251,18 +259,21 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       dataIndex: 'phone',
       key: 'phone',
       width: 130,
+      sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone),
     },
     {
       title: t('worker.email'),
       dataIndex: 'email',
       key: 'email',
       width: 180,
+      sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email),
     },
     {
       title: t('worker.whatsapp'),
       dataIndex: 'whatsapp',
       key: 'whatsapp',
       width: 130,
+      sorter: (a: Worker, b: Worker) => (a.whatsapp || '').localeCompare(b.whatsapp || ''),
       render: (whatsapp: string) => {
         if (!whatsapp) return '-';
         const parts = whatsapp.split(' ');
@@ -282,6 +293,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status),
       render: (status: string) => getStatusTag(status),
     },
     {

@@ -9,12 +9,14 @@ import ExcelImportExportModal from '../components/ExcelImportExportModal';
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Distributor, Site } from '../types/worker';
 import { mockDistributors, mockSites, mockWorkers } from '../data/mockData';
 import { useLocale } from '../contexts/LocaleContext';
+import { useSiteFilter } from '../contexts/SiteFilterContext';
 
 const { Search } = Input;
 const { Option } = Select;
 
 const WorkerManagement: React.FC = () => {
   const { t } = useLocale();
+  const { selectedSiteId } = useSiteFilter();
   const draggleRef = useRef<HTMLDivElement>(null);
   
   // 状态管理
@@ -34,8 +36,6 @@ const WorkerManagement: React.FC = () => {
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [distributorFilters, setDistributorFilters] = useState<string[]>([]);
   
-  // 工地筛选状态（单选）
-  const [selectedSite, setSelectedSite] = useState<string>(mockSites[0]?.id || '');
 
   // 加载模拟数据
   useEffect(() => {
@@ -54,8 +54,8 @@ const WorkerManagement: React.FC = () => {
     let result = workers;
 
     // 工地筛选（单选，优先筛选）
-    if (selectedSite) {
-      result = result.filter(worker => worker.siteId === selectedSite);
+    if (selectedSiteId) {
+      result = result.filter(worker => worker.siteId === selectedSiteId);
     }
 
     // 文本搜索
@@ -79,7 +79,7 @@ const WorkerManagement: React.FC = () => {
     }
 
     setFilteredWorkers(result);
-  }, [workers, selectedSite, searchText, statusFilters, distributorFilters]);
+  }, [workers, selectedSiteId, searchText, statusFilters, distributorFilters]);
 
   // 处理新增工人
   const handleCreateWorker = async (values: CreateWorkerRequest) => {
@@ -203,21 +203,6 @@ const WorkerManagement: React.FC = () => {
           <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '14px' }}>
             管理工人信息，共 {workers.length} 个工人
           </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div>
-            <div style={{ marginBottom: 4, fontSize: '14px', color: '#666' }}>工地选择</div>
-            <Select
-              placeholder="请选择工地"
-              value={selectedSite}
-              onChange={setSelectedSite}
-              style={{ width: 200 }}
-            >
-              {sites.map(site => (
-                <Option key={site.id} value={site.id}>{site.name}</Option>
-              ))}
-            </Select>
-          </div>
         </div>
       </div>
 

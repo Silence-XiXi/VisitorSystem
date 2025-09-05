@@ -3,7 +3,8 @@ import { Card, DatePicker, Table, Space, Button, Row, Col, Statistic, message, P
 import { TeamOutlined, DownloadOutlined, SearchOutlined, QuestionCircleOutlined, ShoppingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { useLocale } from '../contexts/LocaleContext'
-import { mockWorkers, mockSites, mockDistributors } from '../data/mockData'
+import { useSiteFilter } from '../contexts/SiteFilterContext'
+import { mockWorkers, mockSites, mockDistributors, mockItemCategories, mockGuards } from '../data/mockData'
 
 interface AttendanceRecord {
   key: string
@@ -20,6 +21,8 @@ interface AttendanceRecord {
   checkOut?: string
   borrowedItems: number
   returnedItems: number
+  registrarId?: string // 登记人ID
+  registrarName?: string // 登记人姓名
 }
 
 interface SiteSummary {
@@ -31,12 +34,18 @@ interface SiteSummary {
   currentOnSite: number
 }
 
-const mockAttendance: AttendanceRecord[] = mockWorkers.slice(0, 12).map((w, idx) => {
+// 生成基础访客记录
+const baseAttendance: AttendanceRecord[] = mockWorkers.slice(0, 12).map((w, idx) => {
   const siteIndex = idx % mockSites.length
   const distIndex = idx % mockDistributors.length
   const idTypes = ['身份证', '护照', '港澳通行证', '台湾通行证']
   const borrowedItems = Math.floor(Math.random() * 5) + 1 // 1-5个借用物品
   const returnedItems = Math.floor(Math.random() * (borrowedItems + 1)) // 0到借用数量的已归还数量
+  
+  // 获取该工地对应的门卫作为登记人
+  const siteGuards = mockGuards.filter(guard => guard.siteId === mockSites[siteIndex]?.id)
+  const randomGuard = siteGuards.length > 0 ? siteGuards[Math.floor(Math.random() * siteGuards.length)] : null
+  
   return {
     key: w.id,
     workerId: w.workerId,
@@ -51,16 +60,69 @@ const mockAttendance: AttendanceRecord[] = mockWorkers.slice(0, 12).map((w, idx)
     checkIn: dayjs().hour(8).minute(30 + (idx % 10)).format('HH:mm'),
     checkOut: idx % 4 === 0 ? undefined : dayjs().hour(17 + (idx % 2)).minute(10).format('HH:mm'),
     borrowedItems,
-    returnedItems
+    returnedItems,
+    registrarId: randomGuard?.guardId,
+    registrarName: randomGuard?.name || '未指定'
   }
 })
 
+// 为北京CBD项目生成额外的访客记录
+const generateBeijingCBDRecords = (): AttendanceRecord[] => {
+  const beijingCBDWorkers = [
+    { name: '王建国', workerId: 'BJ001', phone: '13800138001', idCard: '110101198001011234', physicalCardId: 'CARD001' },
+    { name: '李小明', workerId: 'BJ002', phone: '13800138002', idCard: '110101198002021234', physicalCardId: 'CARD002' },
+    { name: '张伟', workerId: 'BJ003', phone: '13800138003', idCard: '110101198003031234', physicalCardId: 'CARD003' },
+    { name: '刘强', workerId: 'BJ004', phone: '13800138004', idCard: '110101198004041234', physicalCardId: 'CARD004' },
+    { name: '陈华', workerId: 'BJ005', phone: '13800138005', idCard: '110101198005051234', physicalCardId: 'CARD005' },
+    { name: '赵军', workerId: 'BJ006', phone: '13800138006', idCard: '110101198006061234', physicalCardId: 'CARD006' },
+    { name: '孙丽', workerId: 'BJ007', phone: '13800138007', idCard: '110101198007071234', physicalCardId: 'CARD007' },
+    { name: '周涛', workerId: 'BJ008', phone: '13800138008', idCard: '110101198008081234', physicalCardId: 'CARD008' },
+    { name: '吴敏', workerId: 'BJ009', phone: '13800138009', idCard: '110101198009091234', physicalCardId: 'CARD009' },
+    { name: '郑强', workerId: 'BJ010', phone: '13800138010', idCard: '110101198010101234', physicalCardId: 'CARD010' },
+    { name: '马超', workerId: 'BJ011', phone: '13800138011', idCard: '110101198011111234', physicalCardId: 'CARD011' },
+    { name: '朱亮', workerId: 'BJ012', phone: '13800138012', idCard: '110101198012121234', physicalCardId: 'CARD012' },
+    { name: '许峰', workerId: 'BJ013', phone: '13800138013', idCard: '110101198101011234', physicalCardId: 'CARD013' },
+    { name: '何勇', workerId: 'BJ014', phone: '13800138014', idCard: '110101198102021234', physicalCardId: 'CARD014' },
+    { name: '罗斌', workerId: 'BJ015', phone: '13800138015', idCard: '110101198103031234', physicalCardId: 'CARD015' }
+  ]
+  
+  const idTypes = ['身份证', '护照', '港澳通行证', '台湾通行证']
+  const beijingCBDGuards = mockGuards.filter(guard => guard.siteId === '1') // 北京CBD项目ID为'1'
+  
+  return beijingCBDWorkers.map((worker, idx) => {
+    const borrowedItems = Math.floor(Math.random() * 5) + 1
+    const returnedItems = Math.floor(Math.random() * (borrowedItems + 1))
+    const randomGuard = beijingCBDGuards.length > 0 ? beijingCBDGuards[Math.floor(Math.random() * beijingCBDGuards.length)] : null
+    
+    return {
+      key: `beijing-cbd-${idx}`,
+      workerId: worker.workerId,
+      name: worker.name,
+      distributorName: '北京建筑公司',
+      siteName: '北京CBD项目',
+      contact: worker.phone,
+      idType: idTypes[idx % idTypes.length],
+      idNumber: worker.idCard,
+      physicalCardId: worker.physicalCardId,
+      date: dayjs().subtract(idx % 10, 'day').format('YYYY-MM-DD'),
+      checkIn: dayjs().hour(7 + (idx % 3)).minute(30 + (idx % 30)).format('HH:mm'),
+      checkOut: idx % 5 === 0 ? undefined : dayjs().hour(16 + (idx % 3)).minute(10 + (idx % 50)).format('HH:mm'),
+      borrowedItems,
+      returnedItems,
+      registrarId: randomGuard?.guardId,
+      registrarName: randomGuard?.name || '未指定'
+    }
+  })
+}
+
+const mockAttendance: AttendanceRecord[] = [...baseAttendance, ...generateBeijingCBDRecords()]
+
 const Reports: React.FC = () => {
   const { t } = useLocale()
+  const { selectedSiteId } = useSiteFilter()
   const [dateType, setDateType] = useState<'single' | 'range'>('single')
   const [singleDate, setSingleDate] = useState<Dayjs>(dayjs())
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('week'), dayjs().endOf('week')])
-  const [selectedSite, setSelectedSite] = useState<string>(mockSites[0]?.id || '')
   const [selectedDistributors, setSelectedDistributors] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('visitor-records')
   const [searchKeyword, setSearchKeyword] = useState<string>('')
@@ -75,13 +137,30 @@ const Reports: React.FC = () => {
     for (let i = 0; i < record.borrowedItems; i++) {
       const itemType = itemTypes[i % itemTypes.length]
       const isReturned = i < record.returnedItems
+      
+      // 根据物品类型找到对应的分类
+      const category = mockItemCategories.find(cat => 
+        cat.name === itemType || 
+        (itemType === '门禁卡' && cat.name === '门禁卡') ||
+        (itemType === '钥匙' && cat.name === '钥匙') ||
+        (itemType === '梯子' && cat.name === '梯子') ||
+        (itemType === '安全帽' && cat.name === '安全帽') ||
+        (itemType === '工具包' && cat.name === '工具包') ||
+        (itemType === '防护服' && cat.name === '防护服') ||
+        (itemType === '手套' && cat.name === '手套') ||
+        (itemType === '护目镜' && cat.name === '护目镜')
+      )
+      
       items.push({
         id: `${record.key}-item-${i}`,
         name: `${itemType} #${i + 1}`,
         type: itemType,
+        category: category?.name || '未分类',
+        categoryDescription: category?.description || '暂无描述',
         borrowedTime: record.checkIn || '08:30',
         returnedTime: isReturned ? (record.checkOut || '17:00') : null,
-        status: isReturned ? 'returned' : 'borrowed'
+        status: isReturned ? 'returned' : 'borrowed',
+        borrowHandler: record.registrarName || '未指定'
       })
     }
     
@@ -135,12 +214,12 @@ const Reports: React.FC = () => {
   const filteredSiteSummaries = useMemo(() => {
     let filtered = siteSummaries
     
-    if (selectedSite) {
-      filtered = filtered.filter(site => site.siteId === selectedSite)
+    if (selectedSiteId) {
+      filtered = filtered.filter(site => site.siteId === selectedSiteId)
     }
     
     return filtered
-  }, [siteSummaries, selectedSite])
+  }, [siteSummaries, selectedSiteId])
 
   // 筛选后的出勤数据
   const filteredData = useMemo(() => {
@@ -153,12 +232,13 @@ const Reports: React.FC = () => {
         record.name.toLowerCase().includes(keyword) ||
         record.workerId.toLowerCase().includes(keyword) ||
         record.idNumber.toLowerCase().includes(keyword) ||
-        (record.physicalCardId && record.physicalCardId.toLowerCase().includes(keyword))
+        (record.physicalCardId && record.physicalCardId.toLowerCase().includes(keyword)) ||
+        (record.registrarName && record.registrarName.toLowerCase().includes(keyword))
       )
     }
     
-    if (selectedSite) {
-      const site = mockSites.find(s => s.id === selectedSite)
+    if (selectedSiteId) {
+      const site = mockSites.find(s => s.id === selectedSiteId)
       if (site) {
         filtered = filtered.filter(record => record.siteName === site.name)
       }
@@ -174,15 +254,15 @@ const Reports: React.FC = () => {
     }
     
     return filtered
-  }, [searchKeyword, selectedSite, selectedDistributors])
+  }, [searchKeyword, selectedSiteId, selectedDistributors])
 
   // 计算各种统计数据 - 只与工地筛选框联动
   const siteOnlyFilteredData = useMemo(() => {
-    if (!selectedSite) return []
-    const site = mockSites.find(s => s.id === selectedSite)
+    if (!selectedSiteId) return []
+    const site = mockSites.find(s => s.id === selectedSiteId)
     if (!site) return []
     return mockAttendance.filter(record => record.siteName === site.name)
-  }, [selectedSite])
+  }, [selectedSiteId])
 
   const pending = siteOnlyFilteredData.filter(r => !r.checkOut) // 未离场人数
   const totalEntered = siteOnlyFilteredData.filter(r => !!r.checkIn).length // 当日进场人数
@@ -207,11 +287,11 @@ const Reports: React.FC = () => {
   }
 
   const siteColumns = [
-    { title: '工地名称', dataIndex: 'siteName', key: 'siteName', width: 150 },
-    { title: '总工人数', dataIndex: 'totalWorkers', key: 'totalWorkers', width: 100 },
-    { title: '已进场', dataIndex: 'checkedIn', key: 'checkedIn', width: 100 },
-    { title: '已离场', dataIndex: 'checkedOut', key: 'checkedOut', width: 100 },
-    { title: '当前在场', dataIndex: 'currentOnSite', key: 'currentOnSite', width: 100 },
+    { title: '工地名称', dataIndex: 'siteName', key: 'siteName', width: 150, sorter: (a: SiteSummary, b: SiteSummary) => a.siteName.localeCompare(b.siteName) },
+    { title: '总工人数', dataIndex: 'totalWorkers', key: 'totalWorkers', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.totalWorkers - b.totalWorkers },
+    { title: '已进场', dataIndex: 'checkedIn', key: 'checkedIn', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.checkedIn - b.checkedIn },
+    { title: '已离场', dataIndex: 'checkedOut', key: 'checkedOut', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.checkedOut - b.checkedOut },
+    { title: '当前在场', dataIndex: 'currentOnSite', key: 'currentOnSite', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.currentOnSite - b.currentOnSite },
     { title: '在场和离场比例', key: 'onSiteAndLeftRatio', width: 150,
       render: (_: any, record: SiteSummary) => {
         const onSiteRate = record.totalWorkers > 0 ? Math.round((record.currentOnSite / record.totalWorkers) * 100) : 0
@@ -248,17 +328,26 @@ const Reports: React.FC = () => {
   ]
 
   const attendanceColumns = [
-    { title: '日期', dataIndex: 'date', key: 'date', width: 100 },
-    { title: t('worker.name'), dataIndex: 'name', key: 'name', width: 120 },
-    { title: t('reports.distributor'), dataIndex: 'distributorName', key: 'distributorName', width: 140 },
-    { title: '联系方式', dataIndex: 'contact', key: 'contact', width: 140 },
-    { title: '证件类型', dataIndex: 'idType', key: 'idType', width: 120 },
-    { title: '证件号码', dataIndex: 'idNumber', key: 'idNumber', width: 180 },
-    { title: '实体卡ID', dataIndex: 'physicalCardId', key: 'physicalCardId', width: 120 },
+    { title: '日期', dataIndex: 'date', key: 'date', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.date.localeCompare(b.date) },
+    { title: t('worker.name'), dataIndex: 'name', key: 'name', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.name.localeCompare(b.name) },
+    { title: t('reports.distributor'), dataIndex: 'distributorName', key: 'distributorName', width: 140, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.distributorName.localeCompare(b.distributorName) },
+    { title: '联系方式', dataIndex: 'contact', key: 'contact', width: 140, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.contact.localeCompare(b.contact) },
+    { title: '证件类型', dataIndex: 'idType', key: 'idType', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idType.localeCompare(b.idType) },
+    { title: '证件号码', dataIndex: 'idNumber', key: 'idNumber', width: 180, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idNumber.localeCompare(b.idNumber) },
+    { title: '实体卡ID', dataIndex: 'physicalCardId', key: 'physicalCardId', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.physicalCardId || '').localeCompare(b.physicalCardId || '') },
+    { 
+      title: '登记人', 
+      dataIndex: 'registrarName', 
+      key: 'registrarName', 
+      width: 120,
+      sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.registrarName || '').localeCompare(b.registrarName || ''),
+      render: (name: string) => name || '-'
+    },
     { 
       title: '进场时间', 
       key: 'checkIn', 
-      width: 120,
+      width: 100,
+      sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkIn || '').localeCompare(b.checkIn || ''),
       render: (_: any, record: AttendanceRecord) => {
         return record.checkIn || '-'
       }
@@ -266,15 +355,17 @@ const Reports: React.FC = () => {
     { 
       title: '离场时间', 
       key: 'checkOut', 
-      width: 120,
+      width: 100,
+      sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkOut || '').localeCompare(b.checkOut || ''),
       render: (_: any, record: AttendanceRecord) => {
         return record.checkOut || '-'
       }
     },
     { 
-      title: '借用物品数量', 
+      title: '借用物品', 
       key: 'borrowedItems', 
       width: 120,
+      sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.borrowedItems - b.borrowedItems,
       render: (_: any, record: AttendanceRecord) => {
         return (
           <span 
@@ -306,7 +397,7 @@ const Reports: React.FC = () => {
     { 
       title: (
         <span>
-          已归还数量
+          已归还
           <Tooltip 
             title={
               <div>
@@ -330,6 +421,7 @@ const Reports: React.FC = () => {
       ), 
       key: 'returnedItems', 
       width: 120,
+      sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.returnedItems - b.returnedItems,
       render: (_: any, record: AttendanceRecord) => {
         const isPartiallyReturned = record.returnedItems > 0 && record.returnedItems < record.borrowedItems
         const isNotReturned = record.returnedItems === 0
@@ -399,37 +491,7 @@ const Reports: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      {/* 工地筛选 */}
-      <Card style={{ marginBottom: 16 }}>
-        <Row gutter={16} align="middle">
-          <Col span={6}>
-            <div style={{ marginBottom: 8, fontWeight: 500 }}>选择工地</div>
-            <Select
-              placeholder="请选择工地"
-              value={selectedSite}
-              onChange={setSelectedSite}
-              style={{ width: '100%' }}
-              options={mockSites.map(site => ({ label: site.name, value: site.id }))}
-              allowClear
-            />
-          </Col>
-          <Col span={18}>
-            <div style={{ color: '#666', fontSize: '14px' }}>
-              {selectedSite ? (
-                <>
-                  已选择工地：<strong>{mockSites.find(s => s.id === selectedSite)?.name}</strong>
-                  <span style={{ marginLeft: 16 }}>
-                    以下统计数据仅显示该工地的数据
-                  </span>
-                </>
-              ) : (
-                '请选择工地查看统计数据'
-              )}
-            </div>
-          </Col>
-        </Row>
-      </Card>
+    <div style={{ padding: '0 24px 24px 24px' }}>
 
       {/* 统计数据卡片 */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -609,7 +671,7 @@ const Reports: React.FC = () => {
           <Col span={8}>
             <div style={{ marginBottom: 8 }}>搜索工人</div>
             <Input.Search
-              placeholder="姓名、工号、身份证号码或实体卡ID"
+              placeholder="姓名、工号、身份证号码、实体卡ID或登记人"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               onSearch={setSearchKeyword}
@@ -754,10 +816,10 @@ const Reports: React.FC = () => {
                     }
                     description={
                       <div>
+                        <div><strong>物品分类：</strong>{item.category}</div>
+                        <div><strong>经办人：</strong>{item.borrowHandler}</div>
                         <div><strong>借用时间：</strong>{item.borrowedTime}</div>
-                        {item.returnedTime && (
-                          <div><strong>归还时间：</strong>{item.returnedTime}</div>
-                        )}
+                        <div><strong>归还时间：</strong>{item.returnedTime || '-'}</div>
                       </div>
                     }
                   />

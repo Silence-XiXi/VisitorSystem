@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Tabs, Upload } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, HomeOutlined, TeamOutlined, UploadOutlined, DownloadOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons'
-import { Site, Distributor } from '../types/worker'
-import { mockSites, mockDistributors } from '../data/mockData'
+import { Site, Distributor, Guard } from '../types/worker'
+import { mockSites, mockDistributors, mockGuards } from '../data/mockData'
 import { 
   exportSitesToExcel, 
   exportDistributorsToExcel, 
@@ -27,6 +27,13 @@ const AdminSites: React.FC = () => {
   const [distributorForm] = Form.useForm()
   const [selectedDistributorIds, setSelectedDistributorIds] = useState<string[]>([])
 
+  // 门卫管理状态
+  const [guards, setGuards] = useState<Guard[]>(mockGuards)
+  const [guardModalOpen, setGuardModalOpen] = useState(false)
+  const [editingGuard, setEditingGuard] = useState<Guard | null>(null)
+  const [guardForm] = Form.useForm()
+  const [selectedGuardIds, setSelectedGuardIds] = useState<string[]>([])
+
   // 工地筛选状态
   const [siteStatusFilters, setSiteStatusFilters] = useState<string[]>([])
   const [siteManagerFilters, setSiteManagerFilters] = useState<string[]>([])
@@ -36,9 +43,13 @@ const AdminSites: React.FC = () => {
   const [distributorStatusFilters, setDistributorStatusFilters] = useState<string[]>([])
   const [distributorSiteFilters, setDistributorSiteFilters] = useState<string[]>([])
   const [distributorKeyword, setDistributorKeyword] = useState<string>('')
+
+  // 门卫筛选状态
+  const [guardSiteFilters, setGuardSiteFilters] = useState<string[]>([])
+  const [guardKeyword, setGuardKeyword] = useState<string>('')
   
   // 标签页状态
-  const [activeTab, setActiveTab] = useState<string>('sites')
+  const [activeTab, setActiveTab] = useState<string>('distributors')
 
   // 显示发送方式选择对话框（新增分判商时使用）
   const showSendMethodModal = (distributor: Distributor, password: string) => {
@@ -175,21 +186,22 @@ const AdminSites: React.FC = () => {
       const cfg = map[s || 'active']
       return <Tag color={cfg.color}>{cfg.text}</Tag>
     } },
-    { title: '关联分判商', dataIndex: 'distributorIds', key: 'distributorIds', width: 200, render: (distributorIds?: string[]) => {
-      if (!distributorIds || distributorIds.length === 0) return '-'
-      return (
-        <div>
-          {distributorIds.map(distributorId => {
-            const distributor = distributors.find(d => d.id === distributorId)
-            return distributor ? (
-              <Tag key={distributorId} color="purple" style={{ marginBottom: 2 }}>
-                {distributor.name}
-              </Tag>
-            ) : null
-          })}
-        </div>
-      )
-    } },
+    // 隐藏关联分判商列
+    // { title: '关联分判商', dataIndex: 'distributorIds', key: 'distributorIds', width: 200, render: (distributorIds?: string[]) => {
+    //   if (!distributorIds || distributorIds.length === 0) return '-'
+    //   return (
+    //     <div>
+    //       {distributorIds.map(distributorId => {
+    //         const distributor = distributors.find(d => d.id === distributorId)
+    //         return distributor ? (
+    //           <Tag key={distributorId} color="purple" style={{ marginBottom: 2 }}>
+    //             {distributor.name}
+    //           </Tag>
+    //         ) : null
+    //       })}
+    //     </div>
+    //   )
+    // } },
     { title: '操作', key: 'actions', width: 180, render: (_: any, record: Site) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
@@ -433,6 +445,34 @@ const AdminSites: React.FC = () => {
     distributorForm.resetFields()
   }
 
+  // 门卫表单提交
+  const onGuardSubmit = async () => {
+    const v = await guardForm.validateFields()
+    if (editingGuard) {
+      setGuards(prev => prev.map(g => g.id === editingGuard.id ? { ...editingGuard, ...v } : g))
+      message.success('门卫已更新')
+    } else {
+      const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
+      const newItem: Guard = { 
+        id: (Date.now()).toString(), 
+        guardId: v.guardId,
+        name: v.name, 
+        siteId: v.siteId, 
+        phone: v.phone, 
+        email: v.email, 
+        whatsapp: v.whatsapp, 
+        accountUsername: v.accountUsername, 
+        accountStatus: v.accountStatus || 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      setGuards(prev => [newItem, ...prev])
+      message.success(`门卫已新增！账号：${v.accountUsername || v.guardId}，密码：${defaultPwd}`)
+    }
+    setGuardModalOpen(false)
+    setEditingGuard(null)
+    guardForm.resetFields()
+  }
 
   // Excel导入导出处理函数
   const handleSiteExport = (exportAll: boolean = true) => {
@@ -510,6 +550,118 @@ const AdminSites: React.FC = () => {
     generateDistributorImportTemplate()
     message.success('分判商导入模板已下载')
   }
+
+  const handleGuardExport = (exportAll: boolean = true) => {
+    if (!exportAll && selectedGuardIds.length === 0) {
+      message.warning('请先选择要导出的门卫')
+      return
+    }
+    
+    // 这里应该调用实际的Excel导出API
+    message.success('门卫Excel文件下载中...')
+  }
+
+  // 门卫管理相关函数
+  const handleToggleGuardAccountStatus = (record: Guard) => {
+    const newStatus = record.accountStatus === 'active' ? 'disabled' : 'active'
+    const statusText = newStatus === 'active' ? '启用' : '禁用'
+    
+    Modal.confirm({
+      title: `${statusText}门卫账号`,
+      content: `确定要${statusText}门卫「${record.name}」的账号吗？`,
+      onOk: () => {
+        setGuards(prev => prev.map(g => 
+          g.id === record.id ? { ...g, accountStatus: newStatus } : g
+        ))
+        message.success(`门卫「${record.name}」的账号已${statusText}`)
+      }
+    })
+  }
+
+  // 重置门卫密码
+  const handleResetGuardPassword = (record: Guard) => {
+    Modal.confirm({
+      title: '重置门卫密码',
+      content: `确定要重置门卫「${record.name}」的密码吗？重置后密码将恢复为默认密码。`,
+      onOk: () => {
+        // 这里应该调用后端API重置密码
+        message.success(`门卫「${record.name}」的密码已重置为默认密码`)
+      }
+    })
+  }
+
+  // 门卫列定义
+  const guardColumns = [
+    { title: '门卫编号', dataIndex: 'guardId', key: 'guardId', width: 120, sorter: (a: Guard, b: Guard) => a.guardId.localeCompare(b.guardId) },
+    { title: '姓名', dataIndex: 'name', key: 'name', width: 120, sorter: (a: Guard, b: Guard) => a.name.localeCompare(b.name) },
+    { title: '所属工地', dataIndex: 'siteId', key: 'siteId', width: 150, 
+      render: (siteId: string) => {
+        const site = sites.find(s => s.id === siteId)
+        return site ? site.name : '-'
+      },
+      sorter: (a: Guard, b: Guard) => {
+        const siteA = sites.find(s => s.id === a.siteId)
+        const siteB = sites.find(s => s.id === b.siteId)
+        return (siteA?.name || '').localeCompare(siteB?.name || '')
+      }
+    },
+    { title: '联系电话', dataIndex: 'phone', key: 'phone', width: 130, sorter: (a: Guard, b: Guard) => a.phone.localeCompare(b.phone) },
+    { title: '邮箱', dataIndex: 'email', key: 'email', width: 180, sorter: (a: Guard, b: Guard) => (a.email || '').localeCompare(b.email || '') },
+    { title: 'WhatsApp', dataIndex: 'whatsapp', key: 'whatsapp', width: 130, sorter: (a: Guard, b: Guard) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
+    { title: '账号', dataIndex: 'accountUsername', key: 'accountUsername', width: 120, sorter: (a: Guard, b: Guard) => (a.accountUsername || '').localeCompare(b.accountUsername || '') },
+    { title: '账号状态', dataIndex: 'accountStatus', key: 'accountStatus', width: 100,
+      render: (status: string) => (
+        <Tag color={status === 'active' ? 'green' : 'red'}>
+          {status === 'active' ? '启用' : '禁用'}
+        </Tag>
+      ),
+      sorter: (a: Guard, b: Guard) => (a.accountStatus || '').localeCompare(b.accountStatus || '')
+    },
+    { title: '操作', key: 'actions', width: 200, render: (_: any, record: Guard) => (
+      <Space style={{ justifyContent: 'flex-end' }}>
+        <Button 
+          size="small" 
+          icon={<EditOutlined />} 
+          onClick={() => { setEditingGuard(record); guardForm.setFieldsValue(record); setGuardModalOpen(true) }}
+          title="编辑"
+        />
+        <Button 
+          size="small" 
+          icon={<KeyOutlined />}
+          onClick={() => handleResetGuardPassword(record)}
+          title="重置密码"
+        />
+        <Button 
+          size="small" 
+          icon={record.accountStatus === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
+          type={record.accountStatus === 'active' ? 'default' : 'primary'}
+          onClick={() => handleToggleGuardAccountStatus(record)}
+          title={record.accountStatus === 'active' ? '禁用账号' : '启用账号'}
+        />
+        <Button 
+          danger 
+          size="small" 
+          icon={<DeleteOutlined />} 
+          onClick={() => setGuards(prev => prev.filter(g => g.id !== record.id))}
+          title="删除"
+        />
+      </Space>
+    )}
+  ]
+
+  // 门卫筛选逻辑
+  const filteredGuards = useMemo(() => {
+    return guards.filter(guard => {
+      const matchesKeyword = !guardKeyword.trim() || 
+        guard.guardId.toLowerCase().includes(guardKeyword.toLowerCase()) ||
+        guard.name.toLowerCase().includes(guardKeyword.toLowerCase()) ||
+        guard.phone.includes(guardKeyword)
+      
+      const matchesSite = guardSiteFilters.length === 0 || guardSiteFilters.includes(guard.siteId)
+      
+      return matchesKeyword && matchesSite
+    })
+  }, [guards, guardKeyword, guardSiteFilters])
 
   // 工地管理标签页内容
   const siteManagementTab = (
@@ -744,37 +896,137 @@ const AdminSites: React.FC = () => {
     </Card>
   )
 
+  // 门卫管理标签页内容
+  const guardManagementTab = (
+    <Card>
+      <Row gutter={12} style={{ marginBottom: 12 }}>
+        <Col span={6}>
+          <Input placeholder="关键词（编号/姓名/电话）" value={guardKeyword} onChange={e => setGuardKeyword(e.target.value)} allowClear />
+        </Col>
+        <Col span={6}>
+          <Select
+            mode="multiple"
+            style={{ width: '100%' }}
+            placeholder="工地筛选（可多选）"
+            value={guardSiteFilters}
+            onChange={setGuardSiteFilters}
+            allowClear
+          >
+            {sites.map(site => (
+              <Select.Option key={site.id} value={site.id}>{site.name}</Select.Option>
+            ))}
+          </Select>
+        </Col>
+        <Col span={12}>
+          <Space>
+            <Button 
+              size="small" 
+              icon={<DownloadOutlined />} 
+              onClick={() => handleGuardExport(selectedGuardIds.length === 0)}
+            >
+              {selectedGuardIds.length === 0 ? '导出全部' : `导出已选(${selectedGuardIds.length})`}
+            </Button>
+          </Space>
+        </Col>
+      </Row>
+      
+      {/* 筛选结果统计 */}
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ color: '#666', fontSize: '14px' }}>
+            筛选结果：共 <strong style={{ color: '#1890ff' }}>{filteredGuards.length}</strong> 条记录
+            {guards.length !== filteredGuards.length && (
+              <span style={{ marginLeft: 8, color: '#999' }}>
+                （从 {guards.length} 条记录中筛选）
+              </span>
+            )}
+          </span>
+        </div>
+        
+        <Space>
+          {(guardSiteFilters.length > 0 || guardKeyword.trim()) && (
+            <Button 
+              size="small" 
+              onClick={() => {
+                setGuardSiteFilters([])
+                setGuardKeyword('')
+              }}
+            >
+              清除筛选
+            </Button>
+          )}
+          {selectedGuardIds.length > 0 && (
+            <Button 
+              size="small" 
+              onClick={() => setSelectedGuardIds([])}
+            >
+              清除选择({selectedGuardIds.length})
+            </Button>
+          )}
+        </Space>
+      </div>
+      
+      <Table 
+        rowKey="id" 
+        columns={guardColumns} 
+        dataSource={filteredGuards} 
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+        rowSelection={{
+          selectedRowKeys: selectedGuardIds,
+          onChange: (selectedRowKeys) => setSelectedGuardIds(selectedRowKeys as string[]),
+          getCheckboxProps: (record) => ({
+            name: record.name,
+          }),
+        }}
+      />
+    </Card>
+  )
+
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: '0 24px 24px 24px' }}>
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
         items={[
           {
-            key: 'sites',
-            label: (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
-                <HomeOutlined style={{ color: '#1890ff', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>工地管理</span>
-              </div>
-            ),
-            children: siteManagementTab
-          },
-          {
             key: 'distributors',
             label: (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
                 <TeamOutlined style={{ color: '#52c41a', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>分判商管理</span>
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>分判商管理（{distributors.length}）</span>
               </div>
             ),
             children: distributorManagementTab
+          },
+          {
+            key: 'guards',
+            label: (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
+                <KeyOutlined style={{ color: '#fa8c16', fontSize: '16px' }} />
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>门卫管理（{guards.length}）</span>
+              </div>
+            ),
+            children: guardManagementTab
+          },
+          {
+            key: 'sites',
+            label: (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
+                <HomeOutlined style={{ color: '#1890ff', fontSize: '16px' }} />
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>工地管理（{sites.length}）</span>
+              </div>
+            ),
+            children: siteManagementTab
           }
         ]}
         tabBarExtraContent={
           activeTab === 'sites' ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingSite(null); siteForm.resetFields(); setSiteModalOpen(true) }}>
               新增工地
+            </Button>
+          ) : activeTab === 'guards' ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingGuard(null); guardForm.resetFields(); setGuardModalOpen(true) }}>
+              新增门卫
             </Button>
           ) : (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDistributor(null); distributorForm.resetFields(); setDistributorModalOpen(true) }}>
@@ -856,6 +1108,44 @@ const AdminSites: React.FC = () => {
           {!editingDistributor && (
             <Form.Item name="defaultPassword" label="默认密码" tooltip="若不填写将使用默认密码 Pass@123">
               <Input.Password placeholder="默认密码（留空则使用 Pass@123）" />
+            </Form.Item>
+          )}
+          <Form.Item name="accountStatus" label="账号状态" initialValue={'active'}>
+            <Select options={[{ value: 'active', label: '启用' }, { value: 'disabled', label: '禁用' }]} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 门卫管理模态框 */}
+      <Modal title={editingGuard ? '编辑门卫' : '新增门卫'} open={guardModalOpen} onCancel={() => { setGuardModalOpen(false); setEditingGuard(null) }} onOk={onGuardSubmit} destroyOnClose>
+        <Form form={guardForm} layout="vertical">
+          <Form.Item name="guardId" label="门卫编号" rules={[{ required: true, message: '请输入门卫编号' }]}>
+            <Input placeholder="请输入门卫编号（如：G001）" />
+          </Form.Item>
+          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
+            <Input placeholder="请输入门卫姓名" />
+          </Form.Item>
+          <Form.Item name="siteId" label="所属工地" rules={[{ required: true, message: '请选择工地' }]}>
+            <Select 
+              placeholder="请选择工地" 
+              options={sites.map(s => ({ value: s.id, label: s.name }))} 
+            />
+          </Form.Item>
+          <Form.Item name="phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}>
+            <Input placeholder="联系电话" />
+          </Form.Item>
+          <Form.Item name="email" label="邮箱">
+            <Input placeholder="邮箱" />
+          </Form.Item>
+          <Form.Item name="whatsapp" label="WhatsApp">
+            <Input placeholder="WhatsApp号码（例如：+86 13800138000）" />
+          </Form.Item>
+          <Form.Item name="accountUsername" label="账号">
+            <Input placeholder="登录账号" />
+          </Form.Item>
+          {!editingGuard && (
+            <Form.Item name="defaultPassword" label="初始密码" tooltip="若不填写将使用默认密码 Pass@123">
+              <Input.Password placeholder="初始密码（留空则使用 Pass@123）" />
             </Form.Item>
           )}
           <Form.Item name="accountStatus" label="账号状态" initialValue={'active'}>

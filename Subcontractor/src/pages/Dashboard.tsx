@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Space, Typography, Button, message } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Space, Typography, Button, message, Select } from 'antd'
 import {
   UserOutlined,
   TeamOutlined,
@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom'
 import { useLocale } from '../contexts/LocaleContext'
+import { useSiteFilter } from '../contexts/SiteFilterContext'
 import LocaleSwitcher from '../components/LocaleSwitcher'
 import WorkerManagement from './WorkerManagement'
 
@@ -23,6 +24,7 @@ import ItemBorrowRecords from './ItemBorrowRecords'
 import AccountSettings from './AccountSettings'
 
 import Reports from './Reports'
+import { mockSites } from '../data/mockData'
 import dayjs from 'dayjs'
 
 const { Header, Sider, Content } = Layout
@@ -35,6 +37,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useLocale()
+  const { selectedSiteId, setSelectedSiteId } = useSiteFilter()
 
   // 实时更新时间
   useEffect(() => {
@@ -98,7 +101,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'admin-sites',
       icon: <FileTextOutlined />,
-      label: '工地与分判商管理'
+      label: '工地管理'
     },
     {
       key: 'item-categories',
@@ -230,6 +233,62 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* 当前页面标题 */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              padding: '8px 16px',
+              color: '#333',
+              fontSize: '16px',
+              fontWeight: '600'
+            }}>
+              {location.pathname === '/worker-management' && '北京建筑公司 - 工人信息管理'}
+              {location.pathname === '/admin/sites' && '工地管理'}
+              {location.pathname === '/item-borrow-records' && '物品借用记录管理'}
+              {location.pathname === '/reports' && '访客记录统计'}
+              {location.pathname === '/account-settings' && '账户设置'}
+            </div>
+
+            {/* 工地筛选框 */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              padding: '8px 16px',
+              color: '#666',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              <span style={{ color: '#666', fontSize: '14px' }}>工地筛选：</span>
+              <Select
+                value={selectedSiteId}
+                onChange={setSelectedSiteId}
+                style={{ width: 200 }}
+                placeholder="选择工地"
+                showSearch
+                optionFilterProp="children"
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={mockSites.map(site => ({
+                  value: site.id,
+                  label: site.name
+                }))}
+              />
+              {selectedSiteId && (
+                <div style={{ 
+                  marginLeft: '16px',
+                  padding: '4px 12px',
+                  fontSize: '12px',
+                  color: '#666'
+                }}>
+                  已选择工地：<strong>{mockSites.find(s => s.id === selectedSiteId)?.name}</strong>
+                  <span style={{ marginLeft: '8px' }}>以下统计数据仅显示该工地的数据</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <Space size="middle">
@@ -238,7 +297,9 @@ const Dashboard: React.FC = () => {
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar icon={<UserOutlined />} />
                 <span>{user?.username}</span>
-                <span style={{ color: '#666' }}>({user?.role})</span>
+                <span style={{ color: '#666' }}>
+                  ({user?.role === 'admin' ? '管理员' : user?.role === 'subcontractor' ? '分判商' : user?.role || '未知角色'})
+                </span>
               </Space>
             </Dropdown>
           </Space>

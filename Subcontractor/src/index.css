@@ -122,3 +122,50 @@ html, body {
   box-shadow: 0 4px 8px rgba(24, 144, 255, 0.3);
   transform: translateY(-1px);
 }
+
+/* 固定表格高度样式 */
+.distributor-worker-table {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.distributor-worker-table .ant-table-container {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+.distributor-worker-table .ant-table-content {
+  flex: 1 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.distributor-worker-table .ant-table-body {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  min-height: 0 !important;
+}
+
+.distributor-worker-table .ant-pagination {
+  flex-shrink: 0 !important;
+  margin-top: auto !important;
+  position: relative !important;
+  bottom: 0 !important;
+  width: 100% !important;
+}
+
+/* 确保分页栏位置绝对固定 */
+.distributor-worker-table .ant-table-pagination {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  background: white !important;
+  border-top: 1px solid #f0f0f0 !important;
+  padding: 16px !important;
+  z-index: 10 !important;
+}

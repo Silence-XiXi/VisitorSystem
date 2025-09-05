@@ -3,7 +3,8 @@ import { Card, Table, Space, Button, Row, Col, message, Select, Input, DatePicke
 import { SearchOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { useLocale } from '../contexts/LocaleContext'
-import { mockWorkers, mockSites, mockDistributors } from '../data/mockData'
+import { useSiteFilter } from '../contexts/SiteFilterContext'
+import { mockWorkers, mockSites, mockDistributors, mockGuards } from '../data/mockData'
 
 interface ItemBorrowRecord {
   key: string
@@ -11,7 +12,7 @@ interface ItemBorrowRecord {
   workerName: string
   distributorName: string
   siteName: string
-  itemName: string
+  itemCode: string
   itemType: string
   physicalCardId?: string
   borrowDate: string
@@ -20,6 +21,8 @@ interface ItemBorrowRecord {
   returnTime?: string
   status: 'borrowed' | 'returned'
   borrowDuration?: number // 借用时长（小时）
+  borrowHandlerId?: string // 借用经办人ID
+  borrowHandlerName?: string // 借用经办人姓名
 }
 
 // 生成物品借用记录数据
@@ -32,6 +35,10 @@ const generateItemBorrowRecords = (): ItemBorrowRecord[] => {
     const distIndex = workerIdx % mockDistributors.length
     const borrowedItems = Math.floor(Math.random() * 5) + 1 // 1-5个借用物品
     const returnedItems = Math.floor(Math.random() * (borrowedItems + 1)) // 0到借用数量的已归还数量
+    
+    // 获取该工地对应的门卫作为经办人
+    const siteGuards = mockGuards.filter(guard => guard.siteId === mockSites[siteIndex]?.id)
+    const randomGuard = siteGuards.length > 0 ? siteGuards[Math.floor(Math.random() * siteGuards.length)] : null
     
     for (let i = 0; i < borrowedItems; i++) {
       const itemType = itemTypes[i % itemTypes.length]
@@ -46,7 +53,7 @@ const generateItemBorrowRecords = (): ItemBorrowRecord[] => {
         workerName: worker.name,
         distributorName: mockDistributors[distIndex]?.name || `分判商${distIndex + 1}`,
         siteName: mockSites[siteIndex]?.name || `工地${siteIndex + 1}`,
-        itemName: `${itemType} #${i + 1}`,
+        itemCode: `${itemType} #${i + 1}`,
         itemType: itemType,
         physicalCardId: worker.physicalCardId,
         borrowDate: borrowDate,
@@ -54,7 +61,9 @@ const generateItemBorrowRecords = (): ItemBorrowRecord[] => {
         returnDate: isReturned ? borrowDate : undefined,
         returnTime: returnTime,
         status: isReturned ? 'returned' : 'borrowed',
-        borrowDuration: isReturned ? Math.floor(Math.random() * 8) + 1 : undefined
+        borrowDuration: isReturned ? Math.floor(Math.random() * 8) + 1 : undefined,
+        borrowHandlerId: randomGuard?.guardId,
+        borrowHandlerName: randomGuard?.name || '未指定'
       })
     }
   })
@@ -66,8 +75,8 @@ const mockItemBorrowRecords = generateItemBorrowRecords()
 
 const ItemBorrowRecords: React.FC = () => {
   const { t } = useLocale()
+  const { selectedSiteId } = useSiteFilter()
   const [searchKeyword, setSearchKeyword] = useState<string>('')
-  const [selectedSite, setSelectedSite] = useState<string>(mockSites[0]?.id || '')
   const [selectedDistributor, setSelectedDistributor] = useState<string>('')
   const [selectedItemType, setSelectedItemType] = useState<string>('')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
@@ -86,14 +95,15 @@ const ItemBorrowRecords: React.FC = () => {
       filtered = filtered.filter(record => 
         record.workerName.toLowerCase().includes(keyword) ||
         record.workerId.toLowerCase().includes(keyword) ||
-        record.itemName.toLowerCase().includes(keyword) ||
-        record.itemType.toLowerCase().includes(keyword)
+        record.itemCode.toLowerCase().includes(keyword) ||
+        record.itemType.toLowerCase().includes(keyword) ||
+        (record.borrowHandlerName && record.borrowHandlerName.toLowerCase().includes(keyword))
       )
     }
 
     // 工地筛选
-    if (selectedSite) {
-      const site = mockSites.find(s => s.id === selectedSite)
+    if (selectedSiteId) {
+      const site = mockSites.find(s => s.id === selectedSiteId)
       if (site) {
         filtered = filtered.filter(record => record.siteName === site.name)
       }
@@ -124,7 +134,7 @@ const ItemBorrowRecords: React.FC = () => {
     }
 
     return filtered
-  }, [searchKeyword, selectedSite, selectedDistributor, selectedItemType, selectedStatus, dateRange])
+  }, [searchKeyword, selectedSiteId, selectedDistributor, selectedItemType, selectedStatus, dateRange])
 
 
   // 显示详情
@@ -162,43 +172,58 @@ const ItemBorrowRecords: React.FC = () => {
       title: '工人姓名', 
       dataIndex: 'workerName', 
       key: 'workerName', 
-      width: 120 
+      width: 120,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.workerName.localeCompare(b.workerName)
     },
     { 
       title: '实体卡ID', 
       dataIndex: 'physicalCardId', 
       key: 'physicalCardId', 
-      width: 120 
+      width: 120,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.physicalCardId || '').localeCompare(b.physicalCardId || '')
     },
     { 
       title: '分判商', 
       dataIndex: 'distributorName', 
       key: 'distributorName', 
-      width: 140 
+      width: 140,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.distributorName.localeCompare(b.distributorName)
     },
     { 
       title: '物品类型', 
       dataIndex: 'itemType', 
       key: 'itemType', 
-      width: 100 
+      width: 100,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.itemType.localeCompare(b.itemType)
     },
     { 
-      title: '物品名称', 
-      dataIndex: 'itemName', 
-      key: 'itemName', 
-      width: 140 
+      title: '物品编号', 
+      dataIndex: 'itemCode', 
+      key: 'itemCode', 
+      width: 140,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.itemCode.localeCompare(b.itemCode)
     },
     { 
       title: '借用时间', 
       dataIndex: 'borrowTime', 
       key: 'borrowTime', 
-      width: 100 
+      width: 100,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.borrowTime.localeCompare(b.borrowTime)
+    },
+    { 
+      title: '借用经办人', 
+      dataIndex: 'borrowHandlerName', 
+      key: 'borrowHandlerName', 
+      width: 120,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.borrowHandlerName || '').localeCompare(b.borrowHandlerName || ''),
+      render: (name: string) => name || '-'
     },
     { 
       title: '归还时间', 
       dataIndex: 'returnTime', 
       key: 'returnTime', 
       width: 100,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.returnTime || '').localeCompare(b.returnTime || ''),
       render: (time: string) => time || '-'
     },
     { 
@@ -206,6 +231,7 @@ const ItemBorrowRecords: React.FC = () => {
       dataIndex: 'status', 
       key: 'status', 
       width: 100,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.status.localeCompare(b.status),
       render: (status: string) => (
         <Tag color={status === 'returned' ? 'green' : 'orange'}>
           {status === 'returned' ? '已归还' : '未归还'}
@@ -217,6 +243,7 @@ const ItemBorrowRecords: React.FC = () => {
       dataIndex: 'borrowDuration', 
       key: 'borrowDuration', 
       width: 100,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.borrowDuration || 0) - (b.borrowDuration || 0),
       render: (duration: number) => duration ? `${duration}小时` : '-'
     },
     {
@@ -248,23 +275,6 @@ const ItemBorrowRecords: React.FC = () => {
             查看和管理所有物品借用记录
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div>
-            <div style={{ marginBottom: 4, fontSize: '14px', color: '#666' }}>工地选择</div>
-            <Select
-              placeholder="请选择工地"
-              value={selectedSite}
-              onChange={setSelectedSite}
-              style={{ width: 200 }}
-            >
-              {mockSites.map(site => (
-                <Select.Option key={site.id} value={site.id}>
-                  {site.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </div>
-        </div>
       </div>
 
 
@@ -274,7 +284,7 @@ const ItemBorrowRecords: React.FC = () => {
           <Col xs={24} sm={12} md={4}>
             <div style={{ marginBottom: 8 }}>搜索</div>
             <Input.Search
-              placeholder="工人姓名、编号、物品名称"
+              placeholder="工人姓名、编号、物品编号、经办人"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               onSearch={setSearchKeyword}
@@ -377,7 +387,7 @@ const ItemBorrowRecords: React.FC = () => {
 
       {/* 详情弹窗 */}
       <Modal
-        title={`物品借用详情 - ${selectedRecord?.itemName}`}
+        title={`物品借用详情 - ${selectedRecord?.itemCode}`}
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         footer={[
@@ -409,7 +419,7 @@ const ItemBorrowRecords: React.FC = () => {
             <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
               <Row gutter={16}>
                 <Col span={12}>
-                  <strong>物品名称：</strong>{selectedRecord.itemName}
+                  <strong>物品编号：</strong>{selectedRecord.itemCode}
                 </Col>
                 <Col span={12}>
                   <strong>物品类型：</strong>{selectedRecord.itemType}
@@ -419,6 +429,9 @@ const ItemBorrowRecords: React.FC = () => {
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
                   <strong>借用时间：</strong>{selectedRecord.borrowTime}
+                </Col>
+                <Col span={12} style={{ marginTop: 8 }}>
+                  <strong>借用经办人：</strong>{selectedRecord.borrowHandlerName || '未指定'}
                 </Col>
                 {selectedRecord.returnDate && (
                   <>

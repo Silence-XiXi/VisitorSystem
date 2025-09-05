@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Upload, DatePicker, Typography } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Upload, DatePicker } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, QrcodeOutlined, MailOutlined, MessageOutlined } from '@ant-design/icons'
 import { Worker } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
 import { 
@@ -10,7 +10,6 @@ import {
 } from '../utils/excelUtils'
 import dayjs from 'dayjs'
 
-const { Title } = Typography
 
 // 添加样式来修复表格固定列的问题
 const tableStyles = `
@@ -43,6 +42,8 @@ const DistributorWorkerUpload: React.FC = () => {
   const [workerForm] = Form.useForm()
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const [qrCodeModalOpen, setQrCodeModalOpen] = useState(false)
+  const [selectedWorkerForQR, setSelectedWorkerForQR] = useState<Worker | null>(null)
 
   // 筛选状态
   const [statusFilters, setStatusFilters] = useState<string[]>([])
@@ -99,6 +100,10 @@ const DistributorWorkerUpload: React.FC = () => {
         }
         setWorkers(prev => [newWorker, ...prev])
         message.success('工人信息已添加')
+        
+        // 显示二维码发送选项
+        setSelectedWorkerForQR(newWorker)
+        setQrCodeModalOpen(true)
       }
       
       setWorkerModalOpen(false)
@@ -120,6 +125,63 @@ const DistributorWorkerUpload: React.FC = () => {
         message.success('工人信息已删除')
       }
     })
+  }
+
+  // 发送二维码
+  const handleSendQRCode = (method: 'email' | 'whatsapp', worker?: Worker) => {
+    const targetWorker = worker || selectedWorkerForQR
+    if (!targetWorker) return
+
+    if (method === 'email') {
+      if (!targetWorker.email) {
+        message.warning('该工人没有邮箱地址，无法发送邮件')
+        return
+      }
+      // 这里应该调用实际的邮件发送API，传入工人信息生成二维码
+      console.log('发送邮件二维码到:', targetWorker.email, '工人信息:', {
+        workerId: targetWorker.workerId,
+        name: targetWorker.name,
+        phone: targetWorker.phone
+      })
+      message.success(`二维码已发送到 ${targetWorker.email}`)
+    } else if (method === 'whatsapp') {
+      if (!targetWorker.whatsapp) {
+        message.warning('该工人没有WhatsApp号码，无法发送消息')
+        return
+      }
+      // 这里应该调用实际的WhatsApp发送API，传入工人信息生成二维码
+      console.log('发送WhatsApp二维码到:', targetWorker.whatsapp, '工人信息:', {
+        workerId: targetWorker.workerId,
+        name: targetWorker.name,
+        phone: targetWorker.phone
+      })
+      message.success(`二维码已发送到 ${targetWorker.whatsapp}`)
+    }
+
+    setQrCodeModalOpen(false)
+    setSelectedWorkerForQR(null)
+  }
+
+  // 批量发送二维码
+  const handleBatchSendQRCode = (method: 'email' | 'whatsapp') => {
+    if (selectedWorkerIds.length === 0) {
+      message.warning('请先选择要发送二维码的工人')
+      return
+    }
+
+    const selectedWorkers = workers.filter(w => selectedWorkerIds.includes(w.id))
+    const validWorkers = selectedWorkers.filter(w => 
+      method === 'email' ? w.email : w.whatsapp
+    )
+
+    if (validWorkers.length === 0) {
+      message.warning(`选中的工人中没有有效的${method === 'email' ? '邮箱地址' : 'WhatsApp号码'}`)
+      return
+    }
+
+    // 这里应该调用实际的批量发送API
+    message.success(`二维码已批量发送给 ${validWorkers.length} 名工人`)
+    setSelectedWorkerIds([])
   }
 
 
@@ -184,30 +246,29 @@ const DistributorWorkerUpload: React.FC = () => {
 
   // 工人表格列定义
   const workerColumns = [
-    { title: '工号', dataIndex: 'workerId', key: 'workerId', width: 120, fixed: 'left' as const, ellipsis: true },
-    { title: '姓名', dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, ellipsis: true },
-    { title: '性别', dataIndex: 'gender', key: 'gender', width: 80, render: (gender: string) => getGenderTag(gender), ellipsis: true },
-    { title: '出生日期', dataIndex: 'birthDate', key: 'birthDate', width: 120, render: (d?: string) => d || '-', ellipsis: true },
-    { title: '年龄', dataIndex: 'age', key: 'age', width: 80, render: (age?: number) => (typeof age === 'number' ? age : '-'), ellipsis: true },
-    { title: '身份证号', dataIndex: 'idCard', key: 'idCard', width: 180, ellipsis: true },
-    { title: '地区', dataIndex: 'region', key: 'region', width: 100, ellipsis: true },
-    { title: '联系电话', dataIndex: 'phone', key: 'phone', width: 130, ellipsis: true },
-    { title: '邮箱', dataIndex: 'email', key: 'email', width: 180, ellipsis: true },
+    { title: '工号', dataIndex: 'workerId', key: 'workerId', width: 120, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId) },
+    { title: '姓名', dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name) },
+    { title: '性别', dataIndex: 'gender', key: 'gender', width: 80, render: (gender: string) => getGenderTag(gender), ellipsis: true, sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender) },
+    { title: '出生日期', dataIndex: 'birthDate', key: 'birthDate', width: 120, render: (d?: string) => d || '-', ellipsis: true, sorter: (a: Worker, b: Worker) => (a.birthDate || '').localeCompare(b.birthDate || '') },
+    { title: '年龄', dataIndex: 'age', key: 'age', width: 80, render: (age?: number) => (typeof age === 'number' ? age : '-'), ellipsis: true, sorter: (a: Worker, b: Worker) => (a.age || 0) - (b.age || 0) },
+    { title: '身份证号', dataIndex: 'idCard', key: 'idCard', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.idCard.localeCompare(b.idCard) },
+    { title: '地区', dataIndex: 'region', key: 'region', width: 100, ellipsis: true, sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region) },
+    { title: '联系电话', dataIndex: 'phone', key: 'phone', width: 130, ellipsis: true, sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone) },
+    { title: '邮箱', dataIndex: 'email', key: 'email', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email) },
     { title: 'WhatsApp', dataIndex: 'whatsapp', key: 'whatsapp', width: 130, render: (whatsapp: string) => {
       if (!whatsapp) return '-';
       const parts = whatsapp.split(' ');
       if (parts.length === 2) {
         return (
           <div style={{ lineHeight: '1.2' }}>
-            <div style={{ color: '#666' }}>{parts[0]}</div>
-            <div>{parts[1]}</div>
+            <span style={{ color: '#666' }}>{parts[0]}</span> <span>{parts[1]}</span>
           </div>
         );
       }
       return whatsapp;
-    }, ellipsis: true },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (status: string) => getStatusTag(status), ellipsis: true },
-    { title: '操作', key: 'actions', width: 200, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
+    }, ellipsis: true, sorter: (a: Worker, b: Worker) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
+    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
+    { title: '操作', key: 'actions', width: 150, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -221,6 +282,15 @@ const DistributorWorkerUpload: React.FC = () => {
             setWorkerModalOpen(true) 
           }}
           title="编辑"
+        />
+        <Button 
+          size="small" 
+          icon={<QrcodeOutlined />} 
+          onClick={() => {
+            setSelectedWorkerForQR(record)
+            setQrCodeModalOpen(true)
+          }}
+          title="发送二维码"
         />
         <Button 
           size="small" 
@@ -272,64 +342,48 @@ const DistributorWorkerUpload: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '4px 16px 16px 16px' }}>
+    <div style={{ 
+      height: 'calc(100vh - 160px)', 
+      display: 'flex', 
+      flexDirection: 'column',
+      padding: 0,
+      overflow: 'hidden'
+    }}>
       {/* 添加样式来修复表格固定列覆盖header的问题 */}
       <style>{tableStyles}</style>
       
-      {/* 页面标题 */}
-      <div style={{ marginBottom: 16 }}>
-        <Title level={2} style={{ margin: 0 }}>
-          {currentDistributor.name} - 工人信息管理
-        </Title>
-        <p style={{ color: '#666', margin: '4px 0 0 0' }}>
-          管理您下属的工人信息，包括添加、编辑、导入导出等功能
-        </p>
-      </div>
 
       {/* 工人管理表格 */}
       <Card 
         title={`工人信息管理 (${workers.length})`}
         extra={
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
-            onClick={() => { 
-              setEditingWorker(null)
-              workerForm.resetFields()
-              setWorkerModalOpen(true) 
-            }}
-          >
-            新增工人
-          </Button>
-        }
-      >
-        {/* 筛选器 */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Input.Search
-              placeholder="搜索工人姓名、工号或身份证号"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col span={6}>
-            <Select
-              mode="multiple"
-              style={{ width: '100%' }}
-              placeholder="状态筛选"
-              value={statusFilters}
-              onChange={setStatusFilters}
-              options={[
-                { value: 'active', label: '在职' },
-                { value: 'suspended', label: '暂停' },
-                { value: 'inactive', label: '离职' }
-              ]}
-              allowClear
-            />
-          </Col>
-          <Col span={12}>
-            <Space wrap>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            {/* 筛选器 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Input.Search
+                placeholder="搜索工人姓名、工号或身份证号"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                allowClear
+                style={{ width: 200 }}
+              />
+              <Select
+                mode="multiple"
+                style={{ width: 120 }}
+                placeholder="状态筛选"
+                value={statusFilters}
+                onChange={setStatusFilters}
+                options={[
+                  { value: 'active', label: '在职' },
+                  { value: 'suspended', label: '暂停' },
+                  { value: 'inactive', label: '离职' }
+                ]}
+                allowClear
+              />
+            </div>
+            
+            {/* 操作按钮 */}
+            <Space>
               <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
                 下载模板
               </Button>
@@ -351,10 +405,47 @@ const DistributorWorkerUpload: React.FC = () => {
               >
                 {selectedWorkerIds.length === 0 ? '导出全部' : `导出已选(${selectedWorkerIds.length})`}
               </Button>
+              <Button 
+                icon={<MailOutlined />} 
+                onClick={() => handleBatchSendQRCode('email')}
+                disabled={selectedWorkerIds.length === 0}
+              >
+                批量发送邮件
+              </Button>
+              <Button 
+                icon={<MessageOutlined />} 
+                onClick={() => handleBatchSendQRCode('whatsapp')}
+                disabled={selectedWorkerIds.length === 0}
+              >
+                批量发送WhatsApp
+              </Button>
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />} 
+                onClick={() => { 
+                  setEditingWorker(null)
+                  workerForm.resetFields()
+                  setWorkerModalOpen(true) 
+                }}
+              >
+                新增工人
+              </Button>
             </Space>
-          </Col>
-        </Row>
-
+          </div>
+        }
+        style={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column'
+        }}
+        bodyStyle={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 0, 
+          overflow: 'hidden'
+        }}
+      >
         {/* 选择状态显示 */}
         {selectedWorkerIds.length > 0 && (
           <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -371,26 +462,40 @@ const DistributorWorkerUpload: React.FC = () => {
         )}
 
         {/* 工人表格 */}
-        <Table
-          rowSelection={rowSelection}
-          columns={workerColumns}
-          dataSource={filteredWorkers}
-          rowKey="id"
-          loading={loading}
-          scroll={{ x: 1800 }}
-          pagination={{
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => 
-              `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 20,
-          }}
-          style={{ 
-            fontSize: '14px'
-          }}
-          className="distributor-worker-table"
-        />
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minHeight: 0, 
+          padding: '0 8px 8px 8px'
+        }}>
+          <Table
+            rowSelection={rowSelection}
+            columns={workerColumns}
+            dataSource={filteredWorkers}
+            rowKey="id"
+            loading={loading}
+                          scroll={{ 
+                x: 1800,
+                y: selectedWorkerIds.length > 0 ? 'calc(100vh - 395px)' : 'calc(100vh - 330px)'
+              }}
+            pagination={{
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) => 
+                `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              defaultPageSize: 20,
+              position: ['bottomCenter'],
+              showLessItems: false,
+            }}
+            style={{ 
+              fontSize: '14px',
+              height: selectedWorkerIds.length > 0 ? 'calc(100vh - 395px)' : 'calc(100vh - 330px)'
+            }}
+            className="distributor-worker-table"
+          />
+        </div>
       </Card>
 
       {/* 工人信息模态框 */}
@@ -483,6 +588,62 @@ const DistributorWorkerUpload: React.FC = () => {
             ]} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 二维码发送模态框 */}
+      <Modal
+        title="发送二维码"
+        open={qrCodeModalOpen}
+        onCancel={() => {
+          setQrCodeModalOpen(false)
+          setSelectedWorkerForQR(null)
+        }}
+        footer={null}
+        width={500}
+      >
+        {selectedWorkerForQR && (
+          <div>
+            <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
+              <div><strong>工人姓名：</strong>{selectedWorkerForQR.name}</div>
+              <div><strong>工号：</strong>{selectedWorkerForQR.workerId}</div>
+              <div><strong>联系电话：</strong>{selectedWorkerForQR.phone}</div>
+              {selectedWorkerForQR.email && <div><strong>邮箱：</strong>{selectedWorkerForQR.email}</div>}
+              {selectedWorkerForQR.whatsapp && <div><strong>WhatsApp：</strong>{selectedWorkerForQR.whatsapp}</div>}
+            </div>
+            
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: 16 }}>
+                选择发送方式
+              </div>
+              <Space size="large">
+                <Button 
+                  type="primary" 
+                  icon={<MailOutlined />} 
+                  size="large"
+                  onClick={() => handleSendQRCode('email')}
+                  disabled={!selectedWorkerForQR.email}
+                >
+                  发送邮件
+                </Button>
+                <Button 
+                  type="primary" 
+                  icon={<MessageOutlined />} 
+                  size="large"
+                  onClick={() => handleSendQRCode('whatsapp')}
+                  disabled={!selectedWorkerForQR.whatsapp}
+                >
+                  发送WhatsApp
+                </Button>
+              </Space>
+            </div>
+            
+            {(!selectedWorkerForQR.email && !selectedWorkerForQR.whatsapp) && (
+              <div style={{ textAlign: 'center', color: '#999', fontSize: '14px' }}>
+                该工人没有邮箱或WhatsApp信息，无法发送二维码
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   )
