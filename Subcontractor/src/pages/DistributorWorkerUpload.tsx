@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Upload, DatePicker } from 'antd'
+import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Upload, DatePicker, Pagination } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, QrcodeOutlined, MailOutlined, MessageOutlined } from '@ant-design/icons'
 import { Worker } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
@@ -13,17 +13,41 @@ import dayjs from 'dayjs'
 
 // 添加样式来修复表格固定列的问题
 const tableStyles = `
-  .distributor-worker-table .ant-table-fixed-left,
-  .distributor-worker-table .ant-table-fixed-right {
-    z-index: 100 !important;
+  .ant-card-head {
+    z-index: 1 !important;
+    position: sticky !important;
+    top: 0 !important;
+    background: white !important;
   }
-  .distributor-worker-table .ant-table-fixed-left .ant-table-thead > tr > th,
-  .distributor-worker-table .ant-table-fixed-right .ant-table-thead > tr > th {
-    z-index: 100 !important;
+  .ant-card-head-title {
+    z-index: 1 !important;
+    background: white !important;
   }
-  .distributor-worker-table .ant-table-fixed-left .ant-table-tbody > tr > td,
-  .distributor-worker-table .ant-table-fixed-right .ant-table-tbody > tr > td {
-    z-index: 100 !important;
+  .ant-card-extra {
+    z-index: 1 !important;
+    background: white !important;
+  }
+  .distributor-worker-table .ant-table-thead > tr > th {
+    z-index: 1 !important;
+    position: relative;
+  }
+  .distributor-worker-table .ant-table-thead {
+    z-index: 1 !important;
+  }
+  .ant-table {
+    z-index: 1 !important;
+  }
+  .ant-table-container {
+    z-index: 1 !important;
+  }
+  .ant-table-body {
+    z-index: 1 !important;
+  }
+  .ant-table-tbody {
+    z-index: 1 !important;
+  }
+  .ant-table-tbody > tr > td {
+    z-index: 1 !important;
   }
 `
 
@@ -48,6 +72,10 @@ const DistributorWorkerUpload: React.FC = () => {
   // 筛选状态
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [keyword, setKeyword] = useState<string>('')
+  
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   // 筛选后的工人数据
   const filteredWorkers = useMemo(() => {
@@ -62,6 +90,20 @@ const DistributorWorkerUpload: React.FC = () => {
     })
   }, [workers, statusFilters, keyword])
 
+  // 分页后的工人数据
+  const paginatedWorkers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredWorkers.slice(startIndex, endIndex)
+  }, [filteredWorkers, currentPage, pageSize])
+
+  // 分页处理函数
+  const handlePageChange = (page: number, size?: number) => {
+    setCurrentPage(page)
+    if (size && size !== pageSize) {
+      setPageSize(size)
+    }
+  }
 
   // 工人表单提交
   const onWorkerSubmit = async () => {
@@ -343,7 +385,7 @@ const DistributorWorkerUpload: React.FC = () => {
 
   return (
     <div style={{ 
-      height: 'calc(100vh - 160px)', 
+      height: 'calc(100vh - 64px)', 
       display: 'flex', 
       flexDirection: 'column',
       padding: 0,
@@ -379,6 +421,9 @@ const DistributorWorkerUpload: React.FC = () => {
                   { value: 'inactive', label: '离职' }
                 ]}
                 allowClear
+                maxTagCount="responsive"
+                maxTagTextLength={2}
+                dropdownStyle={{ maxHeight: 200, overflow: 'auto' }}
               />
             </div>
             
@@ -436,30 +481,28 @@ const DistributorWorkerUpload: React.FC = () => {
         style={{ 
           height: '100%', 
           display: 'flex', 
-          flexDirection: 'column'
+          flexDirection: 'column',
+          margin: 0,
+          borderRadius: 0
         }}
         bodyStyle={{ 
           flex: 1, 
           display: 'flex', 
           flexDirection: 'column', 
           padding: 0, 
-          overflow: 'hidden'
+          overflow: 'hidden',
+          margin: 0
+        }}
+        headStyle={{
+          padding: '12px 16px',
+          margin: 0,
+          borderBottom: '1px solid #f0f0f0',
+          position: 'sticky',
+          top: '64px',
+          zIndex: 1,
+          backgroundColor: 'white'
         }}
       >
-        {/* 选择状态显示 */}
-        {selectedWorkerIds.length > 0 && (
-          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#666', fontSize: '14px' }}>
-              已选择 <strong style={{ color: '#1890ff' }}>{selectedWorkerIds.length}</strong> 个工人
-            </span>
-            <Button 
-              size="small" 
-              onClick={() => setSelectedWorkerIds([])}
-            >
-              清除选择({selectedWorkerIds.length})
-            </Button>
-          </div>
-        )}
 
         {/* 工人表格 */}
         <div style={{ 
@@ -467,33 +510,69 @@ const DistributorWorkerUpload: React.FC = () => {
           display: 'flex', 
           flexDirection: 'column', 
           minHeight: 0, 
-          padding: '0 8px 8px 8px'
+          padding: '2px 16px 0 16px',
+          overflow: 'hidden'
         }}>
           <Table
             rowSelection={rowSelection}
             columns={workerColumns}
-            dataSource={filteredWorkers}
+            dataSource={paginatedWorkers}
             rowKey="id"
             loading={loading}
-                          scroll={{ 
-                x: 1800,
-                y: selectedWorkerIds.length > 0 ? 'calc(100vh - 395px)' : 'calc(100vh - 330px)'
-              }}
-            pagination={{
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total, range) => 
-                `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              defaultPageSize: 20,
-              position: ['bottomCenter'],
-              showLessItems: false,
+            scroll={{ 
+              x: 1800,
+              y: 'calc(100vh - 240px)'
             }}
+            pagination={false}
             style={{ 
-              fontSize: '14px',
-              height: selectedWorkerIds.length > 0 ? 'calc(100vh - 395px)' : 'calc(100vh - 330px)'
+              fontSize: '14px'
             }}
             className="distributor-worker-table"
+          />
+        </div>
+
+        {/* 外部分页栏 */}
+        <div style={{ 
+          padding: '12px 8px',
+          borderTop: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa',
+          flexShrink: 0,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          {/* 选择状态显示 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {selectedWorkerIds.length > 0 && (
+              <>
+                <span style={{ color: '#666', fontSize: '14px' }}>
+                  已选择 <strong style={{ color: '#1890ff' }}>{selectedWorkerIds.length}</strong> 个工人
+                </span>
+                <Button 
+                  size="small" 
+                  onClick={() => setSelectedWorkerIds([])}
+                >
+                  清除选择
+                </Button>
+              </>
+            )}
+          </div>
+          
+          <Pagination
+            current={currentPage}
+            pageSize={pageSize}
+            total={filteredWorkers.length}
+            showSizeChanger
+            showQuickJumper
+            showTotal={(total, range) => 
+              `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`
+            }
+            pageSizeOptions={['10', '20', '50', '100']}
+            onChange={handlePageChange}
+            onShowSizeChange={handlePageChange}
+            style={{ 
+              margin: 0
+            }}
           />
         </div>
       </Card>

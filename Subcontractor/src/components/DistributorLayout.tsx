@@ -4,6 +4,7 @@ import { UserOutlined, LogoutOutlined, ClockCircleOutlined } from '@ant-design/i
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import DistributorWorkerUpload from '../pages/DistributorWorkerUpload'
+import DistributorAccountSettings from '../pages/DistributorAccountSettings'
 import { useAuth } from '../hooks/useAuth'
 
 const { Header, Content } = Layout
@@ -66,8 +67,11 @@ const DistributorLayout: React.FC = () => {
       icon: <UserOutlined />,
       label: '个人信息',
       onClick: () => {
-        message.info('个人信息功能开发中...')
+        navigate('/distributor/profile')
       }
+    },
+    {
+      type: 'divider'
     },
     {
       key: 'logout',
@@ -87,7 +91,7 @@ const DistributorLayout: React.FC = () => {
       <Header
         style={{
           position: 'fixed',
-          zIndex: 1,
+          zIndex: 1000,
           width: '100%',
           background: '#fff',
           padding: '0 24px',
@@ -110,35 +114,48 @@ const DistributorLayout: React.FC = () => {
           </div>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Text style={{ marginRight: 16, color: '#666' }}>
-            欢迎，{distributorInfo.name}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Text style={{ color: '#666', fontSize: '14px' }}>
+            hi, {distributorInfo.name}
           </Text>
           <Dropdown
             menu={{ items: userMenuItems }}
             placement="bottomRight"
             arrow
           >
-            <Button type="text" style={{ display: 'flex', alignItems: 'center' }}>
+            <Button 
+              type="text" 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                padding: '4px 8px',
+                height: 'auto'
+              }}
+            >
               <Avatar size="small" icon={<UserOutlined />} />
+              <Text style={{ color: '#666', fontSize: '14px' }}>
+                {user?.username || distributorInfo.username}（分判商）
+              </Text>
             </Button>
           </Dropdown>
         </div>
       </Header>
 
       <Layout style={{ marginTop: 64 }}>
-        <Layout style={{ background: '#f5f5f5' }}>
+        <Layout style={{ background: '#fff' }}>
           <Content
             style={{
-              margin: '24px',
-              padding: '24px',
+              margin: 0,
+              padding: 0,
               background: '#fff',
-              borderRadius: '8px',
-              minHeight: 'calc(100vh - 112px)'
+              minHeight: 'calc(100vh - 64px)'
             }}
           >
             <Routes>
               <Route path="/workers" element={<DistributorWorkerUpload />} />
+              <Route path="/profile" element={<DistributorAccountSettings />} />
+              <Route path="/settings" element={<DistributorAccountSettings />} />
               <Route path="/" element={<Navigate to="/workers" replace />} />
             </Routes>
           </Content>
