@@ -11,7 +11,7 @@ import {
 import dayjs from 'dayjs'
 
 
-// 添加样式来修复表格固定列的问题
+// 表格样式
 const tableStyles = `
   .ant-card-head {
     z-index: 1 !important;
@@ -26,28 +26,6 @@ const tableStyles = `
   .ant-card-extra {
     z-index: 1 !important;
     background: white !important;
-  }
-  .distributor-worker-table .ant-table-thead > tr > th {
-    z-index: 1 !important;
-    position: relative;
-  }
-  .distributor-worker-table .ant-table-thead {
-    z-index: 1 !important;
-  }
-  .ant-table {
-    z-index: 1 !important;
-  }
-  .ant-table-container {
-    z-index: 1 !important;
-  }
-  .ant-table-body {
-    z-index: 1 !important;
-  }
-  .ant-table-tbody {
-    z-index: 1 !important;
-  }
-  .ant-table-tbody > tr > td {
-    z-index: 1 !important;
   }
 `
 
@@ -376,7 +354,28 @@ const DistributorWorkerUpload: React.FC = () => {
   const rowSelection = {
     selectedRowKeys: selectedWorkerIds,
     onChange: (selectedRowKeys: React.Key[]) => {
-      setSelectedWorkerIds(selectedRowKeys as string[])
+      // 获取当前页面的所有工人ID
+      const currentPageWorkerIds = paginatedWorkers.map(w => w.id)
+      
+      // 移除当前页面的所有选中项
+      const otherPageSelections = selectedWorkerIds.filter(id => !currentPageWorkerIds.includes(id))
+      
+      // 添加当前页面的新选中项
+      const newSelections = [...otherPageSelections, ...(selectedRowKeys as string[])]
+      
+      setSelectedWorkerIds(newSelections)
+    },
+    onSelectAll: (selected: boolean) => {
+      if (selected) {
+        // 全选当前页面
+        const currentPageWorkerIds = paginatedWorkers.map(w => w.id)
+        const otherPageSelections = selectedWorkerIds.filter(id => !currentPageWorkerIds.includes(id))
+        setSelectedWorkerIds([...otherPageSelections, ...currentPageWorkerIds])
+      } else {
+        // 取消全选当前页面
+        const currentPageWorkerIds = paginatedWorkers.map(w => w.id)
+        setSelectedWorkerIds(selectedWorkerIds.filter(id => !currentPageWorkerIds.includes(id)))
+      }
     },
     getCheckboxProps: (record: Worker) => ({
       name: record.name,
@@ -527,7 +526,6 @@ const DistributorWorkerUpload: React.FC = () => {
             style={{ 
               fontSize: '14px'
             }}
-            className="distributor-worker-table"
           />
         </div>
 
@@ -543,18 +541,30 @@ const DistributorWorkerUpload: React.FC = () => {
         }}>
           {/* 选择状态显示 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {selectedWorkerIds.length > 0 && (
-              <>
-                <span style={{ color: '#666', fontSize: '14px' }}>
-                  已选择 <strong style={{ color: '#1890ff' }}>{selectedWorkerIds.length}</strong> 个工人
+            <span style={{ color: '#666', fontSize: '14px' }}>
+              已选择 <strong style={{ color: '#1890ff' }}>{selectedWorkerIds.length}</strong> 个工人
+              {selectedWorkerIds.length > 0 && (
+                <span style={{ color: '#999', marginLeft: '8px' }}>
+                  / 共 {filteredWorkers.length} 个
                 </span>
-                <Button 
-                  size="small" 
-                  onClick={() => setSelectedWorkerIds([])}
-                >
-                  清除选择
-                </Button>
-              </>
+              )}
+            </span>
+            {selectedWorkerIds.length > 0 && (
+              <Button 
+                size="small" 
+                onClick={() => setSelectedWorkerIds([])}
+              >
+                清除选择
+              </Button>
+            )}
+            {selectedWorkerIds.length < filteredWorkers.length && (
+              <Button 
+                size="small" 
+                type="primary"
+                onClick={() => setSelectedWorkerIds(filteredWorkers.map(w => w.id))}
+              >
+                全选所有页面
+              </Button>
             )}
           </div>
           
