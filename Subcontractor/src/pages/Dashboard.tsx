@@ -24,6 +24,7 @@ import ItemBorrowRecords from './ItemBorrowRecords'
 import AccountSettings from './AccountSettings'
 
 import Reports from './Reports'
+import Guard from './Guard'
 import { mockSites } from '../data/mockData'
 import dayjs from 'dayjs'
 
@@ -194,26 +195,27 @@ const Dashboard: React.FC = () => {
           right: 0,
           zIndex: 999,
           height: '64px',
-          transition: 'left 0.2s'
+          transition: 'left 0.2s',
+          flexWrap: 'nowrap',
+          overflow: 'hidden'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '16px',
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden'
+          }}>
             <Button
               type="text"
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setCollapsed(!collapsed)}
-              style={{ fontSize: '16px', width: 64, height: 64 }}
+              style={{ fontSize: '16px', width: 64, height: 64, flexShrink: 0 }}
             />
             
-            {/* 当前时间显示 */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              padding: '8px 16px',
-              color: '#666',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}>
+            {/* 当前时间显示 - 在小屏幕上隐藏 */}
+            <div className="header-time-display">
               <ClockCircleOutlined style={{ fontSize: '16px', color: '#1890ff' }} />
               <div>
                 <div style={{ 
@@ -234,38 +236,38 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* 当前页面标题 */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              padding: '8px 16px',
-              color: '#333',
-              fontSize: '16px',
-              fontWeight: '600'
-            }}>
-              {location.pathname === '/worker-management' && '北京建筑公司 - 工人信息管理'}
-              {location.pathname === '/admin/sites' && '工地管理'}
-              {location.pathname === '/item-borrow-records' && '物品借用记录管理'}
-              {location.pathname === '/reports' && '访客记录统计'}
-              {location.pathname === '/account-settings' && '账户设置'}
+            {/* 当前页面标题 - 响应式显示 */}
+            <div className="header-page-title">
+              <span style={{
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '300px'
+              }}>
+                {location.pathname === '/worker-management' && '北京建筑公司 - 工人信息管理'}
+                {location.pathname === '/admin/sites' && '工地管理'}
+                {location.pathname === '/item-borrow-records' && '物品借用记录管理'}
+                {location.pathname === '/reports' && '访客记录统计'}
+                {location.pathname === '/account-settings' && '账户设置'}
+              </span>
             </div>
 
-            {/* 工地筛选框 */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              padding: '8px 16px',
-              color: '#666',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}>
-              <span style={{ color: '#666', fontSize: '14px' }}>工地筛选：</span>
+            {/* 工地筛选框 - 响应式显示 */}
+            <div className="header-site-filter">
+              <span style={{ 
+                color: '#666', 
+                fontSize: '14px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}>工地筛选：</span>
               <Select
                 value={selectedSiteId}
                 onChange={setSelectedSiteId}
-                style={{ width: 200 }}
+                style={{ 
+                  width: '180px',
+                  minWidth: '120px',
+                  flexShrink: 1
+                }}
                 placeholder="选择工地"
                 showSearch
                 optionFilterProp="children"
@@ -277,27 +279,27 @@ const Dashboard: React.FC = () => {
                   label: site.name
                 }))}
               />
-              {selectedSiteId && (
-                <div style={{ 
-                  marginLeft: '16px',
-                  padding: '4px 12px',
-                  fontSize: '12px',
-                  color: '#666'
-                }}>
-                  已选择工地：<strong>{mockSites.find(s => s.id === selectedSiteId)?.name}</strong>
-                  <span style={{ marginLeft: '8px' }}>以下统计数据仅显示该工地的数据</span>
-                </div>
-              )}
             </div>
           </div>
 
-          <Space size="middle">
+          <Space size="middle" className="header-user-info">
             <LocaleSwitcher />
             <Dropdown menu={{ items: dropdownItems }} placement="bottomRight">
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar icon={<UserOutlined />} />
-                <span>{user?.username}</span>
-                <span style={{ color: '#666' }}>
+                <span style={{ 
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '100px'
+                }}>{user?.username}</span>
+                <span style={{ 
+                  color: '#666',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '80px'
+                }}>
                   ({user?.role === 'admin' ? '管理员' : user?.role === 'subcontractor' ? '分判商' : user?.role || '未知角色'})
                 </span>
               </Space>
@@ -306,13 +308,16 @@ const Dashboard: React.FC = () => {
         </Header>
 
         <Content style={{
-          margin: '80px 16px 16px 16px',
-          padding: '24px',
+          margin: '80px 8px 8px 8px',
+          padding: '12px',
           background: '#fff',
-          borderRadius: '12px',
+          borderRadius: '8px',
           minHeight: 'calc(100vh - 96px)',
-          overflow: 'auto',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
+          overflow: 'visible',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          width: 'calc(100vw - 16px)',
+          maxWidth: collapsed ? 'calc(100vw - 96px)' : 'calc(100vw - 216px)',
+          transition: 'max-width 0.2s'
         }}>
           <Routes>
             <Route path="/" element={<Reports />} />
@@ -323,6 +328,7 @@ const Dashboard: React.FC = () => {
             <Route path="/item-categories" element={<ItemCategoryManagement />} />
             <Route path="/item-borrow-records" element={<ItemBorrowRecords />} />
             <Route path="/account" element={<AccountSettings />} />
+            <Route path="/guard" element={<Guard />} />
             <Route path="*" element={<Navigate to="/reports" replace />} />
           </Routes>
         </Content>

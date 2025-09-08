@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, message, Space, Typography } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
@@ -9,7 +9,20 @@ const { Title } = Typography
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, isAuthenticated, user, isLoading } = useAuth()
+
+  // 如果用户已经登录，自动跳转到相应页面
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      if (user.role === 'subcontractor') {
+        navigate('/distributor/workers')
+      } else if (user.role === 'guard') {
+        navigate('/guard')
+      } else {
+        navigate('/dashboard')
+      }
+    }
+  }, [isAuthenticated, user, isLoading, navigate])
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true)
@@ -24,6 +37,9 @@ const Login: React.FC = () => {
           if (result.role === 'subcontractor') {
             console.log('Navigating to distributor workers page')
             navigate('/distributor/workers')
+          } else if (result.role === 'guard') {
+            console.log('Navigating to guard page')
+            navigate('/guard')
           } else {
             console.log('Navigating to dashboard')
             navigate('/dashboard')

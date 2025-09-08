@@ -5,12 +5,33 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import WorkerManagement from './pages/WorkerManagement'
 import DistributorLayout from './components/DistributorLayout'
+import Guard from './pages/Guard'
 import { useAuth } from './hooks/useAuth'
 
 function App() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, isLoading } = useAuth()
   
-  console.log('App - isAuthenticated:', isAuthenticated, 'user:', user)
+  console.log('App - isAuthenticated:', isAuthenticated, 'user:', user, 'isLoading:', isLoading)
+
+  // 在认证状态初始化完成前显示加载状态
+  if (isLoading) {
+    return (
+      <LocaleProvider>
+        <SiteFilterProvider>
+          <div className="App" style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            fontSize: '16px',
+            color: '#666'
+          }}>
+            加载中...
+          </div>
+        </SiteFilterProvider>
+      </LocaleProvider>
+    )
+  }
 
   return (
     <LocaleProvider>
@@ -33,6 +54,11 @@ function App() {
             <Route 
               path="/distributor/*" 
               element={isAuthenticated ? <DistributorLayout /> : <Navigate to="/login" replace />} 
+            />
+            {/* 门卫路由 */}
+            <Route 
+              path="/guard" 
+              element={isAuthenticated && user?.role === 'guard' ? <Guard /> : <Navigate to="/login" replace />} 
             />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>

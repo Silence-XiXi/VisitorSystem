@@ -4,20 +4,29 @@ interface User {
   id: string
   username: string
   role: string
+  siteId?: string
+  siteName?: string
 }
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     // 检查本地存储中是否有用户信息
     const storedUser = localStorage.getItem('user')
     if (storedUser) {
-      const userData = JSON.parse(storedUser)
-      setUser(userData)
-      setIsAuthenticated(true)
+      try {
+        const userData = JSON.parse(storedUser)
+        setUser(userData)
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error('Error parsing stored user data:', error)
+        localStorage.removeItem('user')
+      }
     }
+    setIsLoading(false)
   }, [])
 
   const login = (username: string, password: string): Promise<{ success: boolean; role?: string }> => {
@@ -41,6 +50,14 @@ export const useAuth = () => {
             { username: 'manager1', password: 'mgr123', id: 'admin3' },
             { username: 'manager2', password: 'mgr456', id: 'admin4' },
             { username: 'system', password: 'sys123', id: 'admin5' }
+          ]
+          
+          // 门卫账号列表
+          const guardAccounts = [
+            { username: 'guard1', password: 'guard123', id: 'guard1', name: '门卫张三', siteId: '1', siteName: '北京CBD项目' },
+            { username: 'guard2', password: 'guard456', id: 'guard2', name: '门卫李四', siteId: '2', siteName: '上海浦东工地' },
+            { username: 'guard3', password: 'guard789', id: 'guard3', name: '门卫王五', siteId: '3', siteName: '广州天河工地' },
+            { username: 'guard', password: '123456', id: 'guard', name: '门卫', siteId: '1', siteName: '北京CBD项目' }
           ]
           
           // 先检查是否为分判商账号
@@ -77,6 +94,23 @@ export const useAuth = () => {
             return
           }
           
+          // 最后检查是否为门卫账号
+          const guardAccount = guardAccounts.find(acc => acc.username === username && acc.password === password)
+          if (guardAccount) {
+            const userData: User = {
+              id: guardAccount.id,
+              username: guardAccount.username,
+              role: 'guard',
+              siteId: guardAccount.siteId,
+              siteName: guardAccount.siteName
+            }
+            setUser(userData)
+            setIsAuthenticated(true)
+            localStorage.setItem('user', JSON.stringify(userData))
+            resolve({ success: true, role: 'guard' })
+            return
+          }
+          
           // 账号不存在或密码错误
           resolve({ success: false })
         } else {
@@ -95,6 +129,7 @@ export const useAuth = () => {
   return {
     user,
     isAuthenticated,
+    isLoading,
     login,
     logout
   }

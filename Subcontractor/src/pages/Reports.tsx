@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { Card, DatePicker, Table, Space, Button, Row, Col, Statistic, message, Progress, Select, Tabs, Input, Tooltip, Modal, List, Tag } from 'antd'
 import { TeamOutlined, DownloadOutlined, SearchOutlined, QuestionCircleOutlined, ShoppingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
@@ -128,6 +128,56 @@ const Reports: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>('')
   const [itemDetailModalVisible, setItemDetailModalVisible] = useState<boolean>(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
+  const [tableHeight, setTableHeight] = useState(400)
+  const [pageSize, setPageSize] = useState(20)
+  const [currentPage, setCurrentPage] = useState(1)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // 计算表格高度
+  const calculateTableHeight = () => {
+    const windowHeight = window.innerHeight
+    const headerHeight = 64 // Dashboard header高度
+    const statsCardsHeight = 120 // 统计数据卡片高度
+    const filterCardHeight = 120 // 筛选器Card高度
+    const tabsHeight = 46 // Tabs组件高度
+    const paginationHeight = 90 // 分页组件高度（为小屏幕增加预留空间）
+    const padding = 80 // 上下padding和margin
+    
+    // 计算可用高度
+    const availableHeight = windowHeight - headerHeight - statsCardsHeight - filterCardHeight - tabsHeight - paginationHeight - padding
+    
+    // 根据屏幕尺寸动态调整表格高度
+    let finalHeight = 300
+    
+    if (windowHeight >= 1400) { // 超大屏幕（如27寸4K，1440p及以上）
+      // 超大屏幕充分利用空间，几乎填满整个可用区域
+      finalHeight = Math.max(1000, availableHeight + 40)
+    } else if (windowHeight >= 1200) { // 大屏幕（如27寸1080p，24寸1440p）
+      // 大屏幕充分利用空间，但保留少量边距
+      finalHeight = Math.max(800, availableHeight + 20)
+    } else if (windowHeight >= 900) { // 中等屏幕（如24寸1080p）
+      // 中等屏幕使用大部分可用空间
+      finalHeight = Math.max(600, availableHeight + 10)
+    } else if (windowHeight >= 600) { // 小屏幕（如笔记本）
+      // 小屏幕使用适中空间，确保筛选框可见且分页栏不超出
+      finalHeight = Math.max(400, availableHeight - 50)
+    } else { // 很小屏幕（如平板）
+      // 很小屏幕保持最小可用空间，确保筛选框可见且分页栏不超出
+      finalHeight = Math.max(300, availableHeight - 60)
+    }
+    
+    // 添加调试信息
+    console.log('屏幕高度:', windowHeight, '可用高度:', availableHeight, '最终高度:', finalHeight)
+    
+    setTableHeight(finalHeight)
+  }
+
+  // 监听窗口大小变化
+  useEffect(() => {
+    calculateTableHeight()
+    window.addEventListener('resize', calculateTableHeight)
+    return () => window.removeEventListener('resize', calculateTableHeight)
+  }, [])
 
   // 生成物品数据
   const generateItemData = (record: AttendanceRecord) => {
@@ -328,25 +378,25 @@ const Reports: React.FC = () => {
   ]
 
   const attendanceColumns = [
-    { title: '日期', dataIndex: 'date', key: 'date', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.date.localeCompare(b.date) },
-    { title: t('worker.name'), dataIndex: 'name', key: 'name', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.name.localeCompare(b.name) },
-    { title: t('reports.distributor'), dataIndex: 'distributorName', key: 'distributorName', width: 140, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.distributorName.localeCompare(b.distributorName) },
-    { title: '联系方式', dataIndex: 'contact', key: 'contact', width: 140, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.contact.localeCompare(b.contact) },
-    { title: '证件类型', dataIndex: 'idType', key: 'idType', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idType.localeCompare(b.idType) },
-    { title: '证件号码', dataIndex: 'idNumber', key: 'idNumber', width: 180, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idNumber.localeCompare(b.idNumber) },
-    { title: '实体卡ID', dataIndex: 'physicalCardId', key: 'physicalCardId', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.physicalCardId || '').localeCompare(b.physicalCardId || '') },
+    { title: '日期', dataIndex: 'date', key: 'date', width: 90, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.date.localeCompare(b.date) },
+    { title: t('worker.name'), dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.name.localeCompare(b.name) },
+    { title: t('reports.distributor'), dataIndex: 'distributorName', key: 'distributorName', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.distributorName.localeCompare(b.distributorName) },
+    { title: '联系方式', dataIndex: 'contact', key: 'contact', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.contact.localeCompare(b.contact) },
+    { title: '证件类型', dataIndex: 'idType', key: 'idType', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idType.localeCompare(b.idType) },
+    { title: '证件号码', dataIndex: 'idNumber', key: 'idNumber', width: 160, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idNumber.localeCompare(b.idNumber) },
+    { title: '实体卡ID', dataIndex: 'physicalCardId', key: 'physicalCardId', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.physicalCardId || '').localeCompare(b.physicalCardId || '') },
     { 
       title: '登记人', 
       dataIndex: 'registrarName', 
       key: 'registrarName', 
-      width: 120,
+      width: 100,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.registrarName || '').localeCompare(b.registrarName || ''),
       render: (name: string) => name || '-'
     },
     { 
       title: '进场时间', 
       key: 'checkIn', 
-      width: 100,
+      width: 90,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkIn || '').localeCompare(b.checkIn || ''),
       render: (_: any, record: AttendanceRecord) => {
         return record.checkIn || '-'
@@ -355,7 +405,7 @@ const Reports: React.FC = () => {
     { 
       title: '离场时间', 
       key: 'checkOut', 
-      width: 100,
+      width: 90,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkOut || '').localeCompare(b.checkOut || ''),
       render: (_: any, record: AttendanceRecord) => {
         return record.checkOut || '-'
@@ -364,7 +414,7 @@ const Reports: React.FC = () => {
     { 
       title: '借用物品', 
       key: 'borrowedItems', 
-      width: 120,
+      width: 100,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.borrowedItems - b.borrowedItems,
       render: (_: any, record: AttendanceRecord) => {
         return (
@@ -420,7 +470,7 @@ const Reports: React.FC = () => {
         </span>
       ), 
       key: 'returnedItems', 
-      width: 120,
+      width: 100,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.returnedItems - b.returnedItems,
       render: (_: any, record: AttendanceRecord) => {
         const isPartiallyReturned = record.returnedItems > 0 && record.returnedItems < record.borrowedItems
@@ -490,11 +540,27 @@ const Reports: React.FC = () => {
     setSearchKeyword('')
   }
 
+  // 分页事件处理
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handlePageSizeChange = (current: number, size: number) => {
+    setCurrentPage(current)
+    setPageSize(size)
+  }
+
   return (
-    <div style={{ padding: '0 24px 24px 24px' }}>
+    <div 
+      ref={containerRef}
+      style={{ 
+        padding: '0 24px 24px 24px',
+        width: '100%',
+        overflow: 'visible'
+      }}>
 
       {/* 统计数据卡片 */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
+      <Row gutter={8} style={{ marginBottom: 8 }}>
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
@@ -528,7 +594,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="已借出物品总数"
+              title="已借出物品"
               value={totalBorrowedItems}
               prefix={<ShoppingOutlined />}
               valueStyle={{ color: '#1890ff', fontWeight: 700 }}
@@ -538,7 +604,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="已归还物品总数"
+              title="已归还物品"
               value={totalReturnedItems}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: '#52c41a', fontWeight: 700 }}
@@ -548,7 +614,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="未归还物品总数"
+              title="未归还物品"
               value={totalUnreturnedItems}
               prefix={<ExclamationCircleOutlined />}
               valueStyle={{ color: totalUnreturnedItems > 0 ? '#fa541c' : '#52c41a', fontWeight: 700 }}
@@ -558,10 +624,10 @@ const Reports: React.FC = () => {
       </Row>
 
       {/* 筛选器 */}
-      <Card style={{ marginBottom: 16 }}>
-        <Row gutter={16} align="middle">
+      <Card style={{ marginBottom: 8 }}>
+        <Row gutter={8} align="middle">
           <Col span={8}>
-            <div style={{ marginBottom: 8 }}>日期选择</div>
+            <div style={{ marginBottom: 4 }}>日期选择</div>
             {dateType === 'single' ? (
               <DatePicker 
                 value={singleDate} 
@@ -602,7 +668,7 @@ const Reports: React.FC = () => {
               />
             ) : (
               <div>
-                <div style={{ marginBottom: 8 }}>
+                <div style={{ marginBottom: 4 }}>
                   <Space>
                     <Button 
                       size="small" 
@@ -669,7 +735,7 @@ const Reports: React.FC = () => {
             )}
           </Col>
           <Col span={8}>
-            <div style={{ marginBottom: 8 }}>搜索工人</div>
+            <div style={{ marginBottom: 4 }}>搜索工人</div>
             <Input.Search
               placeholder="姓名、工号、身份证号码、实体卡ID或登记人"
               value={searchKeyword}
@@ -681,7 +747,7 @@ const Reports: React.FC = () => {
             />
           </Col>
           <Col span={8}>
-            <div style={{ marginBottom: 8 }}>选择分判商</div>
+            <div style={{ marginBottom: 4 }}>选择分判商</div>
             <Select
               mode="multiple"
               placeholder="全部分判商"
@@ -722,53 +788,70 @@ const Reports: React.FC = () => {
       </Card>
 
       {/* 数据表格选项卡 */}
-      <Card>
-        <Tabs
-          defaultActiveKey="visitor-records"
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          tabBarExtraContent={
-            <Button 
-              type="primary" 
-              icon={<DownloadOutlined />} 
-              onClick={downloadExcel}
-            >
-              下载Excel
-            </Button>
-          }
-          items={[
-            {
-              key: 'visitor-records',
-              label: '访客记录',
-              children: (
+      <Tabs
+        defaultActiveKey="visitor-records"
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        tabBarExtraContent={
+          <Button 
+            type="primary" 
+            icon={<DownloadOutlined />} 
+            onClick={downloadExcel}
+          >
+            下载Excel
+          </Button>
+        }
+        items={[
+          {
+            key: 'visitor-records',
+            label: '访客记录',
+            children: (
+              <div style={{ height: tableHeight, display: 'flex', flexDirection: 'column' }}>
                 <Table
                   columns={attendanceColumns}
                   dataSource={filteredData}
                   rowKey="key"
+                    scroll={{ x: 1200, y: tableHeight - 90 }}
                   pagination={{ 
-                    pageSize: 20, 
+                    current: currentPage,
+                    pageSize: pageSize,
+                    total: filteredData.length,
                     showSizeChanger: true,
-                    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`
+                    showQuickJumper: true,
+                    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    onChange: handlePageChange,
+                    onShowSizeChange: handlePageSizeChange
                   }}
                 />
-              )
-            },
-            {
-              key: 'site-summary',
-              label: '工地访客统计',
-              children: (
+              </div>
+            )
+          },
+          {
+            key: 'site-summary',
+            label: '工地访客统计',
+            children: (
+              <div style={{ height: tableHeight, display: 'flex', flexDirection: 'column' }}>
                 <Table
                   columns={siteColumns}
                   dataSource={filteredSiteSummaries}
                   rowKey="siteId"
-                  pagination={false}
                   size="small"
+                    scroll={{ x: 800, y: tableHeight - 90 }}
+                  pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+                    pageSizeOptions: ['5', '10', '20'],
+                    size: 'small'
+                  }}
                 />
-              )
-            }
-          ]}
-        />
-      </Card>
+              </div>
+            )
+          }
+        ]}
+      />
 
       {/* 物品详情弹窗 */}
       <Modal
