@@ -64,7 +64,7 @@ const Dashboard: React.FC = () => {
 
   const handleLogout = () => {
     logout()
-    message.success('已退出登录')
+    message.success(t('login.logoutSuccess'))
     navigate('/login')
   }
 
@@ -97,22 +97,22 @@ const Dashboard: React.FC = () => {
     {
       key: 'reports',
       icon: <FileTextOutlined />,
-      label: '首页'
+      label: t('navigation.overview')
     },
     {
       key: 'admin-sites',
       icon: <FileTextOutlined />,
-      label: '工地管理'
+      label: t('admin.siteManagement')
     },
     {
       key: 'item-categories',
       icon: <AppstoreOutlined />,
-      label: '借用物品分类管理'
+      label: t('admin.itemCategoryManagement')
     },
     {
       key: 'item-borrow-records',
       icon: <ClockCircleOutlined />,
-      label: '物品借用记录'
+      label: t('admin.itemBorrowRecords')
     },
     {
       key: 'workers',
@@ -125,7 +125,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'account',
       icon: <UserOutlined />,
-      label: '账户设置',
+      label: t('navigation.accountSettings'),
       onClick: () => handleMenuClick('account')
     },
     {
@@ -259,7 +259,7 @@ const Dashboard: React.FC = () => {
                 fontSize: '14px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
-              }}>工地筛选：</span>
+              }}>{t('admin.siteFilter')}：</span>
               <Select
                 value={selectedSiteId}
                 onChange={setSelectedSiteId}
@@ -268,7 +268,7 @@ const Dashboard: React.FC = () => {
                   minWidth: '120px',
                   flexShrink: 1
                 }}
-                placeholder="选择工地"
+                placeholder={t('admin.selectSite')}
                 showSearch
                 optionFilterProp="children"
                 filterOption={(input, option) =>

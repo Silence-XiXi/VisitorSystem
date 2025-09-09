@@ -16,7 +16,7 @@ const DistributorLayout: React.FC = () => {
   const [distributorInfo, setDistributorInfo] = useState<any>(null)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const { setLocale } = useLocale()
+  const { setLocale, t } = useLocale()
 
   // 检查用户角色，只有分判商才能访问
   useEffect(() => {
@@ -58,14 +58,14 @@ const DistributorLayout: React.FC = () => {
   // 处理退出登录
   const handleLogout = () => {
     logout()
-    message.success('已退出登录')
+    message.success(t('login.logoutSuccess'))
     navigate('/login')
   }
 
   // 语言切换处理函数
   const handleLanguageChange = (newLocale: string) => {
     setLocale(newLocale as 'zh-CN' | 'zh-TW' | 'en-US')
-    message.success('语言已切换')
+    message.success(t('login.languageChanged'))
   }
 
   // 用户下拉菜单
@@ -73,29 +73,29 @@ const DistributorLayout: React.FC = () => {
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: '个人信息',
+      label: t('navigation.profile'),
       onClick: () => {
         navigate('/distributor/profile')
       }
     },
     {
       key: 'language',
-      label: '语言切换',
+      label: t('navigation.languageSwitch'),
       icon: <GlobalOutlined />,
       children: [
         {
           key: 'zh-CN',
-          label: '简体中文',
+          label: t('languages.zhCN'),
           onClick: () => handleLanguageChange('zh-CN')
         },
         {
           key: 'zh-TW',
-          label: '繁體中文',
+          label: t('languages.zhTW'),
           onClick: () => handleLanguageChange('zh-TW')
         },
         {
           key: 'en-US',
-          label: 'English',
+          label: t('languages.enUS'),
           onClick: () => handleLanguageChange('en-US')
         }
       ]
@@ -106,7 +106,7 @@ const DistributorLayout: React.FC = () => {
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: '退出登录',
+      label: t('navigation.logout'),
       onClick: handleLogout
     }
   ]

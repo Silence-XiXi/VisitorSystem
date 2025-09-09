@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Form, Input, Button, message, Space, Typography, Row, Col } from 'antd'
-import { UserOutlined, LockOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Button, message, Space, Typography, Row, Col, Dropdown } from 'antd'
+import { UserOutlined, LockOutlined, ReloadOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
+import { useLocale } from '../contexts/LocaleContext'
 
 const { Title } = Typography
 
@@ -12,6 +13,7 @@ const Login: React.FC = () => {
   const [captchaImage, setCaptchaImage] = useState('')
   const navigate = useNavigate()
   const { login, isAuthenticated, user, isLoading } = useAuth()
+  const { t, setLocale } = useLocale()
 
   // 生成验证码
   const generateCaptcha = () => {
@@ -77,6 +79,12 @@ const Login: React.FC = () => {
     generateCaptcha()
   }, [])
 
+  // 语言切换处理函数
+  const handleLanguageChange = (newLocale: string) => {
+    setLocale(newLocale as 'zh-CN' | 'zh-TW' | 'en-US')
+    message.success(t('login.languageChanged'))
+  }
+
   // 如果用户已经登录，自动跳转到相应页面
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
@@ -93,7 +101,7 @@ const Login: React.FC = () => {
   const onFinish = async (values: { username: string; password: string; captcha: string }) => {
     // 验证验证码
     if (values.captcha.toUpperCase() !== captchaCode.toUpperCase()) {
-      message.error('验证码错误，请重新输入')
+      message.error(t('login.captchaError'))
       generateCaptcha() // 重新生成验证码
       return
     }
@@ -103,7 +111,7 @@ const Login: React.FC = () => {
       const result = await login(values.username, values.password)
       console.log('Login result:', result)
       if (result.success) {
-        message.success('登录成功！')
+        message.success(t('login.loginSuccess'))
         // 添加小延迟确保状态更新
         setTimeout(() => {
           // 根据识别出的角色跳转到不同页面
@@ -120,11 +128,11 @@ const Login: React.FC = () => {
         }, 100)
       } else {
         console.log('Login failed')
-        message.error('登录失败，请检查您的凭据')
+        message.error(t('login.loginFailed'))
         generateCaptcha() // 登录失败时重新生成验证码
       }
     } catch (error) {
-      message.error('登录过程中发生错误')
+      message.error(t('login.loginError'))
       generateCaptcha() // 发生错误时重新生成验证码
     } finally {
       setLoading(false)
@@ -143,6 +151,66 @@ const Login: React.FC = () => {
       position: 'relative',
       overflow: 'hidden'
     }}>
+      {/* 语言切换按钮 - 整个页面右上角 */}
+      <div style={{ 
+        position: 'fixed', 
+        top: '20px', 
+        right: '20px',
+        zIndex: 1000
+      }}>
+        <Dropdown
+          menu={{
+            items: [
+              {
+                key: 'zh-CN',
+                label: t('languages.zhCN'),
+                onClick: () => handleLanguageChange('zh-CN')
+              },
+              {
+                key: 'zh-TW',
+                label: t('languages.zhTW'),
+                onClick: () => handleLanguageChange('zh-TW')
+              },
+              {
+                key: 'en-US',
+                label: t('languages.enUS'),
+                onClick: () => handleLanguageChange('en-US')
+              }
+            ]
+          }}
+          placement="bottomRight"
+          arrow
+        >
+          <Button 
+            type="text" 
+            style={{ 
+              color: '#fff',
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              height: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+            }}
+          >
+            <GlobalOutlined style={{ fontSize: '16px' }} />
+            <span style={{ fontSize: '14px', fontWeight: 500 }}>{t('navigation.languageSwitch')}</span>
+          </Button>
+        </Dropdown>
+      </div>
       {/* 背景装饰元素 */}
       <div style={{
         position: 'absolute',
@@ -178,9 +246,9 @@ const Login: React.FC = () => {
         <Space direction="vertical" size="large" style={{ width: '100%', textAlign: 'center' }}>
           <div>
             <Title level={2} style={{ color: '#1890ff', marginBottom: 8 }}>
-              工地访客管理系统
+              {t('login.title')}
             </Title>
-            <p style={{ color: '#666', margin: 0 }}>请登录您的账户</p>
+            <p style={{ color: '#666', margin: 0 }}>{t('login.subtitle')}</p>
           </div>
 
           <Form
@@ -193,35 +261,35 @@ const Login: React.FC = () => {
 
             <Form.Item
               name="username"
-              label="用户名"
-              rules={[{ required: true, message: '请输入用户名!' }]}
+              label={t('login.username')}
+              rules={[{ required: true, message: t('login.usernamePlaceholder') + '!' }]}
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="请输入用户名"
+                placeholder={t('login.usernamePlaceholder')}
               />
             </Form.Item>
 
             <Form.Item
               name="password"
-              label="密码"
-              rules={[{ required: true, message: '请输入密码!' }]}
+              label={t('login.password')}
+              rules={[{ required: true, message: t('login.passwordPlaceholder') + '!' }]}
             >
               <Input.Password
                 prefix={<LockOutlined />}
-                placeholder="请输入密码"
+                placeholder={t('login.passwordPlaceholder')}
               />
             </Form.Item>
 
             <Form.Item
               name="captcha"
-              label="安全验证"
-              rules={[{ required: true, message: '请输入验证码!' }]}
+              label={t('login.captcha')}
+              rules={[{ required: true, message: t('login.captchaPlaceholder') + '!' }]}
             >
               <Row gutter={8}>
                 <Col span={16}>
                   <Input
-                    placeholder="请输入验证码"
+                    placeholder={t('login.captchaPlaceholder')}
                     style={{ height: 40 }}
                   />
                 </Col>
@@ -287,7 +355,7 @@ const Login: React.FC = () => {
                   fontWeight: 500
                 }}
               >
-                {loading ? '登录中...' : '登录'}
+                {loading ? t('login.loggingIn') : t('login.loginButton')}
               </Button>
             </Form.Item>
           </Form>

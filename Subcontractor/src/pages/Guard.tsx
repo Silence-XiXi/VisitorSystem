@@ -85,7 +85,7 @@ const Guard: React.FC = () => {
   // 认证和导航
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const { locale, setLocale } = useLocale()
+  const { locale, setLocale, t } = useLocale()
   
   // 状态管理
   const [currentView, setCurrentView] = useState<'main' | 'entry' | 'borrow' | 'exit' | 'reports' | 'userCenter'>('main')
@@ -543,7 +543,7 @@ const Guard: React.FC = () => {
     }
     setAttendanceRecords(prev => [newRecord, ...prev])
 
-    message.success('入场登记完成')
+    message.success(t('guard.entryCompleted'))
     
     // 清空输入和查询信息，停留在当前页面
     setScannedWorkerId('')
@@ -804,7 +804,7 @@ const Guard: React.FC = () => {
     )
     setAttendanceRecords(updatedRecords)
 
-    message.success('离场登记完成')
+    message.success(t('guard.exitCompleted'))
     
     // 清空输入和查询信息，停留在当前页面
     setScannedWorkerId('')
@@ -834,7 +834,7 @@ const Guard: React.FC = () => {
   const handleLogout = () => {
     logout()
     navigate('/login')
-    message.success('已退出登录')
+    message.success(t('login.logoutSuccess'))
   }
 
   // 用户中心相关处理函数
@@ -845,7 +845,7 @@ const Guard: React.FC = () => {
   // 语言切换处理函数
   const handleLanguageChange = (newLocale: string) => {
     setLocale(newLocale as 'zh-CN' | 'zh-TW' | 'en-US')
-    message.success('语言已切换')
+    message.success(t('login.languageChanged'))
   }
 
   const handlePasswordChange = async (values: { oldPassword: string; newPassword: string; confirmPassword: string }) => {
@@ -1013,35 +1013,35 @@ const Guard: React.FC = () => {
             items: [
               {
                 key: 'userCenter',
-                label: '修改密码',
+                label: t('navigation.changePassword'),
                 icon: <UserOutlined />,
                 onClick: handleUserCenterClick
               },
               {
                 key: 'language',
-                label: '语言切换',
+                label: t('navigation.languageSwitch'),
                 icon: <GlobalOutlined />,
                 children: [
                   {
                     key: 'zh-CN',
-                    label: '简体中文',
+                    label: t('languages.zhCN'),
                     onClick: () => handleLanguageChange('zh-CN')
                   },
                   {
                     key: 'zh-TW',
-                    label: '繁體中文',
+                    label: t('languages.zhTW'),
                     onClick: () => handleLanguageChange('zh-TW')
                   },
                   {
                     key: 'en-US',
-                    label: 'English',
+                    label: t('languages.enUS'),
                     onClick: () => handleLanguageChange('en-US')
                   }
                 ]
               },
               {
                 key: 'logout',
-                label: '退出登录',
+                label: t('navigation.logout'),
                 icon: <LogoutOutlined />,
                 onClick: handleLogout
               }
@@ -1089,10 +1089,10 @@ const Guard: React.FC = () => {
   // 渲染快捷功能按钮
   const renderQuickButtons = () => {
     const buttons = [
-      { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-      { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
-      { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
-      { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports }
+      { key: 'entry', label: t('guard.entryRegistration'), icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
+      { key: 'borrow', label: t('guard.borrowReturn'), icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+      { key: 'exit', label: t('guard.exitRegistration'), icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
+      { key: 'reports', label: t('guard.reports'), icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports }
     ]
 
     return (
@@ -1447,8 +1447,8 @@ const Guard: React.FC = () => {
               onClick={handleEntryRegistration}
             >
               <UserAddOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
-              <Title level={4}>入场登记</Title>
-              <Text type="secondary">工人入场时进行登记</Text>
+              <Title level={4}>{t('guard.entryRegistration')}</Title>
+              <Text type="secondary">{t('guard.entryDescription')}</Text>
             </Card>
           </Col>
           <Col span={12}>
@@ -1458,8 +1458,8 @@ const Guard: React.FC = () => {
               onClick={handleItemBorrowing}
             >
               <ShoppingCartOutlined style={{ fontSize: '48px', color: '#52c41a', marginBottom: '16px' }} />
-              <Title level={4}>借/还物品</Title>
-              <Text type="secondary">工人借用物品登记</Text>
+              <Title level={4}>{t('guard.borrowReturn')}</Title>
+              <Text type="secondary">{t('guard.borrowDescription')}</Text>
             </Card>
           </Col>
           <Col span={12}>
@@ -1469,8 +1469,8 @@ const Guard: React.FC = () => {
               onClick={handleExitProcess}
             >
               <LogoutOutlined style={{ fontSize: '48px', color: '#fa541c', marginBottom: '16px' }} />
-              <Title level={4}>离场登记</Title>
-              <Text type="secondary">工人离场时进行登记</Text>
+              <Title level={4}>{t('guard.exitRegistration')}</Title>
+              <Text type="secondary">{t('guard.exitDescription')}</Text>
             </Card>
           </Col>
           <Col span={12}>
