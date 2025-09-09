@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Layout, Button, Avatar, Dropdown, Typography, message } from 'antd'
-import { UserOutlined, LogoutOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { UserOutlined, LogoutOutlined, ClockCircleOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import DistributorWorkerUpload from '../pages/DistributorWorkerUpload'
 import DistributorAccountSettings from '../pages/DistributorAccountSettings'
 import { useAuth } from '../hooks/useAuth'
+import { useLocale } from '../contexts/LocaleContext'
 
 const { Header, Content } = Layout
 const { Text } = Typography
@@ -15,6 +16,7 @@ const DistributorLayout: React.FC = () => {
   const [distributorInfo, setDistributorInfo] = useState<any>(null)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { setLocale } = useLocale()
 
   // 检查用户角色，只有分判商才能访问
   useEffect(() => {
@@ -60,6 +62,12 @@ const DistributorLayout: React.FC = () => {
     navigate('/login')
   }
 
+  // 语言切换处理函数
+  const handleLanguageChange = (newLocale: string) => {
+    setLocale(newLocale as 'zh-CN' | 'zh-TW' | 'en-US')
+    message.success('语言已切换')
+  }
+
   // 用户下拉菜单
   const userMenuItems = [
     {
@@ -69,6 +77,28 @@ const DistributorLayout: React.FC = () => {
       onClick: () => {
         navigate('/distributor/profile')
       }
+    },
+    {
+      key: 'language',
+      label: '语言切换',
+      icon: <GlobalOutlined />,
+      children: [
+        {
+          key: 'zh-CN',
+          label: '简体中文',
+          onClick: () => handleLanguageChange('zh-CN')
+        },
+        {
+          key: 'zh-TW',
+          label: '繁體中文',
+          onClick: () => handleLanguageChange('zh-TW')
+        },
+        {
+          key: 'en-US',
+          label: 'English',
+          onClick: () => handleLanguageChange('en-US')
+        }
+      ]
     },
     {
       type: 'divider'

@@ -18,7 +18,9 @@ import {
   Divider,
   Layout,
   Avatar,
-  Dropdown
+  Dropdown,
+  Checkbox,
+  Tooltip
 } from 'antd'
 import { 
   UserAddOutlined, 
@@ -30,11 +32,14 @@ import {
   IdcardOutlined,
   UserOutlined,
   ClockCircleOutlined,
-  ArrowLeftOutlined
+  ArrowLeftOutlined,
+  QuestionCircleOutlined,
+  GlobalOutlined
 } from '@ant-design/icons'
 import { mockWorkers, mockSites, mockDistributors } from '../data/mockData'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
+import { useLocale } from '../contexts/LocaleContext'
 import dayjs from 'dayjs'
 
 const { Title, Text } = Typography
@@ -58,6 +63,7 @@ interface Worker {
     itemId: string
     borrowTime: string
     returnTime?: string
+    remark?: string
   }>
 }
 
@@ -69,6 +75,7 @@ interface AttendanceRecord {
   exitTime?: string
   physicalCardId: string
   phone: string
+  idCard?: string
   status: 'in' | 'out'
   borrowedItems: number
   returnedItems: number
@@ -78,6 +85,7 @@ const Guard: React.FC = () => {
   // 认证和导航
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { locale, setLocale } = useLocale()
   
   // 状态管理
   const [currentView, setCurrentView] = useState<'main' | 'entry' | 'borrow' | 'exit' | 'reports' | 'userCenter'>('main')
@@ -92,9 +100,25 @@ const Guard: React.FC = () => {
   const [itemId, setItemId] = useState('')
   const [itemNumber, setItemNumber] = useState('')
   const [borrowRemark, setBorrowRemark] = useState('')
+  const [borrowItemsList, setBorrowItemsList] = useState<Array<{
+    itemType: string
+    itemId: string
+    remark: string
+    showRemark?: boolean
+  }>>([])
+  const [selectedReturnItems, setSelectedReturnItems] = useState<string[]>([])
+  const [currentBorrowedItems, setCurrentBorrowedItems] = useState<Array<{
+    itemType: string
+    itemId: string
+    borrowTime: string
+    remark: string
+  }>>([])
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [workers, setWorkers] = useState<Worker[]>([])
   const [selectedBorrowedItems, setSelectedBorrowedItems] = useState<string[]>([])
+  const [unreturnedItemRemarks, setUnreturnedItemRemarks] = useState<{[key: string]: string}>({})
+  const [physicalCardReturned, setPhysicalCardReturned] = useState(false)
+  const [borrowQueryId, setBorrowQueryId] = useState('')
   const [userCenterModalVisible, setUserCenterModalVisible] = useState(false)
   const [passwordForm] = Form.useForm()
   const [pagination, setPagination] = useState({
@@ -106,6 +130,20 @@ const Guard: React.FC = () => {
   const [jumpPage, setJumpPage] = useState<string>('')
   const [itemRecordsModalVisible, setItemRecordsModalVisible] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
+
+  // 计算统计数据
+  const currentOnSite = workers.filter(w => w.status === 'in').length
+  const totalExitedToday = workers.filter(w => w.status === 'out').length
+  const totalEnteredToday = attendanceRecords.filter(r => 
+    dayjs(r.entryTime).isSame(dayjs(), 'day')
+  ).length
+  const totalBorrowedItems = workers.reduce((total, worker) => {
+    return total + (worker.borrowedItems?.length || 0)
+  }, 0)
+  const totalUnreturnedItems = workers.reduce((total, worker) => {
+    const unreturnedItems = worker.borrowedItems?.filter(item => !item.returnTime) || []
+    return total + unreturnedItems.length
+  }, 0)
 
   // 实时时间更新
   useEffect(() => {
@@ -132,6 +170,7 @@ const Guard: React.FC = () => {
         id: '1',
         workerId: 'WK001',
         workerName: '张三',
+        idCard: '110101199001011234',
         entryTime: dayjs().subtract(2, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD001',
         phone: '13800138001',
@@ -143,6 +182,7 @@ const Guard: React.FC = () => {
         id: '2',
         workerId: 'WK002',
         workerName: '李四',
+        idCard: '110101199002021234',
         entryTime: dayjs().subtract(1, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD002',
         phone: '13800138002',
@@ -154,6 +194,7 @@ const Guard: React.FC = () => {
         id: '3',
         workerId: 'WK003',
         workerName: '王五',
+        idCard: '110101199003031234',
         entryTime: dayjs().subtract(3, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         exitTime: dayjs().subtract(1, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD003',
@@ -166,6 +207,7 @@ const Guard: React.FC = () => {
         id: '4',
         workerId: 'WK004',
         workerName: '赵六',
+        idCard: '110101199004041234',
         entryTime: dayjs().subtract(4, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD004',
         phone: '13800138004',
@@ -177,6 +219,7 @@ const Guard: React.FC = () => {
         id: '5',
         workerId: 'WK005',
         workerName: '钱七',
+        idCard: '110101199005051234',
         entryTime: dayjs().subtract(30, 'minute').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD005',
         phone: '13800138005',
@@ -188,6 +231,7 @@ const Guard: React.FC = () => {
         id: '6',
         workerId: 'WK006',
         workerName: '孙八',
+        idCard: '110101199006061234',
         entryTime: dayjs().subtract(5, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         exitTime: dayjs().subtract(2, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD006',
@@ -200,6 +244,7 @@ const Guard: React.FC = () => {
         id: '7',
         workerId: 'WK007',
         workerName: '周九',
+        idCard: '110101199007071234',
         entryTime: dayjs().subtract(90, 'minute').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD007',
         phone: '13800138007',
@@ -211,6 +256,7 @@ const Guard: React.FC = () => {
         id: '8',
         workerId: 'WK008',
         workerName: '吴十',
+        idCard: '110101199008081234',
         entryTime: dayjs().subtract(6, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         exitTime: dayjs().subtract(3, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD008',
@@ -223,6 +269,7 @@ const Guard: React.FC = () => {
         id: '9',
         workerId: 'WK009',
         workerName: '郑十一',
+        idCard: '110101199009091234',
         entryTime: dayjs().subtract(45, 'minute').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD009',
         phone: '13800138009',
@@ -234,6 +281,7 @@ const Guard: React.FC = () => {
         id: '10',
         workerId: 'WK010',
         workerName: '王十二',
+        idCard: '110101199010101234',
         entryTime: dayjs().subtract(135, 'minute').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD010',
         phone: '13800138010',
@@ -249,6 +297,7 @@ const Guard: React.FC = () => {
         exitTime: dayjs().subtract(4, 'hour').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD011',
         phone: '13800138011',
+        idCard: '110101199011111234',
         status: 'out',
         borrowedItems: 2,
         returnedItems: 2
@@ -260,6 +309,7 @@ const Guard: React.FC = () => {
         entryTime: dayjs().subtract(105, 'minute').format('YYYY-MM-DD HH:mm:ss'),
         physicalCardId: 'CARD012',
         phone: '13800138012',
+        idCard: '110101199012121234',
         status: 'in',
         borrowedItems: 1,
         returnedItems: 0
@@ -494,10 +544,15 @@ const Guard: React.FC = () => {
     setAttendanceRecords(prev => [newRecord, ...prev])
 
     message.success('入场登记完成')
-    setCurrentView('main')
+    
+    // 清空输入和查询信息，停留在当前页面
+    setScannedWorkerId('')
+    setSelectedWorker(null)
+    setPhysicalCardId('')
+    setPhoneNumber('')
   }
 
-  // 2. 借物登记功能
+  // 2. 借/还物品功能
   const handleItemBorrowing = () => {
     setCurrentView('borrow')
     setScannedWorkerId('')
@@ -506,7 +561,7 @@ const Guard: React.FC = () => {
 
   const handleScanForBorrow = () => {
     if (!scannedWorkerId.trim()) {
-      message.error('请输入工人ID或实体卡ID')
+      message.error('请输入二维码编号或实体卡编号')
       return
     }
 
@@ -515,26 +570,31 @@ const Guard: React.FC = () => {
     )
     
     if (!worker) {
-      message.error('未找到该工人信息')
+      message.error('未找到对应的工人信息')
       return
     }
 
     if (worker.status === 'out') {
-      message.error('该工人未入场，无法借物')
+      message.error('该工人未在场内，无法借物')
       return
     }
 
     setSelectedWorker(worker)
-    setBorrowModalVisible(true)
+    
+    // 加载当前借用物品列表
+    const borrowedItems = worker.borrowedItems?.filter(item => !item.returnTime).map(item => ({
+      itemType: item.itemType,
+      itemId: item.itemId,
+      borrowTime: item.borrowTime,
+      remark: item.remark || ''
+    })) || []
+    setCurrentBorrowedItems(borrowedItems)
+    setSelectedReturnItems([])
+    
     message.success('工人信息查询成功')
   }
 
-  const handleCompleteBorrow = () => {
-    if (!selectedWorker) {
-      message.error('请先查询工人信息')
-      return
-    }
-
+  const handleAddItemToList = () => {
     if (!selectedItemType) {
       message.error('请选择物品类型')
       return
@@ -545,18 +605,107 @@ const Guard: React.FC = () => {
       return
     }
 
-    const newBorrowedItem = {
+    // 检查是否已存在相同的物品
+    const existingItem = borrowItemsList.find(item => 
+      item.itemType === selectedItemType && item.itemId === itemNumber.trim()
+    )
+
+    if (existingItem) {
+      message.error('该物品已添加到借用列表中')
+      return
+    }
+
+    const newItem = {
       itemType: selectedItemType,
       itemId: itemNumber.trim(),
-      borrowTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-      remark: borrowRemark.trim()
+      remark: '',
+      showRemark: false
     }
+
+    setBorrowItemsList([...borrowItemsList, newItem])
+    
+    // 清空输入框
+    setSelectedItemType('')
+    setItemNumber('')
+    
+    message.success('物品已添加到借用列表')
+  }
+
+  const handleRemoveItemFromList = (index: number) => {
+    const newList = borrowItemsList.filter((_, i) => i !== index)
+    setBorrowItemsList(newList)
+    message.success('物品已从借用列表中移除')
+  }
+
+  const handleBorrowReturnItems = () => {
+    if (selectedReturnItems.length === 0) {
+      message.error('请选择要归还的物品')
+      return
+    }
+
+    const updatedWorkers = workers.map(w => 
+      w.id === selectedWorker?.id 
+        ? { 
+            ...w, 
+            borrowedItems: w.borrowedItems?.map(item => 
+              selectedReturnItems.includes(`${item.itemType}-${item.itemId}`)
+                ? { ...item, returnTime: dayjs().format('YYYY-MM-DD HH:mm:ss') }
+                : item
+            )
+          }
+        : w
+    )
+    setWorkers(updatedWorkers)
+
+    // 更新考勤记录
+    const updatedRecords = attendanceRecords.map(record => 
+      record.workerId === selectedWorker?.workerId
+        ? { ...record, borrowedItems: Math.max(0, record.borrowedItems - selectedReturnItems.length) }
+        : record
+    )
+    setAttendanceRecords(updatedRecords)
+
+    message.success(`成功归还 ${selectedReturnItems.length} 个物品`)
+    
+    // 重新加载当前借用物品列表
+    const updatedWorker = updatedWorkers.find(w => w.id === selectedWorker?.id)
+    if (updatedWorker) {
+      const borrowedItems = updatedWorker.borrowedItems?.filter(item => !item.returnTime).map(item => ({
+        itemType: item.itemType,
+        itemId: item.itemId,
+        borrowTime: item.borrowTime,
+        remark: item.remark || ''
+      })) || []
+      setCurrentBorrowedItems(borrowedItems)
+    }
+    
+    setSelectedReturnItems([])
+  }
+
+  const handleCompleteBorrow = () => {
+    if (!selectedWorker) {
+      message.error('请先查询工人信息')
+      return
+    }
+
+    if (borrowItemsList.length === 0) {
+      message.error('请至少添加一个物品到借用列表')
+      return
+    }
+
+    // 将借用列表中的物品转换为完整的借用记录
+    const borrowedItems = borrowItemsList.map(item => ({
+      itemType: item.itemType,
+      itemId: item.itemId,
+      borrowTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      remark: item.remark
+    }))
 
     const updatedWorkers = workers.map(w => 
       w.id === selectedWorker.id 
         ? { 
             ...w, 
-            borrowedItems: [...(w.borrowedItems || []), newBorrowedItem]
+            borrowedItems: [...(w.borrowedItems || []), ...borrowedItems]
           }
         : w
     )
@@ -565,16 +714,21 @@ const Guard: React.FC = () => {
     // 更新考勤记录
     const updatedRecords = attendanceRecords.map(record => 
       record.workerId === selectedWorker.workerId
-        ? { ...record, borrowedItems: record.borrowedItems + 1 }
+        ? { ...record, borrowedItems: record.borrowedItems + borrowItemsList.length }
         : record
     )
     setAttendanceRecords(updatedRecords)
 
-    message.success('借物登记完成')
+    message.success(`借物登记完成，共借用 ${borrowItemsList.length} 个物品`)
+    
+    // 清空输入和查询信息，停留在当前页面
+    setScannedWorkerId('')
+    setSelectedWorker(null)
     setSelectedItemType('')
     setItemNumber('')
-    setBorrowRemark('')
-    setCurrentView('main')
+    setBorrowItemsList([])
+    setCurrentBorrowedItems([])
+    setSelectedReturnItems([])
   }
 
   // 3. 离场功能
@@ -586,7 +740,7 @@ const Guard: React.FC = () => {
 
   const handleScanForExit = () => {
     if (!scannedWorkerId.trim()) {
-      message.error('请输入工人ID或实体卡ID')
+      message.error('请输入二维码编号或实体卡编号')
       return
     }
 
@@ -595,28 +749,35 @@ const Guard: React.FC = () => {
     )
     
     if (!worker) {
-      message.error('未找到该工人信息')
+      message.error('未找到对应的工人信息')
       return
     }
 
     if (worker.status === 'out') {
-      message.error('该工人未入场，无法离场')
+      message.error('该工人未在场内，无法离场')
       return
     }
 
     setSelectedWorker(worker)
-    setExitModalVisible(true)
     message.success('工人信息查询成功')
   }
 
   const handleCompleteExit = () => {
     if (!selectedWorker) return
 
-    // 检查是否有未归还物品
-    const unreturnedItems = selectedWorker.borrowedItems?.filter(item => !item.returnTime) || []
-    if (unreturnedItems.length > 0) {
-      message.error(`该工人还有 ${unreturnedItems.length} 件物品未归还，请先归还物品`)
+    // 验证实体卡是否已归还
+    if (!physicalCardReturned) {
+      message.error('请确认实体卡已归还')
       return
+    }
+
+    // 验证未归还物品是否都有备注
+    const unreturnedItems = selectedWorker.borrowedItems?.filter((item: any) => !item.returnTime) || []
+    for (const item of unreturnedItems) {
+      if (!unreturnedItemRemarks[item.itemId] || unreturnedItemRemarks[item.itemId].trim() === '') {
+        message.error(`请为未归还物品 "${item.itemType} - ${item.itemId}" 填写备注`)
+        return
+      }
     }
 
     // 更新工人状态
@@ -644,12 +805,23 @@ const Guard: React.FC = () => {
     setAttendanceRecords(updatedRecords)
 
     message.success('离场登记完成')
-    setExitModalVisible(false)
-    setCurrentView('main')
+    
+    // 清空输入和查询信息，停留在当前页面
+    setScannedWorkerId('')
+    setSelectedWorker(null)
+    setSelectedBorrowedItems([])
+    setUnreturnedItemRemarks({})
+    setPhysicalCardReturned(false)
   }
 
   // 4. 报表功能
   const handleReports = () => {
+    setCurrentView('reports')
+  }
+
+  // 处理统计卡片点击事件
+  const handleStatClick = (filterType: 'all' | 'in' | 'out') => {
+    setStatusFilter(filterType)
     setCurrentView('reports')
   }
 
@@ -668,6 +840,12 @@ const Guard: React.FC = () => {
   // 用户中心相关处理函数
   const handleUserCenterClick = () => {
     setUserCenterModalVisible(true)
+  }
+
+  // 语言切换处理函数
+  const handleLanguageChange = (newLocale: string) => {
+    setLocale(newLocale as 'zh-CN' | 'zh-TW' | 'en-US')
+    message.success('语言已切换')
   }
 
   const handlePasswordChange = async (values: { oldPassword: string; newPassword: string; confirmPassword: string }) => {
@@ -750,21 +928,55 @@ const Guard: React.FC = () => {
     setSelectedBorrowedItems([])
   }
 
-  // 计算统计数据
-  const currentOnSite = workers.filter(w => w.status === 'in').length
-  const totalEnteredToday = attendanceRecords.filter(r => 
-    dayjs(r.entryTime).isSame(dayjs(), 'day')
-  ).length
-  const totalExitedToday = attendanceRecords.filter(r => 
-    r.exitTime && dayjs(r.exitTime).isSame(dayjs(), 'day')
-  ).length
-  const pendingExit = workers.filter(w => w.status === 'in').length
+  // 检查是否可以完成离场
+  const canCompleteExit = () => {
+    if (!selectedWorker) return false
+    
+    // 检查实体卡是否已归还
+    if (!physicalCardReturned) return false
+    
+    // 检查未归还物品是否都有备注
+    const unreturnedItems = selectedWorker.borrowedItems?.filter((item: any) => !item.returnTime) || []
+    for (const item of unreturnedItems) {
+      if (!unreturnedItemRemarks[item.itemId] || unreturnedItemRemarks[item.itemId].trim() === '') {
+        return false
+      }
+    }
+    
+    return true
+  }
+
+  // 借/还物品页面查询工人信息
+  const handleBorrowQuery = () => {
+    if (!borrowQueryId.trim()) {
+      message.error('请输入二维码编号或实体卡编号')
+      return
+    }
+
+    const worker = workers.find(w => 
+      w.workerId === borrowQueryId || w.physicalCardId === borrowQueryId
+    )
+
+    if (!worker) {
+      message.error('未找到对应的工人信息')
+      return
+    }
+
+    if (worker.status !== 'in') {
+      message.error('该工人未在场内，无法借物')
+      return
+    }
+
+    setSelectedWorker(worker)
+    message.success('工人信息查询成功')
+  }
+
 
   // Header组件
   const renderHeader = () => (
     <Header style={{ 
       background: '#fff', 
-      padding: '0 24px', 
+      padding: '0 clamp(12px, 3vw, 24px)', 
       display: 'flex', 
       justifyContent: 'space-between', 
       alignItems: 'center',
@@ -777,16 +989,25 @@ const Guard: React.FC = () => {
       zIndex: 1000,
       height: '64px'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <Title level={2} style={{ margin: 0, color: '#1890ff', fontSize: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(12px, 3vw, 24px)' }}>
+        <Title level={2} style={{ 
+          margin: 0, 
+          color: '#1890ff', 
+          fontSize: 'clamp(16px, 4vw, 24px)',
+          lineHeight: '1.2'
+        }}>
           {user?.siteName || '工地管理系统'}
         </Title>
-        <Text type="secondary" style={{ fontSize: '18px', fontWeight: 'bold' }}>
+        <Text type="secondary" style={{ 
+          fontSize: 'clamp(12px, 3vw, 18px)', 
+          fontWeight: 'bold',
+          whiteSpace: 'nowrap'
+        }}>
           <ClockCircleOutlined /> {currentTime}
         </Text>
       </div>
       
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 16px)' }}>
         <Dropdown
           menu={{
             items: [
@@ -795,6 +1016,28 @@ const Guard: React.FC = () => {
                 label: '修改密码',
                 icon: <UserOutlined />,
                 onClick: handleUserCenterClick
+              },
+              {
+                key: 'language',
+                label: '语言切换',
+                icon: <GlobalOutlined />,
+                children: [
+                  {
+                    key: 'zh-CN',
+                    label: '简体中文',
+                    onClick: () => handleLanguageChange('zh-CN')
+                  },
+                  {
+                    key: 'zh-TW',
+                    label: '繁體中文',
+                    onClick: () => handleLanguageChange('zh-TW')
+                  },
+                  {
+                    key: 'en-US',
+                    label: 'English',
+                    onClick: () => handleLanguageChange('en-US')
+                  }
+                ]
               },
               {
                 key: 'logout',
@@ -809,27 +1052,31 @@ const Guard: React.FC = () => {
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: '12px',
+            gap: 'clamp(6px, 1.5vw, 12px)',
             cursor: 'pointer',
-            padding: '8px 12px',
+            padding: 'clamp(4px, 1vw, 8px) clamp(6px, 1.5vw, 12px)',
             borderRadius: '6px',
             transition: 'background-color 0.2s'
           }}
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <Avatar icon={<UserOutlined />} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Avatar icon={<UserOutlined />} size={window.innerWidth < 768 ? 'small' : 'default'} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)' }}>
               <Text 
                 strong 
                 style={{ 
                   color: '#1890ff',
-                  fontSize: '16px'
+                  fontSize: 'clamp(12px, 2.5vw, 16px)',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {user?.username || '门卫'}
               </Text>
-              <Text type="secondary" style={{ fontSize: '14px' }}>
+              <Text type="secondary" style={{ 
+                fontSize: 'clamp(10px, 2vw, 14px)',
+                whiteSpace: 'nowrap'
+              }}>
                 ({user?.role === 'guard' ? '门卫' : '用户'})
               </Text>
             </div>
@@ -843,7 +1090,7 @@ const Guard: React.FC = () => {
   const renderQuickButtons = () => {
     const buttons = [
       { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-      { key: 'borrow', label: '借物登记', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+      { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
       { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
       { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports }
     ]
@@ -864,11 +1111,22 @@ const Guard: React.FC = () => {
               type="default"
               icon={button.icon}
               onClick={button.onClick}
-              style={{
-                color: button.color,
-                borderColor: button.color,
-                height: '36px'
-              }}
+                  style={{
+                    color: button.key === 'entry' && currentView === 'entry' ? '#fff' : 
+                           button.key === 'borrow' && currentView === 'borrow' ? '#fff' :
+                           button.key === 'exit' && currentView === 'exit' ? '#fff' :
+                           button.key === 'reports' && currentView === 'reports' ? '#fff' :
+                           button.color,
+                    borderColor: button.color,
+                    backgroundColor: button.key === 'entry' && currentView === 'entry' ? '#1890ff' : 
+                                   button.key === 'borrow' && currentView === 'borrow' ? '#52c41a' :
+                                   button.key === 'exit' && currentView === 'exit' ? '#fa541c' :
+                                   button.key === 'reports' && currentView === 'reports' ? '#722ed1' :
+                                   'transparent',
+                    height: window.innerWidth >= 768 ? '48px' : '40px',
+                    fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 22px)' : 'clamp(14px, 2vw, 20px)',
+                    padding: window.innerWidth >= 768 ? '0 16px' : '0 12px'
+                  }}
             >
               {button.label}
             </Button>
@@ -1053,45 +1311,129 @@ const Guard: React.FC = () => {
         }}>
         
         {/* 统计卡片 */}
+        <style>
+          {`
+            @media (max-width: 1200px) {
+              .ant-statistic-title {
+                display: none !important;
+              }
+            }
+          `}
+        </style>
         <Row gutter={16} style={{ marginBottom: '24px' }}>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="当前在场人数"
-                value={currentOnSite}
-                prefix={<UserAddOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
+          <Col span={12}>
+            <Card style={{ height: '140px' }}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div 
+                    style={{ 
+                      flex: 1, 
+                      textAlign: 'center', 
+                      padding: '0 4px',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onClick={() => handleStatClick('all')}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Statistic
+                      title="今日入场"
+                      value={totalEnteredToday}
+                      prefix={<UserAddOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      valueStyle={{ 
+                        color: '#52c41a',
+                        fontSize: 'clamp(20px, 4vw, 28px)',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </div>
+                  <div style={{ width: '1px', height: '50px', background: '#f0f0f0', margin: '0 6px' }}></div>
+                  <div 
+                    style={{ 
+                      flex: 1, 
+                      textAlign: 'center', 
+                      padding: '0 4px',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onClick={() => handleStatClick('out')}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Statistic
+                      title="已离场"
+                      value={totalExitedToday}
+                      prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      valueStyle={{ 
+                        color: '#1890ff',
+                        fontSize: 'clamp(20px, 4vw, 28px)',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </div>
+                  <div style={{ width: '1px', height: '50px', background: '#f0f0f0', margin: '0 6px' }}></div>
+                  <div 
+                    style={{ 
+                      flex: 1, 
+                      textAlign: 'center', 
+                      padding: '0 4px',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onClick={() => handleStatClick('in')}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Statistic
+                      title="未离场"
+                      value={currentOnSite}
+                      prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      valueStyle={{ 
+                        color: '#ff4d4f',
+                        fontSize: 'clamp(20px, 4vw, 28px)',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </Card>
           </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="今日入场人数"
-                value={totalEnteredToday}
-                prefix={<UserAddOutlined />}
-                valueStyle={{ color: '#52c41a' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="今日离场人数"
-                value={totalExitedToday}
-                prefix={<LogoutOutlined />}
-                valueStyle={{ color: '#fa541c' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="待离场人数"
-                value={pendingExit}
-                prefix={<LogoutOutlined />}
-                valueStyle={{ color: '#fa541c' }}
-              />
+          <Col span={12}>
+            <Card style={{ height: '140px' }}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
+                    <Statistic
+                      title="借出物品"
+                      value={totalBorrowedItems}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      valueStyle={{ 
+                        color: '#1890ff',
+                        fontSize: 'clamp(20px, 4vw, 28px)',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </div>
+                  <div style={{ width: '1px', height: '50px', background: '#f0f0f0', margin: '0 6px' }}></div>
+                  <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
+                    <Statistic
+                      title="待归还物品"
+                      value={totalUnreturnedItems}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      valueStyle={{ 
+                        color: '#ff4d4f',
+                        fontSize: 'clamp(20px, 4vw, 28px)',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </Card>
           </Col>
         </Row>
@@ -1116,7 +1458,7 @@ const Guard: React.FC = () => {
               onClick={handleItemBorrowing}
             >
               <ShoppingCartOutlined style={{ fontSize: '48px', color: '#52c41a', marginBottom: '16px' }} />
-              <Title level={4}>借物登记</Title>
+              <Title level={4}>借/还物品</Title>
               <Text type="secondary">工人借用物品登记</Text>
             </Card>
           </Col>
@@ -1163,15 +1505,17 @@ const Guard: React.FC = () => {
         }}>
           <div style={{ 
             display: 'flex', 
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
             justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '16px'
+            alignItems: window.innerWidth < 768 ? 'flex-start' : 'center',
+            marginBottom: '16px',
+            gap: window.innerWidth < 768 ? '12px' : '0'
           }}>
             <Title level={2} style={{ margin: 0 }}>入场登记</Title>
             <Space wrap>
               {[
                 { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                { key: 'borrow', label: '借物登记', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
                 { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
                 { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
                 { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
@@ -1182,9 +1526,20 @@ const Guard: React.FC = () => {
                   icon={button.icon}
                   onClick={button.onClick}
                   style={{
-                    color: button.color,
+                    color: button.key === 'entry' && currentView === 'entry' ? '#fff' : 
+                           button.key === 'borrow' && currentView === 'borrow' ? '#fff' :
+                           button.key === 'exit' && currentView === 'exit' ? '#fff' :
+                           button.key === 'reports' && currentView === 'reports' ? '#fff' :
+                           button.color,
                     borderColor: button.color,
-                    height: '36px'
+                    backgroundColor: button.key === 'entry' && currentView === 'entry' ? '#1890ff' : 
+                                   button.key === 'borrow' && currentView === 'borrow' ? '#52c41a' :
+                                   button.key === 'exit' && currentView === 'exit' ? '#fa541c' :
+                                   button.key === 'reports' && currentView === 'reports' ? '#722ed1' :
+                                   'transparent',
+                    height: window.innerWidth >= 768 ? '48px' : '40px',
+                    fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 22px)' : 'clamp(14px, 2vw, 20px)',
+                    padding: window.innerWidth >= 768 ? '0 16px' : '0 12px'
                   }}
                 >
                   {button.label}
@@ -1196,9 +1551,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号：</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号/实体卡编号：</Text>
               <Input
-                placeholder="请输入工人ID（必填）"
+                placeholder="请输入二维码编号或实体卡编号（必填）"
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
@@ -1275,7 +1630,7 @@ const Guard: React.FC = () => {
     )
   }
 
-  // 借物登记页面
+  // 借/还物品页面
   if (currentView === 'borrow') {
     return (
       <Layout style={{ minHeight: '100vh' }}>
@@ -1289,15 +1644,17 @@ const Guard: React.FC = () => {
         }}>
           <div style={{ 
             display: 'flex', 
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
             justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '16px'
+            alignItems: window.innerWidth < 768 ? 'flex-start' : 'center',
+            marginBottom: '16px',
+            gap: window.innerWidth < 768 ? '12px' : '0'
           }}>
-            <Title level={2} style={{ margin: 0 }}>借物登记</Title>
+            <Title level={2} style={{ margin: 0 }}>借/还物品</Title>
             <Space wrap>
               {[
                 { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                { key: 'borrow', label: '借物登记', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
                 { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
                 { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
                 { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
@@ -1308,9 +1665,20 @@ const Guard: React.FC = () => {
                   icon={button.icon}
                   onClick={button.onClick}
                   style={{
-                    color: button.color,
+                    color: button.key === 'entry' && currentView === 'entry' ? '#fff' : 
+                           button.key === 'borrow' && currentView === 'borrow' ? '#fff' :
+                           button.key === 'exit' && currentView === 'exit' ? '#fff' :
+                           button.key === 'reports' && currentView === 'reports' ? '#fff' :
+                           button.color,
                     borderColor: button.color,
-                    height: '36px'
+                    backgroundColor: button.key === 'entry' && currentView === 'entry' ? '#1890ff' : 
+                                   button.key === 'borrow' && currentView === 'borrow' ? '#52c41a' :
+                                   button.key === 'exit' && currentView === 'exit' ? '#fa541c' :
+                                   button.key === 'reports' && currentView === 'reports' ? '#722ed1' :
+                                   'transparent',
+                    height: window.innerWidth >= 768 ? '48px' : '40px',
+                    fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 22px)' : 'clamp(14px, 2vw, 20px)',
+                    padding: window.innerWidth >= 768 ? '0 16px' : '0 12px'
                   }}
                 >
                   {button.label}
@@ -1322,9 +1690,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号：</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号/实体卡编号：</Text>
               <Input
-                placeholder="请输入工人ID（必填）"
+                placeholder="请输入二维码编号或实体卡编号（必填）"
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
@@ -1355,15 +1723,102 @@ const Guard: React.FC = () => {
                       </div>
                       <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>身份证号：</Text>
-                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.idCard}</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
+                          {selectedWorker.idCard ? 
+                            (selectedWorker.idCard.length >= 8 ? 
+                              `${selectedWorker.idCard.slice(0, 4)}****${selectedWorker.idCard.slice(-4)}` : 
+                              selectedWorker.idCard
+                            ) : '-'
+                          }
+                        </Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>实体卡号：</Text>
-                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.physicalCardId}</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>电话号码：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.phone || '-'}</Text>
+                      </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>入场时间：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.entryTime || '-'}</Text>
                       </div>
                     </Space>
                   </Card>
                 </div>
+
+                {/* 当前借用物品列表 */}
+                {currentBorrowedItems.length > 0 && (
+                  <div>
+                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>当前借用物品：</Text>
+                    <Card size="small" style={{ marginTop: '8px' }}>
+                      {currentBorrowedItems.map((item, index) => {
+                        const itemKey = `${item.itemType}-${item.itemId}`
+                        return (
+                          <div key={index} style={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            padding: '8px 0',
+                            borderBottom: index < currentBorrowedItems.length - 1 ? '1px solid #f0f0f0' : 'none'
+                          }}>
+                            <Checkbox
+                              checked={selectedReturnItems.includes(itemKey)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedReturnItems([...selectedReturnItems, itemKey])
+                                } else {
+                                  setSelectedReturnItems(selectedReturnItems.filter(key => key !== itemKey))
+                                }
+                              }}
+                              style={{ marginRight: '12px' }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ marginBottom: '4px' }}>
+                                <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
+                                  {item.itemType === 'safety_helmet' ? '安全帽' :
+                                   item.itemType === 'safety_gloves' ? '防护手套' :
+                                   item.itemType === 'tool_kit' ? '工具包' :
+                                   item.itemType === 'safety_shoes' ? '安全鞋' :
+                                   item.itemType === 'protective_clothing' ? '防护服' :
+                                   item.itemType === 'other' ? '其他' : item.itemType}
+                                </Text>
+                              </div>
+                              <div style={{ marginBottom: '4px' }}>
+                                <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                                  编号：{item.itemId}
+                                </Text>
+                              </div>
+                              <div>
+                                <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                                  借用时间：{item.borrowTime}
+                                </Text>
+                              </div>
+                              {item.remark && (
+                                <div>
+                                  <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                                    备注：{item.remark}
+                                  </Text>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </Card>
+                    {selectedReturnItems.length > 0 && (
+                      <Button 
+                        type="primary" 
+                        size="large"
+                        onClick={handleBorrowReturnItems}
+                        style={{ 
+                          width: '100%', 
+                          height: '48px', 
+                          fontSize: 'clamp(16px, 2.5vw, 22px)',
+                          marginTop: '12px'
+                        }}
+                      >
+                        归还选中物品 ({selectedReturnItems.length}个)
+                      </Button>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>3. 物品类型：</Text>
@@ -1371,7 +1826,12 @@ const Guard: React.FC = () => {
                     placeholder="请选择物品类型（必填）"
                     value={selectedItemType}
                     onChange={setSelectedItemType}
-                    style={{ marginTop: '8px', width: '100%', height: '48px' }}
+                    style={{ 
+                      marginTop: '8px', 
+                      width: '100%', 
+                      height: '48px',
+                      fontSize: 'clamp(18px, 3vw, 24px)'
+                    }}
                     size="large"
                   >
                     <Option value="safety_helmet">安全帽</Option>
@@ -1389,28 +1849,137 @@ const Guard: React.FC = () => {
                     placeholder="请输入物品编号（必填）"
                     value={itemNumber}
                     onChange={(e) => setItemNumber(e.target.value)}
-                    style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
-                  />
-                </div>
-
-                <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>5. 备注：</Text>
-                  <Input.TextArea
-                    placeholder="请输入备注信息（可选）"
-                    value={borrowRemark}
-                    onChange={(e) => setBorrowRemark(e.target.value)}
-                    style={{ marginTop: '8px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
-                    rows={3}
+                    style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(18px, 3vw, 24px)' }}
                   />
                 </div>
 
                 <Button 
                   type="primary" 
                   size="large"
-                  onClick={handleCompleteBorrow}
-                  style={{ width: '100%', height: '56px', fontSize: 'clamp(18px, 3vw, 24px)' }}
+                  onClick={handleAddItemToList}
+                  style={{ 
+                    width: '100%', 
+                    height: '48px', 
+                    fontSize: 'clamp(16px, 2.5vw, 22px)', 
+                    marginTop: '16px',
+                    backgroundColor: '#73d13d',
+                    borderColor: '#73d13d',
+                    color: '#fff'
+                  }}
                 >
-                  完成借物登记
+                  添加物品到借用列表
+                </Button>
+
+                {/* 借用物品列表 */}
+                {borrowItemsList.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>借用物品列表：</Text>
+                    <Card size="small" style={{ marginTop: '8px' }}>
+                      {borrowItemsList.map((item, index) => (
+                        <div key={index} style={{ 
+                          padding: '12px 0',
+                          borderBottom: index < borrowItemsList.length - 1 ? '1px solid #f0f0f0' : 'none'
+                        }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'flex-start',
+                            marginBottom: '8px'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ marginBottom: '4px' }}>
+                                <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
+                                  {item.itemType === 'safety_helmet' ? '安全帽' :
+                                   item.itemType === 'safety_gloves' ? '防护手套' :
+                                   item.itemType === 'tool_kit' ? '工具包' :
+                                   item.itemType === 'safety_shoes' ? '安全鞋' :
+                                   item.itemType === 'protective_clothing' ? '防护服' :
+                                   item.itemType === 'other' ? '其他' : item.itemType}
+                                </Text>
+                              </div>
+                              <div>
+                                <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                                  编号：{item.itemId}
+                                </Text>
+                              </div>
+                            </div>
+                            <Button 
+                              type="text" 
+                              danger
+                              size="small"
+                              onClick={() => handleRemoveItemFromList(index)}
+                              style={{ fontSize: 'clamp(14px, 2vw, 18px)', marginLeft: '8px' }}
+                            >
+                              删除
+                            </Button>
+                          </div>
+                          <div>
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '8px',
+                              marginBottom: item.showRemark ? '8px' : '0'
+                            }}>
+                              <Button 
+                                type="text" 
+                                size="small"
+                                onClick={() => {
+                                  const newList = [...borrowItemsList]
+                                  newList[index].showRemark = !newList[index].showRemark
+                                  setBorrowItemsList(newList)
+                                }}
+                                style={{ 
+                                  fontSize: 'clamp(12px, 1.8vw, 16px)',
+                                  padding: '0',
+                                  height: 'auto',
+                                  color: item.showRemark ? '#1890ff' : '#666'
+                                }}
+                              >
+                                {item.showRemark ? '收起备注' : '添加备注'}
+                              </Button>
+                              {item.remark && !item.showRemark && (
+                                <Text type="secondary" style={{ fontSize: 'clamp(12px, 1.8vw, 16px)' }}>
+                                  已填写备注
+                                </Text>
+                              )}
+                            </div>
+                            {item.showRemark && (
+                              <Input.TextArea
+                                placeholder="请输入该物品的备注信息（可选）"
+                                value={item.remark}
+                                onChange={(e) => {
+                                  const newList = [...borrowItemsList]
+                                  newList[index].remark = e.target.value
+                                  setBorrowItemsList(newList)
+                                }}
+                                style={{ 
+                                  fontSize: 'clamp(14px, 2vw, 18px)',
+                                  minHeight: '32px',
+                                  maxHeight: '64px'
+                                }}
+                                autoSize={{ minRows: 1, maxRows: 2 }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </Card>
+                  </div>
+                )}
+
+                <Button 
+                  type="primary" 
+                  size="large"
+                  onClick={handleCompleteBorrow}
+                  disabled={borrowItemsList.length === 0}
+                  style={{ 
+                    width: '100%', 
+                    height: '56px', 
+                    fontSize: 'clamp(18px, 3vw, 24px)',
+                    marginTop: '16px'
+                  }}
+                >
+                  完成借物登记 {borrowItemsList.length > 0 && `(${borrowItemsList.length}个物品)`}
                 </Button>
               </>
             )}
@@ -1436,15 +2005,17 @@ const Guard: React.FC = () => {
         }}>
           <div style={{ 
             display: 'flex', 
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
             justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '16px'
+            alignItems: window.innerWidth < 768 ? 'flex-start' : 'center',
+            marginBottom: '16px',
+            gap: window.innerWidth < 768 ? '12px' : '0'
           }}>
             <Title level={2} style={{ margin: 0 }}>离场登记</Title>
             <Space wrap>
               {[
                 { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                { key: 'borrow', label: '借物登记', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
                 { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
                 { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
                 { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
@@ -1455,9 +2026,20 @@ const Guard: React.FC = () => {
                   icon={button.icon}
                   onClick={button.onClick}
                   style={{
-                    color: button.color,
+                    color: button.key === 'entry' && currentView === 'entry' ? '#fff' : 
+                           button.key === 'borrow' && currentView === 'borrow' ? '#fff' :
+                           button.key === 'exit' && currentView === 'exit' ? '#fff' :
+                           button.key === 'reports' && currentView === 'reports' ? '#fff' :
+                           button.color,
                     borderColor: button.color,
-                    height: '36px'
+                    backgroundColor: button.key === 'entry' && currentView === 'entry' ? '#1890ff' : 
+                                   button.key === 'borrow' && currentView === 'borrow' ? '#52c41a' :
+                                   button.key === 'exit' && currentView === 'exit' ? '#fa541c' :
+                                   button.key === 'reports' && currentView === 'reports' ? '#722ed1' :
+                                   'transparent',
+                    height: window.innerWidth >= 768 ? '48px' : '40px',
+                    fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 22px)' : 'clamp(14px, 2vw, 20px)',
+                    padding: window.innerWidth >= 768 ? '0 16px' : '0 12px'
                   }}
                 >
                   {button.label}
@@ -1469,9 +2051,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号：</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号/实体卡编号：</Text>
               <Input
-                placeholder="请输入工人ID（必填）"
+                placeholder="请输入二维码编号或实体卡编号（必填）"
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
@@ -1502,11 +2084,22 @@ const Guard: React.FC = () => {
                       </div>
                       <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>身份证号：</Text>
-                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.idCard}</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
+                          {selectedWorker.idCard ? 
+                            (selectedWorker.idCard.length >= 8 ? 
+                              `${selectedWorker.idCard.slice(0, 4)}****${selectedWorker.idCard.slice(-4)}` : 
+                              selectedWorker.idCard
+                            ) : '-'
+                          }
+                        </Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>实体卡号：</Text>
-                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.physicalCardId}</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>电话号码：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.phone || '-'}</Text>
+                      </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>入场时间：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.entryTime || '-'}</Text>
                       </div>
                     </Space>
                   </Card>
@@ -1519,46 +2112,73 @@ const Guard: React.FC = () => {
                       <Space direction="vertical" size="small" style={{ width: '100%' }}>
                         {selectedWorker.borrowedItems.map((item: any, index: number) => (
                           <div key={index} style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center',
-                            padding: '8px',
+                            padding: '12px',
                             border: '1px solid #f0f0f0',
-                            borderRadius: '4px'
+                            borderRadius: '4px',
+                            marginBottom: '8px'
                           }}>
-                            <div>
-                              <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
-                                {item.itemType} - {item.itemId}
-                              </Text>
-                              {item.remark && (
-                                <div>
-                                  <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                    备注：{item.remark}
-                                  </Text>
-                                </div>
-                              )}
+                            <div style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              marginBottom: item.returnTime ? '0' : '8px'
+                            }}>
+                              <div>
+                                <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
+                                  {item.itemType} - {item.itemId}
+                                </Text>
+                                {item.remark && (
+                                  <div>
+                                    <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                                      备注：{item.remark}
+                                    </Text>
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {item.returnTime ? (
+                                  <Tag color="green" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>已归还</Tag>
+                                ) : (
+                                  <>
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedBorrowedItems.includes(item.itemId)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedBorrowedItems([...selectedBorrowedItems, item.itemId])
+                                        } else {
+                                          setSelectedBorrowedItems(selectedBorrowedItems.filter(id => id !== item.itemId))
+                                        }
+                                      }}
+                                      style={{ transform: 'scale(1.2)' }}
+                                    />
+                                    <Tag color="orange" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>未归还</Tag>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {item.returnTime ? (
-                                <Tag color="green" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>已归还</Tag>
-                              ) : (
-                                <>
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedBorrowedItems.includes(item.itemId)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedBorrowedItems([...selectedBorrowedItems, item.itemId])
-                                      } else {
-                                        setSelectedBorrowedItems(selectedBorrowedItems.filter(id => id !== item.itemId))
-                                      }
-                                    }}
-                                    style={{ transform: 'scale(1.2)' }}
-                                  />
-                                  <Tag color="orange" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>未归还</Tag>
-                                </>
-                              )}
-                            </div>
+                            {!item.returnTime && !selectedBorrowedItems.includes(item.itemId) && (
+                              <div>
+                                <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                                  未归还原因备注（必填）：
+                                </Text>
+                                <Input.TextArea
+                                  placeholder="请填写未归还原因..."
+                                  value={unreturnedItemRemarks[item.itemId] || ''}
+                                  onChange={(e) => {
+                                    setUnreturnedItemRemarks({
+                                      ...unreturnedItemRemarks,
+                                      [item.itemId]: e.target.value
+                                    })
+                                  }}
+                                  style={{ 
+                                    marginTop: '4px',
+                                    fontSize: 'clamp(14px, 2vw, 18px)'
+                                  }}
+                                  autoSize={{ minRows: 1, maxRows: 2 }}
+                                />
+                              </div>
+                            )}
                           </div>
                         ))}
                       </Space>
@@ -1591,6 +2211,42 @@ const Guard: React.FC = () => {
                   </div>
                 )}
 
+                <div>
+                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>
+                    {selectedWorker.borrowedItems && selectedWorker.borrowedItems.some((item: any) => !item.returnTime) ? '5. 实体卡归还：' : '4. 实体卡归还：'}
+                  </Text>
+                  <Card size="small" style={{ marginTop: '8px' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      padding: '8px'
+                    }}>
+                      <div>
+                        <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
+                          实体卡：{selectedWorker.physicalCardId}
+                        </Text>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                            请确认实体卡已收回
+                          </Text>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={physicalCardReturned}
+                          onChange={(e) => setPhysicalCardReturned(e.target.checked)}
+                          style={{ transform: 'scale(1.2)' }}
+                        />
+                        <Tag color={physicalCardReturned ? "green" : "orange"} style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
+                          {physicalCardReturned ? '已归还' : '未归还'}
+                        </Tag>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+
                 <Button 
                   type="primary" 
                   size="large"
@@ -1601,7 +2257,7 @@ const Guard: React.FC = () => {
                     fontSize: 'clamp(18px, 3vw, 24px)',
                     marginTop: '16px'
                   }}
-                  disabled={selectedWorker.borrowedItems?.some((item: any) => !item.returnTime)}
+                  disabled={!canCompleteExit()}
                 >
                   完成离场登记
                 </Button>
@@ -1629,6 +2285,20 @@ const Guard: React.FC = () => {
         dataIndex: 'workerName',
         key: 'workerName',
         width: 100,
+      },
+      {
+        title: '身份证号',
+        dataIndex: 'idCard',
+        key: 'idCard',
+        width: 140,
+        render: (text: string) => {
+          if (!text) return '-'
+          // 显示前4位和后4位，中间用星号代替
+          if (text.length >= 8) {
+            return `${text.slice(0, 4)}****${text.slice(-4)}`
+          }
+          return text
+        },
       },
       {
         title: '入场时间',
@@ -1674,51 +2344,105 @@ const Guard: React.FC = () => {
         render: (value: number, record: AttendanceRecord) => (
           <span 
             style={{ 
-              display: 'inline-block',
-              width: '24px',
-              height: '24px',
-              lineHeight: '24px',
-              textAlign: 'center',
-              backgroundColor: value > 0 ? '#1890ff' : '#f5f5f5',
-              color: value > 0 ? '#fff' : '#999',
-              borderRadius: '4px',
-              cursor: value > 0 ? 'pointer' : 'default',
-              fontSize: '12px',
+              color: '#1890ff', 
               fontWeight: 'bold',
-              border: value > 0 ? 'none' : '1px solid #d9d9d9'
+              backgroundColor: '#e6f7ff',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: '1px solid #91d5ff',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
             }}
-            onClick={() => value > 0 && handleViewItemRecords(record)}
+            onClick={() => handleViewItemRecords(record)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#bae7ff'
+              e.currentTarget.style.borderColor = '#69c0ff'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#e6f7ff'
+              e.currentTarget.style.borderColor = '#91d5ff'
+            }}
           >
             {value}
           </span>
         ),
       },
       {
-        title: '已归还',
+        title: (
+          <span>
+            已归还
+            <Tooltip 
+              title={
+                <div>
+                  <div>绿色：✅ 完全归还</div>
+                  <div>橙色：⚠️ 部分归还</div>
+                  <div>红色：❌ 未归还</div>
+                </div>
+              }
+              placement="top"
+            >
+              <QuestionCircleOutlined 
+                style={{ 
+                  marginLeft: 4, 
+                  color: '#1890ff', 
+                  cursor: 'help',
+                  fontSize: '12px'
+                }} 
+              />
+            </Tooltip>
+          </span>
+        ),
         dataIndex: 'returnedItems',
         key: 'returnedItems',
         width: 100,
-        render: (value: number, record: AttendanceRecord) => (
-          <span 
-            style={{ 
-              display: 'inline-block',
-              width: '24px',
-              height: '24px',
-              lineHeight: '24px',
-              textAlign: 'center',
-              backgroundColor: value > 0 ? '#52c41a' : '#f5f5f5',
-              color: value > 0 ? '#fff' : '#999',
-              borderRadius: '4px',
-              cursor: value > 0 ? 'pointer' : 'default',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              border: value > 0 ? 'none' : '1px solid #d9d9d9'
-            }}
-            onClick={() => value > 0 && handleViewItemRecords(record)}
-          >
-            {value}
-          </span>
-        ),
+        render: (value: number, record: AttendanceRecord) => {
+          const isPartiallyReturned = value > 0 && value < record.borrowedItems
+          const isNotReturned = value === 0
+          
+          let color = '#52c41a' // 绿色 - 完全归还
+          let backgroundColor = '#f6ffed'
+          let borderColor = '#b7eb8f'
+          
+          if (isPartiallyReturned) {
+            color = '#faad14' // 橙色 - 部分归还
+            backgroundColor = '#fffbe6'
+            borderColor = '#ffe58f'
+          } else if (isNotReturned) {
+            color = '#ff4d4f' // 红色 - 未归还
+            backgroundColor = '#fff2f0'
+            borderColor = '#ffccc7'
+          }
+          
+          return (
+            <span 
+              style={{ 
+                color, 
+                fontWeight: 'bold',
+                backgroundColor,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: `1px solid ${borderColor}`,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onClick={() => handleViewItemRecords(record)}
+              onMouseEnter={(e) => {
+                const currentBg = e.currentTarget.style.backgroundColor
+                const currentBorder = e.currentTarget.style.borderColor
+                e.currentTarget.style.backgroundColor = currentBg === 'rgb(246, 255, 237)' ? '#d9f7be' : 
+                                                     currentBg === 'rgb(255, 251, 230)' ? '#ffe58f' : '#ffccc7'
+                e.currentTarget.style.borderColor = currentBorder === 'rgb(183, 235, 143)' ? '#95de64' :
+                                                  currentBorder === 'rgb(255, 229, 143)' ? '#ffd666' : '#ffa39e'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = backgroundColor
+                e.currentTarget.style.borderColor = borderColor
+              }}
+            >
+              {value}
+            </span>
+          )
+        },
       },
     ]
 
@@ -1753,16 +2477,50 @@ const Guard: React.FC = () => {
           <div style={{ flexShrink: 0 }}>
             <div style={{ 
               display: 'flex', 
+              flexDirection: window.innerWidth < 768 ? 'column' : 'row',
               justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '16px'
+              alignItems: window.innerWidth < 768 ? 'flex-start' : 'center',
+              marginBottom: '16px',
+              gap: window.innerWidth < 768 ? '12px' : '0'
             }}>
               <Title level={2} style={{ margin: 0 }}>今日访客记录</Title>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div               style={{ 
+                display: 'flex', 
+                alignItems: window.innerWidth < 768 ? 'flex-start' : 'center', 
+                gap: '12px',
+                flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+                width: window.innerWidth < 768 ? '100%' : 'auto'
+              }}>
+                {window.innerWidth >= 768 && (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px'
+                  }}>
+                    <Text strong style={{ fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)' }}>状态筛选：</Text>
+                    <Select
+                      value={statusFilter}
+                      onChange={handleStatusFilterChange}
+                      style={{ 
+                        width: 120,
+                        fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)'
+                      }}
+                      size="small"
+                    >
+                      <Option value="all">全部</Option>
+                      <Option value="in">在场</Option>
+                      <Option value="out">已离场</Option>
+                    </Select>
+                    <Text type="secondary">
+                      共 {filteredRecords.length} 条记录
+                    </Text>
+                  </div>
+                )}
+                
                 <Space wrap>
                   {[
                     { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                    { key: 'borrow', label: '借物登记', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                    { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
                     { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
                     { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
                     { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
@@ -1773,34 +2531,53 @@ const Guard: React.FC = () => {
                       icon={button.icon}
                       onClick={button.onClick}
                       style={{
-                        color: button.color,
+                        color: button.key === 'entry' && currentView === 'entry' ? '#fff' : 
+                               button.key === 'borrow' && currentView === 'borrow' ? '#fff' :
+                               button.key === 'exit' && currentView === 'exit' ? '#fff' :
+                               button.key === 'reports' && currentView === 'reports' ? '#fff' :
+                               button.color,
                         borderColor: button.color,
-                        height: '36px'
+                        backgroundColor: button.key === 'entry' && currentView === 'entry' ? '#1890ff' : 
+                                       button.key === 'borrow' && currentView === 'borrow' ? '#52c41a' :
+                                       button.key === 'exit' && currentView === 'exit' ? '#fa541c' :
+                                       button.key === 'reports' && currentView === 'reports' ? '#722ed1' :
+                                       'transparent',
+                        height: window.innerWidth >= 768 ? '48px' : '40px',
+                        fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 22px)' : 'clamp(14px, 2vw, 20px)',
+                        padding: window.innerWidth >= 768 ? '0 16px' : '0 12px'
                       }}
                     >
                       {button.label}
                     </Button>
                   ))}
                 </Space>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Text strong>状态筛选：</Text>
-                  <Select
-                    value={statusFilter}
-                    onChange={handleStatusFilterChange}
-                    style={{ width: 120 }}
-                    size="small"
-                  >
-                    <Option value="all">全部</Option>
-                    <Option value="in">在场</Option>
-                    <Option value="out">已离场</Option>
-                  </Select>
-                  <Text type="secondary">
-                    共 {filteredRecords.length} 条记录
-                  </Text>
-                </div>
               </div>
             </div>
+            
+            {/* 手机端状态筛选框 */}
+            {window.innerWidth < 768 && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px',
+                marginBottom: '16px'
+              }}>
+                <Text strong>状态筛选：</Text>
+                <Select
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  style={{ width: 120 }}
+                  size="small"
+                >
+                  <Option value="all">全部</Option>
+                  <Option value="in">在场</Option>
+                  <Option value="out">已离场</Option>
+                </Select>
+                <Text type="secondary">
+                  共 {filteredRecords.length} 条记录
+                </Text>
+              </div>
+            )}
           </div>
 
           {/* 表格区域 */}
@@ -1822,6 +2599,9 @@ const Guard: React.FC = () => {
                 pagination={false}
                 scroll={{ x: 1000 }}
                 size="small"
+                style={{
+                  fontSize: window.innerWidth >= 768 ? 'clamp(18px, 3vw, 24px)' : 'clamp(14px, 2vw, 18px)'
+                }}
               />
             </div>
           </div>
@@ -1839,7 +2619,9 @@ const Guard: React.FC = () => {
               justifyContent: 'space-between', 
               alignItems: 'center'
             }}>
-              <Text type="secondary">
+              <Text type="secondary" style={{ 
+                display: window.innerWidth < 768 ? 'none' : 'block'
+              }}>
                 第 {((pagination.current - 1) * pagination.pageSize) + 1}-{Math.min(pagination.current * pagination.pageSize, filteredRecords.length)} 条，共 {filteredRecords.length} 条记录
               </Text>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1874,7 +2656,12 @@ const Guard: React.FC = () => {
                   >
                     下一页
                   </Button>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}>
+                  <div style={{ 
+                    display: window.innerWidth < 768 ? 'none' : 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    marginLeft: '8px' 
+                  }}>
                     <Text type="secondary" style={{ fontSize: '12px' }}>跳转至</Text>
                     <Input
                       size="small"

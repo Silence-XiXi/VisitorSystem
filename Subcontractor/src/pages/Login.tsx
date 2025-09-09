@@ -1,15 +1,81 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Form, Input, Button, message, Space, Typography } from 'antd'
-import { UserOutlined, LockOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Button, message, Space, Typography, Row, Col } from 'antd'
+import { UserOutlined, LockOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 
 const { Title } = Typography
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false)
+  const [captchaCode, setCaptchaCode] = useState('')
+  const [captchaImage, setCaptchaImage] = useState('')
   const navigate = useNavigate()
   const { login, isAuthenticated, user, isLoading } = useAuth()
+
+  // 生成验证码
+  const generateCaptcha = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let result = ''
+    for (let i = 0; i < 4; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setCaptchaCode(result)
+    
+    // 创建验证码图片
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    canvas.width = 120
+    canvas.height = 40
+    
+    if (ctx) {
+      // 背景
+      ctx.fillStyle = '#f0f0f0'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      
+      // 添加干扰线
+      for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = `hsl(${Math.random() * 360}, 50%, 70%)`
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height)
+        ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height)
+        ctx.stroke()
+      }
+      
+      // 添加干扰点
+      for (let i = 0; i < 50; i++) {
+        ctx.fillStyle = `hsl(${Math.random() * 360}, 50%, 60%)`
+        ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1, 1)
+      }
+      
+      // 绘制验证码文字
+      ctx.font = 'bold 20px Arial'
+      ctx.fillStyle = '#333'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      
+      for (let i = 0; i < result.length; i++) {
+        const x = 20 + i * 25
+        const y = 20 + (Math.random() - 0.5) * 10
+        const angle = (Math.random() - 0.5) * 0.4
+        
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.rotate(angle)
+        ctx.fillStyle = `hsl(${Math.random() * 360}, 70%, 40%)`
+        ctx.fillText(result[i], 0, 0)
+        ctx.restore()
+      }
+    }
+    
+    setCaptchaImage(canvas.toDataURL())
+  }
+
+  // 初始化验证码
+  useEffect(() => {
+    generateCaptcha()
+  }, [])
 
   // 如果用户已经登录，自动跳转到相应页面
   useEffect(() => {
@@ -24,7 +90,14 @@ const Login: React.FC = () => {
     }
   }, [isAuthenticated, user, isLoading, navigate])
 
-  const onFinish = async (values: { username: string; password: string }) => {
+  const onFinish = async (values: { username: string; password: string; captcha: string }) => {
+    // 验证验证码
+    if (values.captcha.toUpperCase() !== captchaCode.toUpperCase()) {
+      message.error('验证码错误，请重新输入')
+      generateCaptcha() // 重新生成验证码
+      return
+    }
+
     setLoading(true)
     try {
       const result = await login(values.username, values.password)
@@ -48,9 +121,11 @@ const Login: React.FC = () => {
       } else {
         console.log('Login failed')
         message.error('登录失败，请检查您的凭据')
+        generateCaptcha() // 登录失败时重新生成验证码
       }
     } catch (error) {
       message.error('登录过程中发生错误')
+      generateCaptcha() // 发生错误时重新生成验证码
     } finally {
       setLoading(false)
     }
@@ -136,6 +211,68 @@ const Login: React.FC = () => {
                 prefix={<LockOutlined />}
                 placeholder="请输入密码"
               />
+            </Form.Item>
+
+            <Form.Item
+              name="captcha"
+              label="安全验证"
+              rules={[{ required: true, message: '请输入验证码!' }]}
+            >
+              <Row gutter={8}>
+                <Col span={16}>
+                  <Input
+                    placeholder="请输入验证码"
+                    style={{ height: 40 }}
+                  />
+                </Col>
+                <Col span={8}>
+                  <div style={{ 
+                    height: 40, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '6px',
+                    background: '#fff',
+                    cursor: 'pointer',
+                    position: 'relative'
+                  }}
+                  onClick={generateCaptcha}
+                  >
+                    {captchaImage && (
+                      <img 
+                        src={captchaImage} 
+                        alt="验证码" 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover',
+                          borderRadius: '6px'
+                        }} 
+                      />
+                    )}
+                    <Button
+                      type="text"
+                      icon={<ReloadOutlined />}
+                      size="small"
+                      style={{
+                        position: 'absolute',
+                        top: 2,
+                        right: 2,
+                        padding: '2px 4px',
+                        minWidth: 'auto',
+                        height: 'auto',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        border: 'none'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        generateCaptcha()
+                      }}
+                    />
+                  </div>
+                </Col>
+              </Row>
             </Form.Item>
 
             <Form.Item style={{ marginBottom: 0 }}>
