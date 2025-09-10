@@ -16,7 +16,18 @@ const DistributorLayout: React.FC = () => {
   const [distributorInfo, setDistributorInfo] = useState<any>(null)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const { setLocale, t } = useLocale()
+  const { setLocale, t, locale } = useLocale()
+
+  // 根据语言格式化时间
+  const formatTime = (time: dayjs.Dayjs) => {
+    if (locale === 'zh-CN') {
+      return time.format('YYYY年MM月DD日 HH:mm:ss dddd')
+    } else if (locale === 'zh-TW') {
+      return time.format('YYYY年MM月DD日 HH:mm:ss dddd')
+    } else {
+      return time.format('YYYY-MM-DD HH:mm:ss dddd')
+    }
+  }
 
   // 检查用户角色，只有分判商才能访问
   useEffect(() => {
@@ -140,7 +151,7 @@ const DistributorLayout: React.FC = () => {
             fontWeight: 500
           }}>
             <ClockCircleOutlined style={{ marginRight: 8 }} />
-            {currentTime.format('YYYY年MM月DD日 HH:mm:ss dddd')}
+            {formatTime(currentTime)}
           </div>
         </div>
         
@@ -165,7 +176,7 @@ const DistributorLayout: React.FC = () => {
             >
               <Avatar size="small" icon={<UserOutlined />} />
               <Text style={{ color: '#666', fontSize: '14px' }}>
-                {user?.username || distributorInfo.username}（分判商）
+                {user?.username || distributorInfo.username}（{t('common.subcontractor')}）
               </Text>
             </Button>
           </Dropdown>

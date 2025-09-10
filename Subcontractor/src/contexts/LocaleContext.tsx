@@ -59,6 +59,8 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
   const handleSetLocale = (newLocale: LocaleType) => {
     setLocale(newLocale);
     localStorage.setItem('locale', newLocale);
+    // 触发自定义事件，通知DynamicConfigProvider更新Ant Design的locale
+    window.dispatchEvent(new CustomEvent('localeChanged'));
   };
 
   useEffect(() => {

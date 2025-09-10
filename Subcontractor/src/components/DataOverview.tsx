@@ -9,6 +9,7 @@ import {
 import { mockWorkers } from '../data/mockData'
 import dayjs from 'dayjs'
 import Pie from './Pie'
+import { useLocale } from '../contexts/LocaleContext'
 
 const { Title } = Typography
 
@@ -21,6 +22,7 @@ interface RecentActivity {
 }
 
 const DataOverview: React.FC = () => {
+  const { locale } = useLocale()
   const [stats, setStats] = useState({
     totalWorkers: 156,
     currentWorkers: 89,
@@ -29,14 +31,14 @@ const DataOverview: React.FC = () => {
   })
 
   const formatNow = () => {
-    const d = new Date()
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const hh = String(d.getHours()).padStart(2, '0')
-    const mm = String(d.getMinutes()).padStart(2, '0')
-    const ss = String(d.getSeconds()).padStart(2, '0')
-    return `${y}-${m}-${day} ${hh}:${mm}:${ss}`
+    const now = dayjs()
+    if (locale === 'zh-CN') {
+      return now.format('YYYY年MM月DD日 HH:mm:ss')
+    } else if (locale === 'zh-TW') {
+      return now.format('YYYY年MM月DD日 HH:mm:ss')
+    } else {
+      return now.format('YYYY-MM-DD HH:mm:ss')
+    }
   }
 
   const [currentTime, setCurrentTime] = useState<string>(formatNow())
@@ -133,7 +135,7 @@ const DataOverview: React.FC = () => {
       setCurrentTime(formatNow())
     }, 1000)
     return () => clearInterval(timer)
-  }, [])
+  }, [locale])
 
   // 统计：男女比例与年龄阶段
   const genderAndAge = useMemo(() => {

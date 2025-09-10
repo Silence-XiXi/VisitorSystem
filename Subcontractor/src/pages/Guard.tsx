@@ -145,14 +145,25 @@ const Guard: React.FC = () => {
     return total + unreturnedItems.length
   }, 0)
 
+  // 根据语言格式化时间
+  const formatTime = (time: dayjs.Dayjs) => {
+    if (locale === 'zh-CN') {
+      return time.format('YYYY年MM月DD日 HH:mm:ss')
+    } else if (locale === 'zh-TW') {
+      return time.format('YYYY年MM月DD日 HH:mm:ss')
+    } else {
+      return time.format('YYYY-MM-DD HH:mm:ss')
+    }
+  }
+
   // 实时时间更新
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(dayjs().format('YYYY-MM-DD HH:mm:ss'))
+      setCurrentTime(formatTime(dayjs()))
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [locale])
 
   // 初始化数据
   useEffect(() => {
@@ -1108,7 +1119,7 @@ const Guard: React.FC = () => {
                 fontSize: 'clamp(10px, 2vw, 14px)',
                 whiteSpace: 'nowrap'
               }}>
-                ({user?.role === 'guard' ? t('guard.guard') : t('guard.user')})
+                ({user?.role === 'guard' ? t('common.guard') : t('common.unknownRole')})
               </Text>
             </div>
           </div>
@@ -1201,7 +1212,7 @@ const Guard: React.FC = () => {
         render: (value: string | null) => value || '-',
       },
       {
-        title: t('guard.status'),
+        title: t('guard.guardStatus'),
         dataIndex: 'status',
         key: 'status',
         render: (status: string) => (
@@ -1264,8 +1275,8 @@ const Guard: React.FC = () => {
         <Space>
           <Avatar size={64} icon={<UserOutlined />} />
           <div>
-            <Title level={4} style={{ margin: 0 }}>{user?.username || t('guard.guard')}</Title>
-            <Text type="secondary">{user?.role === 'guard' ? t('guard.guard') : t('guard.user')}</Text>
+            <Title level={4} style={{ margin: 0 }}>{user?.username || t('common.guard')}</Title>
+            <Text type="secondary">{user?.role === 'guard' ? t('common.guard') : t('common.unknownRole')}</Text>
             <br />
             <Text type="secondary">{t('guard.site')}：{user?.siteName || t('guard.unknownSite')}</Text>
           </div>
@@ -2357,7 +2368,7 @@ const Guard: React.FC = () => {
         width: 100,
       },
       {
-        title: t('guard.name'),
+        title: t('guard.workerName'),
         dataIndex: 'workerName',
         key: 'workerName',
         width: 100,
@@ -2402,7 +2413,7 @@ const Guard: React.FC = () => {
         width: 120,
       },
       {
-        title: t('guard.status'),
+        title: t('guard.guardStatus'),
         dataIndex: 'status',
         key: 'status',
         width: 80,

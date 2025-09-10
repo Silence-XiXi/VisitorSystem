@@ -36,8 +36,28 @@ const Dashboard: React.FC = () => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const { selectedSiteId, setSelectedSiteId } = useSiteFilter()
+
+  // 根据语言格式化时间
+  const formatTime = (time: dayjs.Dayjs) => {
+    if (locale === 'zh-CN') {
+      return {
+        date: time.format('YYYY年MM月DD日'),
+        weekday: time.format('dddd')
+      }
+    } else if (locale === 'zh-TW') {
+      return {
+        date: time.format('YYYY年MM月DD日'),
+        weekday: time.format('dddd')
+      }
+    } else {
+      return {
+        date: time.format('YYYY-MM-DD'),
+        weekday: time.format('dddd')
+      }
+    }
+  }
 
   // 实时更新时间
   useEffect(() => {
@@ -230,7 +250,7 @@ const Dashboard: React.FC = () => {
                   color: '#8c8c8c',
                   lineHeight: '1.2'
                 }}>
-                  {currentTime.format('YYYY年MM月DD日')} {currentTime.format('dddd')}
+                  {formatTime(currentTime).date} {formatTime(currentTime).weekday}
                 </div>
               </div>
             </div>
@@ -299,7 +319,7 @@ const Dashboard: React.FC = () => {
                   textOverflow: 'ellipsis',
                   maxWidth: '80px'
                 }}>
-                  ({user?.role === 'admin' ? '管理员' : user?.role === 'subcontractor' ? '分判商' : user?.role || '未知角色'})
+                  ({user?.role === 'admin' ? t('common.admin') : user?.role === 'subcontractor' ? t('common.subcontractor') : user?.role ? t(`common.${user.role}`) : t('common.unknownRole')})
                 </span>
               </Space>
             </Dropdown>

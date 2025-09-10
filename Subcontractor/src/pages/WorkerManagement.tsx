@@ -170,10 +170,10 @@ const WorkerManagement: React.FC = () => {
 
       // 添加到现有工人列表
       setWorkers(prev => [...newWorkers, ...prev]);
-      message.success(`成功导入 ${importWorkers.length} 个工人信息`);
+      message.success(t('worker.importSuccess').replace('{count}', importWorkers.length.toString()));
       
     } catch (error) {
-      message.error('导入失败，请重试');
+      message.error(t('worker.importFailed'));
       throw error;
     } finally {
       setLoading(false);
@@ -189,7 +189,7 @@ const WorkerManagement: React.FC = () => {
   // 下载模板
   const handleDownloadTemplate = () => {
     // TODO: 实现实际的模板下载逻辑
-    message.success('工人导入模板已下载');
+    message.success(t('worker.templateDownloaded'));
   };
 
   return (
@@ -201,7 +201,7 @@ const WorkerManagement: React.FC = () => {
             {t('worker.title')}
           </h2>
           <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '14px' }}>
-            管理工人信息，共 {workers.length} 个工人
+            {t('guard.totalWorkers').replace('{count}', workers.length.toString())}
           </p>
         </div>
       </div>
@@ -252,21 +252,21 @@ const WorkerManagement: React.FC = () => {
                 onClick={handleDownloadTemplate}
                 size="small"
               >
-                下载模板
+                {t('guard.downloadTemplate')}
               </Button>
               <Button
                 icon={<UploadOutlined />}
                 onClick={() => setExcelModalVisible(true)}
                 size="small"
               >
-                导入
+                {t('guard.import')}
               </Button>
               <Button
                 icon={<DownloadOutlined />}
                 onClick={() => setExcelModalVisible(true)}
                 size="small"
               >
-                导出
+                {t('guard.export')}
               </Button>
               <Button
                 type="primary"
@@ -274,7 +274,7 @@ const WorkerManagement: React.FC = () => {
                 onClick={() => setFormVisible(true)}
                 size="small"
               >
-                新增
+                {t('guard.add')}
               </Button>
             </Space>
           </Col>

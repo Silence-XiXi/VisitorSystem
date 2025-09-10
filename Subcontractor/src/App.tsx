@@ -33,6 +33,26 @@ function App() {
     )
   }
 
+  // 如果用户已登录，根据角色重定向到默认页面
+  if (isAuthenticated && user) {
+    const currentPath = window.location.pathname
+    console.log('Current path:', currentPath, 'User role:', user.role)
+    
+    // 如果用户在登录页面，重定向到对应角色页面
+    if (currentPath === '/login') {
+      if (user.role === 'subcontractor') {
+        window.location.replace('/distributor/workers')
+        return null
+      } else if (user.role === 'guard') {
+        window.location.replace('/guard')
+        return null
+      } else {
+        window.location.replace('/dashboard')
+        return null
+      }
+    }
+  }
+
   return (
     <LocaleProvider>
       <SiteFilterProvider>

@@ -71,9 +71,10 @@ export const useAuth = () => {
               role: 'subcontractor'
             }
             console.log('Setting user data:', userData)
+            // 先保存到localStorage，再更新状态
+            localStorage.setItem('user', JSON.stringify(userData))
             setUser(userData)
             setIsAuthenticated(true)
-            localStorage.setItem('user', JSON.stringify(userData))
             console.log('User data set, resolving with success')
             resolve({ success: true, role: 'subcontractor' })
             return
@@ -87,9 +88,10 @@ export const useAuth = () => {
               username,
               role: 'admin'
             }
+            // 先保存到localStorage，再更新状态
+            localStorage.setItem('user', JSON.stringify(userData))
             setUser(userData)
             setIsAuthenticated(true)
-            localStorage.setItem('user', JSON.stringify(userData))
             resolve({ success: true, role: 'admin' })
             return
           }
@@ -104,9 +106,10 @@ export const useAuth = () => {
               siteId: guardAccount.siteId,
               siteName: guardAccount.siteName
             }
+            // 先保存到localStorage，再更新状态
+            localStorage.setItem('user', JSON.stringify(userData))
             setUser(userData)
             setIsAuthenticated(true)
-            localStorage.setItem('user', JSON.stringify(userData))
             resolve({ success: true, role: 'guard' })
             return
           }

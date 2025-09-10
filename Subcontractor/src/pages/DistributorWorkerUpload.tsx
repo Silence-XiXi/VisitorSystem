@@ -8,6 +8,7 @@ import {
   readWorkerExcelFile,
   generateWorkerImportTemplate
 } from '../utils/excelUtils'
+import { useLocale } from '../contexts/LocaleContext'
 import dayjs from 'dayjs'
 
 
@@ -30,6 +31,8 @@ const tableStyles = `
 `
 
 const DistributorWorkerUpload: React.FC = () => {
+  const { t } = useLocale()
+  
   // 模拟当前登录的分判商信息
   const currentDistributor = {
     id: '1',
@@ -95,7 +98,7 @@ const DistributorWorkerUpload: React.FC = () => {
             ? { ...w, ...values, updatedAt: new Date().toISOString() }
             : w
         ))
-        message.success('工人信息已更新')
+        message.success(t('distributor.workerInfoUpdated'))
       } else {
         // 新增工人
         const newWorker: Worker = {
@@ -119,7 +122,7 @@ const DistributorWorkerUpload: React.FC = () => {
           updatedAt: new Date().toISOString()
         }
         setWorkers(prev => [newWorker, ...prev])
-        message.success('工人信息已添加')
+        message.success(t('distributor.workerInfoAdded'))
         
         // 显示二维码发送选项
         setSelectedWorkerForQR(newWorker)
@@ -137,12 +140,12 @@ const DistributorWorkerUpload: React.FC = () => {
   // 删除工人
   const handleDeleteWorker = (worker: Worker) => {
     Modal.confirm({
-      title: '确认删除',
+      title: t('distributor.confirmDelete'),
       icon: <ExclamationCircleOutlined />,
-      content: `确定要删除工人「${worker.name}」吗？`,
+      content: t('distributor.confirmDeleteContent').replace('{name}', worker.name),
       onOk: () => {
         setWorkers(prev => prev.filter(w => w.id !== worker.id))
-        message.success('工人信息已删除')
+        message.success(t('distributor.workerInfoDeleted'))
       }
     })
   }
@@ -154,7 +157,7 @@ const DistributorWorkerUpload: React.FC = () => {
 
     if (method === 'email') {
       if (!targetWorker.email) {
-        message.warning('该工人没有邮箱地址，无法发送邮件')
+        message.warning(t('distributor.noEmailWarning'))
         return
       }
       // 这里应该调用实际的邮件发送API，传入工人信息生成二维码
@@ -163,10 +166,10 @@ const DistributorWorkerUpload: React.FC = () => {
         name: targetWorker.name,
         phone: targetWorker.phone
       })
-      message.success(`二维码已发送到 ${targetWorker.email}`)
+      message.success(t('distributor.qrCodeSentToEmail').replace('{email}', targetWorker.email))
     } else if (method === 'whatsapp') {
       if (!targetWorker.whatsapp) {
-        message.warning('该工人没有WhatsApp号码，无法发送消息')
+        message.warning(t('distributor.noWhatsappWarning'))
         return
       }
       // 这里应该调用实际的WhatsApp发送API，传入工人信息生成二维码
@@ -175,7 +178,7 @@ const DistributorWorkerUpload: React.FC = () => {
         name: targetWorker.name,
         phone: targetWorker.phone
       })
-      message.success(`二维码已发送到 ${targetWorker.whatsapp}`)
+      message.success(t('distributor.qrCodeSentToWhatsapp').replace('{whatsapp}', targetWorker.whatsapp))
     }
 
     setQrCodeModalOpen(false)
@@ -185,7 +188,7 @@ const DistributorWorkerUpload: React.FC = () => {
   // 批量发送二维码
   const handleBatchSendQRCode = (method: 'email' | 'whatsapp') => {
     if (selectedWorkerIds.length === 0) {
-      message.warning('请先选择要发送二维码的工人')
+      message.warning(t('distributor.pleaseSelectWorkers'))
       return
     }
 
@@ -195,12 +198,12 @@ const DistributorWorkerUpload: React.FC = () => {
     )
 
     if (validWorkers.length === 0) {
-      message.warning(`选中的工人中没有有效的${method === 'email' ? '邮箱地址' : 'WhatsApp号码'}`)
+      message.warning(method === 'email' ? t('distributor.noValidEmailWarning') : t('distributor.noValidWhatsappWarning'))
       return
     }
 
     // 这里应该调用实际的批量发送API
-    message.success(`二维码已批量发送给 ${validWorkers.length} 名工人`)
+    message.success(t('distributor.qrCodeBatchSent').replace('{count}', validWorkers.length.toString()))
     setSelectedWorkerIds([])
   }
 
@@ -213,25 +216,25 @@ const DistributorWorkerUpload: React.FC = () => {
         ? { ...w, status: newStatus, updatedAt: new Date().toISOString() }
         : w
     ))
-    message.success(`工人状态已更新为${newStatus === 'active' ? '在职' : '暂停'}`)
+    message.success(t('distributor.workerStatusUpdated').replace('{status}', newStatus === 'active' ? t('distributor.active') : t('distributor.suspended')))
   }
 
   // 导出工人数据
   const handleExport = (exportAll: boolean = true) => {
     const dataToExport = exportAll ? workers : workers.filter(worker => selectedWorkerIds.includes(worker.id))
     if (!exportAll && selectedWorkerIds.length === 0) {
-      message.warning('请先选择要导出的工人')
+      message.warning(t('distributor.pleaseSelectWorkersToExport'))
       return
     }
     
     exportWorkersToExcel(dataToExport, [], [])
-    message.success(`已导出 ${dataToExport.length} 条工人信息`)
+    message.success(t('distributor.exportedWorkers').replace('{count}', dataToExport.length.toString()))
   }
 
   // 下载模板
   const handleDownloadTemplate = () => {
     generateWorkerImportTemplate()
-    message.success('工人信息导入模板已下载')
+    message.success(t('distributor.templateDownloaded'))
   }
 
   // 导入工人数据
@@ -240,7 +243,7 @@ const DistributorWorkerUpload: React.FC = () => {
     readWorkerExcelFile(file)
       .then(({ workers: importedWorkers, errors }) => {
         if (errors.length > 0) {
-          message.error(`导入失败：${errors.join(', ')}`)
+          message.error(t('distributor.importFailed').replace('{errors}', errors.join(', ')))
         } else {
           // 过滤出属于当前分判商的工人并转换为Worker类型
           const validWorkers: Worker[] = importedWorkers
@@ -253,11 +256,11 @@ const DistributorWorkerUpload: React.FC = () => {
               updatedAt: new Date().toISOString()
             }))
           setWorkers(prev => [...validWorkers, ...prev])
-          message.success(`成功导入 ${validWorkers.length} 条工人信息`)
+          message.success(t('distributor.importSuccess').replace('{count}', validWorkers.length.toString()))
         }
       })
       .catch(error => {
-        message.error('导入失败：' + error.message)
+        message.error(t('distributor.importError').replace('{error}', error.message))
       })
       .finally(() => {
         setLoading(false)
@@ -266,16 +269,16 @@ const DistributorWorkerUpload: React.FC = () => {
 
   // 工人表格列定义
   const workerColumns = [
-    { title: '工号', dataIndex: 'workerId', key: 'workerId', width: 120, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId) },
-    { title: '姓名', dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name) },
-    { title: '性别', dataIndex: 'gender', key: 'gender', width: 80, render: (gender: string) => getGenderTag(gender), ellipsis: true, sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender) },
-    { title: '出生日期', dataIndex: 'birthDate', key: 'birthDate', width: 120, render: (d?: string) => d || '-', ellipsis: true, sorter: (a: Worker, b: Worker) => (a.birthDate || '').localeCompare(b.birthDate || '') },
-    { title: '年龄', dataIndex: 'age', key: 'age', width: 80, render: (age?: number) => (typeof age === 'number' ? age : '-'), ellipsis: true, sorter: (a: Worker, b: Worker) => (a.age || 0) - (b.age || 0) },
-    { title: '身份证号', dataIndex: 'idCard', key: 'idCard', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.idCard.localeCompare(b.idCard) },
-    { title: '地区', dataIndex: 'region', key: 'region', width: 100, ellipsis: true, sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region) },
-    { title: '联系电话', dataIndex: 'phone', key: 'phone', width: 130, ellipsis: true, sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone) },
-    { title: '邮箱', dataIndex: 'email', key: 'email', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email) },
-    { title: 'WhatsApp', dataIndex: 'whatsapp', key: 'whatsapp', width: 130, render: (whatsapp: string) => {
+    { title: t('distributor.workerId'), dataIndex: 'workerId', key: 'workerId', width: 120, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId) },
+    { title: t('distributor.name'), dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name) },
+    { title: t('distributor.gender'), dataIndex: 'gender', key: 'gender', width: 80, render: (gender: string) => getGenderTag(gender), ellipsis: true, sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender) },
+    { title: t('distributor.birthDate'), dataIndex: 'birthDate', key: 'birthDate', width: 120, render: (d?: string) => d || '-', ellipsis: true, sorter: (a: Worker, b: Worker) => (a.birthDate || '').localeCompare(b.birthDate || '') },
+    { title: t('distributor.age'), dataIndex: 'age', key: 'age', width: 80, render: (age?: number) => (typeof age === 'number' ? age : '-'), ellipsis: true, sorter: (a: Worker, b: Worker) => (a.age || 0) - (b.age || 0) },
+    { title: t('distributor.idCard'), dataIndex: 'idCard', key: 'idCard', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.idCard.localeCompare(b.idCard) },
+    { title: t('distributor.region'), dataIndex: 'region', key: 'region', width: 100, ellipsis: true, sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region) },
+    { title: t('distributor.phone'), dataIndex: 'phone', key: 'phone', width: 130, ellipsis: true, sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone) },
+    { title: t('distributor.email'), dataIndex: 'email', key: 'email', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email) },
+    { title: t('distributor.whatsapp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 130, render: (whatsapp: string) => {
       if (!whatsapp) return '-';
       const parts = whatsapp.split(' ');
       if (parts.length === 2) {
@@ -287,8 +290,8 @@ const DistributorWorkerUpload: React.FC = () => {
       }
       return whatsapp;
     }, ellipsis: true, sorter: (a: Worker, b: Worker) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
-    { title: '操作', key: 'actions', width: 150, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
+    { title: t('distributor.status'), dataIndex: 'status', key: 'status', width: 100, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
+    { title: t('common.actions'), key: 'actions', width: 150, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -301,7 +304,7 @@ const DistributorWorkerUpload: React.FC = () => {
             })
             setWorkerModalOpen(true) 
           }}
-          title="编辑"
+          title={t('common.edit')}
         />
         <Button 
           size="small" 
@@ -310,20 +313,20 @@ const DistributorWorkerUpload: React.FC = () => {
             setSelectedWorkerForQR(record)
             setQrCodeModalOpen(true)
           }}
-          title="发送二维码"
+          title={t('distributor.sendQRCode')}
         />
         <Button 
           size="small" 
           icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />} 
           onClick={() => handleToggleStatus(record)}
-          title={record.status === 'active' ? '暂停' : '启用'}
+          title={record.status === 'active' ? t('distributor.pause') : t('distributor.enable')}
         />
         <Button 
           size="small" 
           danger 
           icon={<DeleteOutlined />} 
           onClick={() => handleDeleteWorker(record)}
-          title="删除"
+          title={t('common.delete')}
         />
       </Space>
     ) }
@@ -332,8 +335,8 @@ const DistributorWorkerUpload: React.FC = () => {
   // 获取性别标签
   const getGenderTag = (gender: string) => {
     const map: Record<string, { color: string; text: string }> = { 
-      male: { color: 'blue', text: '男' }, 
-      female: { color: 'pink', text: '女' } 
+      male: { color: 'blue', text: t('distributor.male') }, 
+      female: { color: 'pink', text: t('distributor.female') } 
     }
     const cfg = map[gender]
     return <Tag color={cfg.color}>{cfg.text}</Tag>
@@ -342,9 +345,9 @@ const DistributorWorkerUpload: React.FC = () => {
   // 获取状态标签
   const getStatusTag = (status: string) => {
     const map: Record<string, { color: string; text: string }> = { 
-      active: { color: 'green', text: '在职' }, 
-      suspended: { color: 'orange', text: '暂停' }, 
-      inactive: { color: 'red', text: '离职' } 
+      active: { color: 'green', text: t('distributor.active') }, 
+      suspended: { color: 'orange', text: t('distributor.suspended') }, 
+      inactive: { color: 'red', text: t('distributor.inactive') } 
     }
     const cfg = map[status]
     return <Tag color={cfg.color}>{cfg.text}</Tag>
@@ -396,13 +399,13 @@ const DistributorWorkerUpload: React.FC = () => {
 
       {/* 工人管理表格 */}
       <Card 
-        title={`工人信息管理 (${workers.length})`}
+        title={`${t('distributor.workerInfoManagement')} (${workers.length})`}
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             {/* 筛选器 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Input.Search
-                placeholder="搜索工人姓名、工号或身份证号"
+                placeholder={t('distributor.searchWorkerPlaceholder')}
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 allowClear
@@ -411,13 +414,13 @@ const DistributorWorkerUpload: React.FC = () => {
               <Select
                 mode="multiple"
                 style={{ width: 120 }}
-                placeholder="状态筛选"
+                placeholder={t('distributor.statusFilter')}
                 value={statusFilters}
                 onChange={setStatusFilters}
                 options={[
-                  { value: 'active', label: '在职' },
-                  { value: 'suspended', label: '暂停' },
-                  { value: 'inactive', label: '离职' }
+                  { value: 'active', label: t('distributor.active') },
+                  { value: 'suspended', label: t('distributor.suspended') },
+                  { value: 'inactive', label: t('distributor.inactive') }
                 ]}
                 allowClear
                 maxTagCount="responsive"
@@ -429,7 +432,7 @@ const DistributorWorkerUpload: React.FC = () => {
             {/* 操作按钮 */}
             <Space>
               <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
-                下载模板
+                {t('distributor.downloadTemplate')}
               </Button>
               <Upload
                 accept=".xlsx,.xls"
@@ -440,28 +443,28 @@ const DistributorWorkerUpload: React.FC = () => {
                 }}
               >
                 <Button icon={<UploadOutlined />} loading={loading}>
-                  Excel导入
+                  {t('distributor.excelImport')}
                 </Button>
               </Upload>
               <Button 
                 icon={<DownloadOutlined />} 
                 onClick={() => handleExport(selectedWorkerIds.length === 0)}
               >
-                {selectedWorkerIds.length === 0 ? '导出全部' : `导出已选(${selectedWorkerIds.length})`}
+                {selectedWorkerIds.length === 0 ? t('distributor.exportAll') : `${t('distributor.exportSelected')}(${selectedWorkerIds.length})`}
               </Button>
               <Button 
                 icon={<MailOutlined />} 
                 onClick={() => handleBatchSendQRCode('email')}
                 disabled={selectedWorkerIds.length === 0}
               >
-                批量发送邮件
+                {t('distributor.batchSendEmail')}
               </Button>
               <Button 
                 icon={<MessageOutlined />} 
                 onClick={() => handleBatchSendQRCode('whatsapp')}
                 disabled={selectedWorkerIds.length === 0}
               >
-                批量发送WhatsApp
+                {t('distributor.batchSendWhatsApp')}
               </Button>
               <Button 
                 type="primary" 
@@ -472,7 +475,7 @@ const DistributorWorkerUpload: React.FC = () => {
                   setWorkerModalOpen(true) 
                 }}
               >
-                新增工人
+                {t('distributor.addWorker')}
               </Button>
             </Space>
           </div>
@@ -542,10 +545,10 @@ const DistributorWorkerUpload: React.FC = () => {
           {/* 选择状态显示 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ color: '#666', fontSize: '14px' }}>
-              已选择 <strong style={{ color: '#1890ff' }}>{selectedWorkerIds.length}</strong> 个工人
+              {t('distributor.selectedWorkers').replace('{count}', selectedWorkerIds.length.toString())}
               {selectedWorkerIds.length > 0 && (
                 <span style={{ color: '#999', marginLeft: '8px' }}>
-                  / 共 {filteredWorkers.length} 个
+                  / {t('distributor.totalWorkers').replace('{count}', filteredWorkers.length.toString())}
                 </span>
               )}
             </span>
@@ -554,7 +557,7 @@ const DistributorWorkerUpload: React.FC = () => {
                 size="small" 
                 onClick={() => setSelectedWorkerIds([])}
               >
-                清除选择
+                {t('distributor.clearSelection')}
               </Button>
             )}
             {selectedWorkerIds.length < filteredWorkers.length && (
@@ -563,7 +566,7 @@ const DistributorWorkerUpload: React.FC = () => {
                 type="primary"
                 onClick={() => setSelectedWorkerIds(filteredWorkers.map(w => w.id))}
               >
-                全选所有页面
+                {t('distributor.selectAllPages')}
               </Button>
             )}
           </div>
@@ -575,7 +578,7 @@ const DistributorWorkerUpload: React.FC = () => {
             showSizeChanger
             showQuickJumper
             showTotal={(total, range) => 
-              `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`
+              t('distributor.pageInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString())
             }
             pageSizeOptions={['10', '20', '50', '100']}
             onChange={handlePageChange}
@@ -589,7 +592,7 @@ const DistributorWorkerUpload: React.FC = () => {
 
       {/* 工人信息模态框 */}
       <Modal
-        title={editingWorker ? '编辑工人信息' : '新增工人信息'}
+        title={editingWorker ? t('distributor.editWorkerInfo') : t('distributor.addWorkerInfo')}
         open={workerModalOpen}
         onCancel={() => {
           setWorkerModalOpen(false)
@@ -603,43 +606,43 @@ const DistributorWorkerUpload: React.FC = () => {
         <Form form={workerForm} layout="vertical">
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="workerId" label="工号" rules={[{ required: true, message: '请输入工号' }]}>
-                <Input placeholder="例如：WK001" />
+              <Form.Item name="workerId" label={t('distributor.workerId')} rules={[{ required: true, message: t('distributor.pleaseEnterWorkerId') }]}>
+                <Input placeholder={t('distributor.workerIdPlaceholder')} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
-                <Input placeholder="工人姓名" />
+              <Form.Item name="name" label={t('distributor.name')} rules={[{ required: true, message: t('distributor.pleaseEnterName') }]}>
+                <Input placeholder={t('distributor.namePlaceholder')} />
               </Form.Item>
             </Col>
           </Row>
           
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="gender" label="性别" rules={[{ required: true, message: '请选择性别' }]}>
-                <Select placeholder="请选择性别" options={[{ value: 'male', label: '男' }, { value: 'female', label: '女' }]} />
+              <Form.Item name="gender" label={t('distributor.gender')} rules={[{ required: true, message: t('distributor.pleaseSelectGender') }]}>
+                <Select placeholder={t('distributor.genderPlaceholder')} options={[{ value: 'male', label: t('distributor.male') }, { value: 'female', label: t('distributor.female') }]} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="birthDate" label="出生日期">
-                <DatePicker style={{ width: '100%' }} placeholder="选择出生日期" />
+              <Form.Item name="birthDate" label={t('distributor.birthDate')}>
+                <DatePicker style={{ width: '100%' }} placeholder={t('distributor.birthDatePlaceholder')} />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="idCard" label="身份证号" rules={[{ required: true, message: '请输入身份证号' }]}>
-                <Input placeholder="身份证号码" />
+              <Form.Item name="idCard" label={t('distributor.idCard')} rules={[{ required: true, message: t('distributor.pleaseEnterIdCard') }]}>
+                <Input placeholder={t('distributor.idCardPlaceholder')} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="region" label="地区" rules={[{ required: true, message: '请选择地区' }]}>
-                <Select placeholder="请选择地区" options={[
-                  { value: '中国大陆', label: '中国大陆' },
-                  { value: '中国香港', label: '中国香港' },
-                  { value: '中国澳门', label: '中国澳门' },
-                  { value: '中国台湾', label: '中国台湾' }
+              <Form.Item name="region" label={t('distributor.region')} rules={[{ required: true, message: t('distributor.pleaseSelectRegion') }]}>
+                <Select placeholder={t('distributor.regionPlaceholder')} options={[
+                  { value: '中国大陆', label: t('distributor.chinaMainland') },
+                  { value: '中国香港', label: t('distributor.chinaHongkong') },
+                  { value: '中国澳门', label: t('distributor.chinaMacau') },
+                  { value: '中国台湾', label: t('distributor.chinaTaiwan') }
                 ]} />
               </Form.Item>
             </Col>
@@ -647,21 +650,21 @@ const DistributorWorkerUpload: React.FC = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}>
-                <Input placeholder="手机号码" />
+              <Form.Item name="phone" label={t('distributor.phone')} rules={[{ required: true, message: t('distributor.pleaseEnterPhone') }]}>
+                <Input placeholder={t('distributor.phonePlaceholder')} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="email" label="邮箱">
-                <Input placeholder="邮箱地址" />
+              <Form.Item name="email" label={t('distributor.email')}>
+                <Input placeholder={t('distributor.emailPlaceholder')} />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="whatsapp" label="WhatsApp">
-                <Input placeholder="例如：+86 13800138001" />
+              <Form.Item name="whatsapp" label={t('distributor.whatsapp')}>
+                <Input placeholder={t('distributor.whatsappPlaceholder')} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -669,11 +672,11 @@ const DistributorWorkerUpload: React.FC = () => {
             </Col>
           </Row>
 
-          <Form.Item name="status" label="状态" initialValue="active">
+          <Form.Item name="status" label={t('distributor.status')} initialValue="active">
             <Select options={[
-              { value: 'active', label: '在职' },
-              { value: 'suspended', label: '暂停' },
-              { value: 'inactive', label: '离职' }
+              { value: 'active', label: t('distributor.active') },
+              { value: 'suspended', label: t('distributor.suspended') },
+              { value: 'inactive', label: t('distributor.inactive') }
             ]} />
           </Form.Item>
         </Form>
@@ -681,7 +684,7 @@ const DistributorWorkerUpload: React.FC = () => {
 
       {/* 二维码发送模态框 */}
       <Modal
-        title="发送二维码"
+        title={t('distributor.sendQRCodeTitle')}
         open={qrCodeModalOpen}
         onCancel={() => {
           setQrCodeModalOpen(false)
@@ -693,16 +696,16 @@ const DistributorWorkerUpload: React.FC = () => {
         {selectedWorkerForQR && (
           <div>
             <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
-              <div><strong>工人姓名：</strong>{selectedWorkerForQR.name}</div>
-              <div><strong>工号：</strong>{selectedWorkerForQR.workerId}</div>
-              <div><strong>联系电话：</strong>{selectedWorkerForQR.phone}</div>
-              {selectedWorkerForQR.email && <div><strong>邮箱：</strong>{selectedWorkerForQR.email}</div>}
-              {selectedWorkerForQR.whatsapp && <div><strong>WhatsApp：</strong>{selectedWorkerForQR.whatsapp}</div>}
+              <div><strong>{t('distributor.workerName')}</strong>{selectedWorkerForQR.name}</div>
+              <div><strong>{t('distributor.workerIdLabel')}</strong>{selectedWorkerForQR.workerId}</div>
+              <div><strong>{t('distributor.phoneLabel')}</strong>{selectedWorkerForQR.phone}</div>
+              {selectedWorkerForQR.email && <div><strong>{t('distributor.emailLabel')}</strong>{selectedWorkerForQR.email}</div>}
+              {selectedWorkerForQR.whatsapp && <div><strong>{t('distributor.whatsappLabel')}</strong>{selectedWorkerForQR.whatsapp}</div>}
             </div>
             
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: 16 }}>
-                选择发送方式
+                {t('distributor.selectSendMethod')}
               </div>
               <Space size="large">
                 <Button 
@@ -712,7 +715,7 @@ const DistributorWorkerUpload: React.FC = () => {
                   onClick={() => handleSendQRCode('email')}
                   disabled={!selectedWorkerForQR.email}
                 >
-                  发送邮件
+                  {t('distributor.sendEmail')}
                 </Button>
                 <Button 
                   type="primary" 
@@ -721,14 +724,14 @@ const DistributorWorkerUpload: React.FC = () => {
                   onClick={() => handleSendQRCode('whatsapp')}
                   disabled={!selectedWorkerForQR.whatsapp}
                 >
-                  发送WhatsApp
+                  {t('distributor.sendWhatsapp')}
                 </Button>
               </Space>
             </div>
             
             {(!selectedWorkerForQR.email && !selectedWorkerForQR.whatsapp) && (
               <div style={{ textAlign: 'center', color: '#999', fontSize: '14px' }}>
-                该工人没有邮箱或WhatsApp信息，无法发送二维码
+                {t('distributor.noContactInfo')}
               </div>
             )}
           </div>

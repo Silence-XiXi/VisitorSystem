@@ -88,12 +88,13 @@ const Login: React.FC = () => {
   // 如果用户已经登录，自动跳转到相应页面
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
+      console.log('Auto redirecting user:', user)
       if (user.role === 'subcontractor') {
-        navigate('/distributor/workers')
+        navigate('/distributor/workers', { replace: true })
       } else if (user.role === 'guard') {
-        navigate('/guard')
+        navigate('/guard', { replace: true })
       } else {
-        navigate('/dashboard')
+        navigate('/dashboard', { replace: true })
       }
     }
   }, [isAuthenticated, user, isLoading, navigate])
@@ -112,20 +113,8 @@ const Login: React.FC = () => {
       console.log('Login result:', result)
       if (result.success) {
         message.success(t('login.loginSuccess'))
-        // 添加小延迟确保状态更新
-        setTimeout(() => {
-          // 根据识别出的角色跳转到不同页面
-          if (result.role === 'subcontractor') {
-            console.log('Navigating to distributor workers page')
-            navigate('/distributor/workers')
-          } else if (result.role === 'guard') {
-            console.log('Navigating to guard page')
-            navigate('/guard')
-          } else {
-            console.log('Navigating to dashboard')
-            navigate('/dashboard')
-          }
-        }, 100)
+        // 不在这里手动跳转，让useEffect处理跳转
+        // 这样可以避免双重跳转逻辑冲突
       } else {
         console.log('Login failed')
         message.error(t('login.loginFailed'))

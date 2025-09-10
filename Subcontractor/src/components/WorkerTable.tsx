@@ -48,23 +48,23 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     const activities: Array<{ time: string; event: string; detail?: string; color?: string }> = [];
 
     // 上班
-    activities.push({ time: base.add(8, 'hour').add(Math.floor(Math.random() * 30), 'minute').format('HH:mm'), event: '上班打卡', color: 'green' });
+    activities.push({ time: base.add(8, 'hour').add(Math.floor(Math.random() * 30), 'minute').format('HH:mm'), event: t('guard.clockIn'), color: 'green' });
     // 借用物品 0-2 次
     const borrowTimes = Math.floor(Math.random() * 3);
     for (let i = 0; i < borrowTimes; i++) {
       activities.push({
         time: base.add(9 + i * 2, 'hour').add(Math.floor(Math.random() * 50), 'minute').format('HH:mm'),
-        event: '借用物品',
+        event: t('guard.borrowItem'),
         detail: `编号#${Math.floor(Math.random() * 9000) + 1000}`,
         color: 'blue'
       });
     }
     // 可能的还物
     if (borrowTimes > 0) {
-      activities.push({ time: base.add(16, 'hour').add(Math.floor(Math.random() * 40), 'minute').format('HH:mm'), event: '归还物品', color: 'gold' });
+      activities.push({ time: base.add(16, 'hour').add(Math.floor(Math.random() * 40), 'minute').format('HH:mm'), event: t('guard.returnItem'), color: 'gold' });
     }
     // 下班（有时未下班，用状态体现，这里默认有）
-    activities.push({ time: base.add(17, 'hour').add(Math.floor(Math.random() * 50), 'minute').format('HH:mm'), event: '下班打卡', color: 'gray' });
+    activities.push({ time: base.add(17, 'hour').add(Math.floor(Math.random() * 50), 'minute').format('HH:mm'), event: t('guard.clockOut'), color: 'gray' });
 
     // 按时间排序
     return activities.sort((a, b) => (a.time > b.time ? 1 : -1));
@@ -124,10 +124,10 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       // 模拟发送过程
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const methodText = method === 'email' ? '邮箱' : 'WhatsApp';
-      message.success(`已成功发送二维码到 ${worker.name} 的${methodText}`);
+      const methodText = method === 'email' ? t('guard.sendToEmail') : t('guard.sendToWhatsApp');
+      message.success(t('guard.sendSuccess').replace('{name}', worker.name).replace('{method}', methodText));
     } catch (error) {
-      message.error('发送失败，请重试');
+      message.error(t('guard.sendFailed'));
     } finally {
       setSendingLoading(false);
     }
@@ -136,12 +136,12 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   // 处理批量发送二维码
   const handleBatchSendQRCode = async (method: 'email' | 'whatsapp') => {
     if (selectedRowKeys.length === 0) {
-      message.warning('请先选择要发送的工人');
+      message.warning(t('guard.pleaseSelectWorkers'));
       return;
     }
 
     const selectedWorkers = workers.filter(worker => selectedRowKeys.includes(worker.id));
-    const methodText = method === 'email' ? '邮箱' : 'WhatsApp';
+    const methodText = method === 'email' ? t('guard.sendToEmail') : t('guard.sendToWhatsApp');
 
     try {
       setSendingLoading(true);
@@ -149,13 +149,13 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       // 模拟批量发送过程
       for (let i = 0; i < selectedWorkers.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 500));
-        message.success(`已发送到 ${selectedWorkers[i].name} 的${methodText} (${i + 1}/${selectedWorkers.length})`);
+        message.success(t('guard.batchSendSuccess').replace('{name}', selectedWorkers[i].name).replace('{method}', methodText).replace('{current}', (i + 1).toString()).replace('{total}', selectedWorkers.length.toString()));
       }
       
-      message.success(`批量发送完成！共发送 ${selectedWorkers.length} 个工人`);
+      message.success(t('guard.batchSendComplete').replace('{count}', selectedWorkers.length.toString()));
       setSelectedRowKeys([]);
     } catch (error) {
-      message.error('批量发送失败，请重试');
+      message.error(t('guard.batchSendFailed'));
     } finally {
       setSendingLoading(false);
     }
@@ -289,7 +289,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       },
     },
     {
-      title: '状态',
+      title: t('worker.status'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
@@ -319,7 +319,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => onViewQR(record)}
             />
           </Tooltip>
-          <Tooltip title="发送到邮箱">
+          <Tooltip title={t('guard.sendToEmail')}>
             <Button
               type="text"
               size="small"
@@ -328,7 +328,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               loading={sendingLoading}
             />
           </Tooltip>
-          <Tooltip title="发送到WhatsApp">
+          <Tooltip title={t('guard.sendToWhatsApp')}>
             <Button
               type="text"
               size="small"
@@ -374,7 +374,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           alignItems: 'center'
         }}>
           <span>
-            已选择 <strong>{selectedRowKeys.length}</strong> 个工人
+            {t('guard.selectedWorkers').replace('{count}', selectedRowKeys.length.toString())}
           </span>
           <Space>
             <Button
@@ -383,7 +383,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => handleBatchSendQRCode('email')}
               loading={sendingLoading}
             >
-              批量发送到邮箱 ({selectedRowKeys.length})
+              {t('guard.batchSendToEmail')} ({selectedRowKeys.length})
             </Button>
             <Button
               type="primary"
@@ -391,12 +391,12 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => handleBatchSendQRCode('whatsapp')}
               loading={sendingLoading}
             >
-              批量发送到WhatsApp ({selectedRowKeys.length})
+              {t('guard.batchSendToWhatsApp')} ({selectedRowKeys.length})
             </Button>
             <Button
               onClick={() => setSelectedRowKeys([])}
             >
-              取消选择
+              {t('guard.cancelSelection')}
             </Button>
           </Space>
         </div>
@@ -454,7 +454,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
             </Row>
             <Divider />
             <div>
-              <p style={{ fontWeight: 600, marginBottom: 8 }}>当日活动</p>
+              <p style={{ fontWeight: 600, marginBottom: 8 }}>{t('guard.todayActivities')}</p>
               <Timeline
                 items={getTodayActivities(selectedWorker).map(a => ({
                   color: a.color,

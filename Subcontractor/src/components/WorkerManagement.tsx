@@ -17,6 +17,7 @@ import {
   Typography,
   Avatar
 } from 'antd'
+import { useLocale } from '../contexts/LocaleContext'
 import {
   PlusOutlined,
   EditOutlined,
@@ -45,6 +46,7 @@ interface Worker {
 }
 
 const WorkerManagement: React.FC = () => {
+  const { t } = useLocale()
   const [workers, setWorkers] = useState<Worker[]>([
     {
       key: '1',
