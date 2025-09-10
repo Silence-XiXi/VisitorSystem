@@ -295,48 +295,49 @@ const Login: React.FC = () => {
                 </Col>
                 <Col span={8}>
                   <div style={{ 
-                    height: 40, 
                     display: 'flex', 
                     alignItems: 'center', 
-                    justifyContent: 'center',
-                    border: '1px solid #d9d9d9',
-                    borderRadius: '6px',
-                    background: '#fff',
-                    cursor: 'pointer',
-                    position: 'relative'
-                  }}
-                  onClick={generateCaptcha}
-                  >
-                    {captchaImage && (
-                      <img 
-                        src={captchaImage} 
-                        alt="验证码" 
-                        style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'cover',
-                          borderRadius: '6px'
-                        }} 
-                      />
-                    )}
+                    gap: '4px'
+                  }}>
+                    <div style={{ 
+                      height: 40, 
+                      flex: 1,
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '6px',
+                      background: '#fff',
+                      cursor: 'pointer'
+                    }}
+                    onClick={generateCaptcha}
+                    >
+                      {captchaImage && (
+                        <img 
+                          src={captchaImage} 
+                          alt="验证码" 
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover',
+                            borderRadius: '6px'
+                          }} 
+                        />
+                      )}
+                    </div>
                     <Button
                       type="text"
                       icon={<ReloadOutlined />}
                       size="small"
                       style={{
-                        position: 'absolute',
-                        top: 2,
-                        right: 2,
-                        padding: '2px 4px',
+                        padding: '4px 6px',
                         minWidth: 'auto',
-                        height: 'auto',
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        border: 'none'
+                        height: '32px',
+                        background: '#f5f5f5',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '6px'
                       }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        generateCaptcha()
-                      }}
+                      onClick={generateCaptcha}
                     />
                   </div>
                 </Col>

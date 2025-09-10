@@ -479,39 +479,39 @@ const Guard: React.FC = () => {
 
   const handleScanWorkerId = () => {
     if (!scannedWorkerId.trim()) {
-      message.error('请输入工人ID')
+      message.error(t('guard.pleaseEnterWorkerId'))
       return
     }
 
     const worker = workers.find(w => w.workerId === scannedWorkerId.trim())
     if (!worker) {
-      message.error('未找到该工人信息')
+      message.error(t('guard.workerNotFound'))
       return
     }
 
     if (worker.status === 'in') {
-      message.error('该工人已入场，请检查状态')
+      message.error(t('guard.workerAlreadyEntered'))
       return
     }
 
     setSelectedWorker(worker)
     setPhoneNumber(worker.phone)
-    message.success('工人信息查询成功')
+    message.success(t('guard.workerQuerySuccess'))
   }
 
   const handleCompleteEntry = () => {
     if (!selectedWorker) {
-      message.error('请先查询工人信息')
+      message.error(t('guard.pleaseQueryWorkerFirst'))
       return
     }
 
     if (!physicalCardId.trim()) {
-      message.error('请输入实体卡编号')
+      message.error(t('guard.pleaseEnterPhysicalCardId'))
       return
     }
 
     if (!phoneNumber.trim()) {
-      message.error('请输入联系电话')
+      message.error(t('guard.pleaseEnterPhoneNumber'))
       return
     }
 
@@ -561,7 +561,7 @@ const Guard: React.FC = () => {
 
   const handleScanForBorrow = () => {
     if (!scannedWorkerId.trim()) {
-      message.error('请输入二维码编号或实体卡编号')
+      message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForBorrow'))
       return
     }
 
@@ -570,12 +570,12 @@ const Guard: React.FC = () => {
     )
     
     if (!worker) {
-      message.error('未找到对应的工人信息')
+      message.error(t('guard.workerNotFound'))
       return
     }
 
     if (worker.status === 'out') {
-      message.error('该工人未在场内，无法借物')
+      message.error(t('guard.workerNotOnSiteCannotBorrow'))
       return
     }
 
@@ -591,17 +591,17 @@ const Guard: React.FC = () => {
     setCurrentBorrowedItems(borrowedItems)
     setSelectedReturnItems([])
     
-    message.success('工人信息查询成功')
+    message.success(t('guard.workerQuerySuccess'))
   }
 
   const handleAddItemToList = () => {
     if (!selectedItemType) {
-      message.error('请选择物品类型')
+      message.error(t('guard.pleaseSelectItemType'))
       return
     }
 
     if (!itemNumber.trim()) {
-      message.error('请输入物品编号')
+      message.error(t('guard.pleaseEnterItemNumber'))
       return
     }
 
@@ -611,7 +611,7 @@ const Guard: React.FC = () => {
     )
 
     if (existingItem) {
-      message.error('该物品已添加到借用列表中')
+      message.error(t('guard.itemAlreadyInList'))
       return
     }
 
@@ -628,18 +628,18 @@ const Guard: React.FC = () => {
     setSelectedItemType('')
     setItemNumber('')
     
-    message.success('物品已添加到借用列表')
+    message.success(t('guard.itemAddedToList'))
   }
 
   const handleRemoveItemFromList = (index: number) => {
     const newList = borrowItemsList.filter((_, i) => i !== index)
     setBorrowItemsList(newList)
-    message.success('物品已从借用列表中移除')
+    message.success(t('guard.itemRemovedFromList'))
   }
 
   const handleBorrowReturnItems = () => {
     if (selectedReturnItems.length === 0) {
-      message.error('请选择要归还的物品')
+      message.error(t('guard.pleaseSelectItemsToReturn'))
       return
     }
 
@@ -665,7 +665,7 @@ const Guard: React.FC = () => {
     )
     setAttendanceRecords(updatedRecords)
 
-    message.success(`成功归还 ${selectedReturnItems.length} 个物品`)
+    message.success(t('guard.returnItemsSuccess').replace('{count}', selectedReturnItems.length.toString()))
     
     // 重新加载当前借用物品列表
     const updatedWorker = updatedWorkers.find(w => w.id === selectedWorker?.id)
@@ -684,12 +684,12 @@ const Guard: React.FC = () => {
 
   const handleCompleteBorrow = () => {
     if (!selectedWorker) {
-      message.error('请先查询工人信息')
+      message.error(t('guard.pleaseQueryWorkerFirst'))
       return
     }
 
     if (borrowItemsList.length === 0) {
-      message.error('请至少添加一个物品到借用列表')
+      message.error(t('guard.pleaseAddAtLeastOneItem'))
       return
     }
 
@@ -719,7 +719,7 @@ const Guard: React.FC = () => {
     )
     setAttendanceRecords(updatedRecords)
 
-    message.success(`借物登记完成，共借用 ${borrowItemsList.length} 个物品`)
+    message.success(t('guard.borrowRegistrationSuccess').replace('{count}', borrowItemsList.length.toString()))
     
     // 清空输入和查询信息，停留在当前页面
     setScannedWorkerId('')
@@ -740,7 +740,7 @@ const Guard: React.FC = () => {
 
   const handleScanForExit = () => {
     if (!scannedWorkerId.trim()) {
-      message.error('请输入二维码编号或实体卡编号')
+      message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForExit'))
       return
     }
 
@@ -749,17 +749,17 @@ const Guard: React.FC = () => {
     )
     
     if (!worker) {
-      message.error('未找到对应的工人信息')
+      message.error(t('guard.workerNotFound'))
       return
     }
 
     if (worker.status === 'out') {
-      message.error('该工人未在场内，无法离场')
+      message.error(t('guard.workerNotOnSiteCannotExit'))
       return
     }
 
     setSelectedWorker(worker)
-    message.success('工人信息查询成功')
+    message.success(t('guard.workerQuerySuccess'))
   }
 
   const handleCompleteExit = () => {
@@ -767,7 +767,7 @@ const Guard: React.FC = () => {
 
     // 验证实体卡是否已归还
     if (!physicalCardReturned) {
-      message.error('请确认实体卡已归还')
+      message.error(t('guard.pleaseConfirmPhysicalCardReturned'))
       return
     }
 
@@ -775,7 +775,7 @@ const Guard: React.FC = () => {
     const unreturnedItems = selectedWorker.borrowedItems?.filter((item: any) => !item.returnTime) || []
     for (const item of unreturnedItems) {
       if (!unreturnedItemRemarks[item.itemId] || unreturnedItemRemarks[item.itemId].trim() === '') {
-        message.error(`请为未归还物品 "${item.itemType} - ${item.itemId}" 填写备注`)
+        message.error(t('guard.pleaseFillRemarkForItem').replace('{itemType}', item.itemType).replace('{itemId}', item.itemId))
         return
       }
     }
@@ -850,12 +850,12 @@ const Guard: React.FC = () => {
 
   const handlePasswordChange = async (values: { oldPassword: string; newPassword: string; confirmPassword: string }) => {
     if (values.newPassword !== values.confirmPassword) {
-      message.error('新密码和确认密码不一致')
+      message.error(t('guard.passwordMismatch'))
       return
     }
     
     // 模拟密码修改
-    message.success('密码修改成功')
+    message.success(t('guard.passwordChangeSuccess'))
     setUserCenterModalVisible(false)
     passwordForm.resetFields()
   }
@@ -895,10 +895,41 @@ const Guard: React.FC = () => {
     setItemRecordsModalVisible(true)
   }
 
+  // 全选/取消全选当前借用物品
+  const handleSelectAllCurrentBorrowedItems = () => {
+    if (currentBorrowedItems.length === 0) return
+    
+    const allItemKeys = currentBorrowedItems.map(item => `${item.itemType}-${item.itemId}`)
+    
+    // 如果当前已全选，则取消全选；否则全选
+    if (selectedReturnItems.length === allItemKeys.length && 
+        allItemKeys.every(key => selectedReturnItems.includes(key))) {
+      setSelectedReturnItems([])
+    } else {
+      setSelectedReturnItems(allItemKeys)
+    }
+  }
+
+  // 全选/取消全选借用物品
+  const handleSelectAllBorrowedItems = () => {
+    if (!selectedWorker) return
+    
+    const unreturnedItems = selectedWorker.borrowedItems?.filter((item: any) => !item.returnTime) || []
+    const allItemIds = unreturnedItems.map((item: any) => item.itemId)
+    
+    // 如果当前已全选，则取消全选；否则全选
+    if (selectedBorrowedItems.length === allItemIds.length && 
+        allItemIds.every(id => selectedBorrowedItems.includes(id))) {
+      setSelectedBorrowedItems([])
+    } else {
+      setSelectedBorrowedItems(allItemIds)
+    }
+  }
+
   // 归还选中物品
   const handleReturnItems = () => {
     if (!selectedWorker || selectedBorrowedItems.length === 0) {
-      message.error('请选择要归还的物品')
+      message.error(t('guard.pleaseSelectItemsToReturn'))
       return
     }
 
@@ -924,7 +955,7 @@ const Guard: React.FC = () => {
     )
     setAttendanceRecords(updatedRecords)
 
-    message.success(`成功归还 ${selectedBorrowedItems.length} 件物品`)
+    message.success(t('guard.returnItemsSuccessCount').replace('{count}', selectedBorrowedItems.length.toString()))
     setSelectedBorrowedItems([])
   }
 
@@ -949,7 +980,7 @@ const Guard: React.FC = () => {
   // 借/还物品页面查询工人信息
   const handleBorrowQuery = () => {
     if (!borrowQueryId.trim()) {
-      message.error('请输入二维码编号或实体卡编号')
+      message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForQuery'))
       return
     }
 
@@ -958,17 +989,17 @@ const Guard: React.FC = () => {
     )
 
     if (!worker) {
-      message.error('未找到对应的工人信息')
+      message.error(t('guard.workerNotFound'))
       return
     }
 
     if (worker.status !== 'in') {
-      message.error('该工人未在场内，无法借物')
+      message.error(t('guard.workerNotOnSiteCannotBorrow'))
       return
     }
 
     setSelectedWorker(worker)
-    message.success('工人信息查询成功')
+    message.success(t('guard.workerQuerySuccess'))
   }
 
 
@@ -1071,13 +1102,13 @@ const Guard: React.FC = () => {
                   whiteSpace: 'nowrap'
                 }}
               >
-                {user?.username || '门卫'}
+                {user?.username || t('guard.guard')}
               </Text>
               <Text type="secondary" style={{ 
                 fontSize: 'clamp(10px, 2vw, 14px)',
                 whiteSpace: 'nowrap'
               }}>
-                ({user?.role === 'guard' ? '门卫' : '用户'})
+                ({user?.role === 'guard' ? t('guard.guard') : t('guard.user')})
               </Text>
             </div>
           </div>
@@ -1103,7 +1134,7 @@ const Guard: React.FC = () => {
         borderRadius: '8px',
         border: '1px solid #e9ecef'
       }}>
-        <Text strong style={{ marginBottom: '12px', display: 'block' }}>快速功能：</Text>
+        <Text strong style={{ marginBottom: '12px', display: 'block' }}>{t('guard.quickFunctions')}</Text>
         <Space wrap>
           {buttons.map(button => (
             <Button
@@ -1149,33 +1180,33 @@ const Guard: React.FC = () => {
 
     const itemColumns = [
       {
-        title: '物品类型',
+        title: t('guard.itemType'),
         dataIndex: 'itemName',
         key: 'itemName',
       },
       {
-        title: '物品编号',
+        title: t('guard.itemId'),
         dataIndex: 'itemId',
         key: 'itemId',
       },
       {
-        title: '借用时间',
+        title: t('guard.borrowTime'),
         dataIndex: 'borrowTime',
         key: 'borrowTime',
       },
       {
-        title: '归还时间',
+        title: t('guard.returnTime'),
         dataIndex: 'returnTime',
         key: 'returnTime',
         render: (value: string | null) => value || '-',
       },
       {
-        title: '状态',
+        title: t('guard.status'),
         dataIndex: 'status',
         key: 'status',
         render: (status: string) => (
           <Tag color={status === 'returned' ? 'green' : 'orange'}>
-            {status === 'returned' ? '已归还' : '未归还'}
+            {status === 'returned' ? t('guard.returned') : t('guard.notReturned')}
           </Tag>
         ),
       },
@@ -1183,26 +1214,26 @@ const Guard: React.FC = () => {
 
     return (
       <Modal
-        title={`${selectedRecord.workerName} 的物品借用记录`}
+        title={`${selectedRecord.workerName} ${t('guard.itemBorrowRecords')}`}
         open={itemRecordsModalVisible}
         onCancel={() => setItemRecordsModalVisible(false)}
         footer={null}
         width={800}
       >
         <div style={{ marginBottom: '16px' }}>
-          <Text strong>工人信息：</Text>
+          <Text strong>{t('guard.workerInfo')}</Text>
           <div style={{ marginTop: '8px', padding: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
             <Row gutter={16}>
               <Col span={8}>
-                <Text type="secondary">工号：</Text>
+                <Text type="secondary">{t('guard.workerIdLabel')}</Text>
                 <Text strong>{selectedRecord.workerId}</Text>
               </Col>
               <Col span={8}>
-                <Text type="secondary">姓名：</Text>
+                <Text type="secondary">{t('guard.nameLabel')}</Text>
                 <Text strong>{selectedRecord.workerName}</Text>
               </Col>
               <Col span={8}>
-                <Text type="secondary">电话：</Text>
+                <Text type="secondary">{t('guard.phoneLabel')}</Text>
                 <Text strong>{selectedRecord.phone}</Text>
               </Col>
             </Row>
@@ -1223,7 +1254,7 @@ const Guard: React.FC = () => {
   // 用户中心Modal
   const renderUserCenterModal = () => (
     <Modal
-      title="用户中心"
+      title={t('guard.userCenter')}
       open={userCenterModalVisible}
       onCancel={() => setUserCenterModalVisible(false)}
       footer={null}
@@ -1233,10 +1264,10 @@ const Guard: React.FC = () => {
         <Space>
           <Avatar size={64} icon={<UserOutlined />} />
           <div>
-            <Title level={4} style={{ margin: 0 }}>{user?.username || '门卫'}</Title>
-            <Text type="secondary">{user?.role === 'guard' ? '门卫' : '用户'}</Text>
+            <Title level={4} style={{ margin: 0 }}>{user?.username || t('guard.guard')}</Title>
+            <Text type="secondary">{user?.role === 'guard' ? t('guard.guard') : t('guard.user')}</Text>
             <br />
-            <Text type="secondary">工地：{user?.siteName || '未知工地'}</Text>
+            <Text type="secondary">{t('guard.site')}：{user?.siteName || t('guard.unknownSite')}</Text>
           </div>
         </Space>
       </div>
@@ -1249,49 +1280,49 @@ const Guard: React.FC = () => {
         layout="vertical"
       >
         <Form.Item
-          label="当前密码"
+          label={t('guard.currentPassword')}
           name="oldPassword"
-          rules={[{ required: true, message: '请输入当前密码' }]}
+          rules={[{ required: true, message: t('guard.pleaseEnterCurrentPassword') }]}
         >
-          <Input.Password placeholder="请输入当前密码" />
+          <Input.Password placeholder={t('guard.pleaseEnterCurrentPassword')} />
         </Form.Item>
         
         <Form.Item
-          label="新密码"
+          label={t('guard.newPassword')}
           name="newPassword"
           rules={[
-            { required: true, message: '请输入新密码' },
-            { min: 6, message: '密码长度至少6位' }
+            { required: true, message: t('guard.pleaseEnterNewPassword') },
+            { min: 6, message: t('guard.passwordMinLength') }
           ]}
         >
-          <Input.Password placeholder="请输入新密码" />
+          <Input.Password placeholder={t('guard.pleaseEnterNewPassword')} />
         </Form.Item>
         
         <Form.Item
-          label="确认新密码"
+          label={t('guard.confirmNewPassword')}
           name="confirmPassword"
           rules={[
-            { required: true, message: '请确认新密码' },
+            { required: true, message: t('guard.pleaseEnterNewPassword') },
             ({ getFieldValue }) => ({
               validator(_, value) {
                 if (!value || getFieldValue('newPassword') === value) {
                   return Promise.resolve()
                 }
-                return Promise.reject(new Error('两次输入的密码不一致'))
+                return Promise.reject(new Error(t('guard.passwordMismatch')))
               },
             }),
           ]}
         >
-          <Input.Password placeholder="请再次输入新密码" />
+          <Input.Password placeholder={t('guard.pleaseEnterNewPassword')} />
         </Form.Item>
         
         <Form.Item>
           <Space>
             <Button type="primary" htmlType="submit">
-              修改密码
+              {t('navigation.changePassword')}
             </Button>
             <Button onClick={() => setUserCenterModalVisible(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
           </Space>
         </Form.Item>
@@ -1339,7 +1370,7 @@ const Guard: React.FC = () => {
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <Statistic
-                      title="今日入场"
+                      title={t('guard.todayEntry')}
                       value={totalEnteredToday}
                       prefix={<UserAddOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
@@ -1364,7 +1395,7 @@ const Guard: React.FC = () => {
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <Statistic
-                      title="已离场"
+                      title={t('guard.exited')}
                       value={totalExitedToday}
                       prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
@@ -1389,7 +1420,7 @@ const Guard: React.FC = () => {
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <Statistic
-                      title="未离场"
+                      title={t('guard.notExited')}
                       value={currentOnSite}
                       prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
@@ -1409,7 +1440,7 @@ const Guard: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
                     <Statistic
-                      title="借出物品"
+                      title={t('guard.borrowedItems')}
                       value={totalBorrowedItems}
                       prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
@@ -1422,7 +1453,7 @@ const Guard: React.FC = () => {
                   <div style={{ width: '1px', height: '50px', background: '#f0f0f0', margin: '0 6px' }}></div>
                   <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
                     <Statistic
-                      title="待归还物品"
+                      title={t('guard.pendingReturn')}
                       value={totalUnreturnedItems}
                       prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
@@ -1480,8 +1511,8 @@ const Guard: React.FC = () => {
               onClick={handleReports}
             >
               <BarChartOutlined style={{ fontSize: '48px', color: '#722ed1', marginBottom: '16px' }} />
-              <Title level={4}>报表查看</Title>
-              <Text type="secondary">查看访客记录和统计</Text>
+              <Title level={4}>{t('guard.reports')}</Title>
+              <Text type="secondary">{t('guard.viewVisitorRecords')}</Text>
             </Card>
           </Col>
         </Row>
@@ -1511,14 +1542,14 @@ const Guard: React.FC = () => {
             marginBottom: '16px',
             gap: window.innerWidth < 768 ? '12px' : '0'
           }}>
-            <Title level={2} style={{ margin: 0 }}>入场登记</Title>
+            <Title level={2} style={{ margin: 0 }}>{t('guard.entryRegistration')}</Title>
             <Space wrap>
               {[
-                { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
-                { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
-                { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
-                { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
+                { key: 'entry', label: t('guard.entryRegistration'), icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
+                { key: 'borrow', label: t('guard.borrowReturn'), icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                { key: 'exit', label: t('guard.exitRegistration'), icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
+                { key: 'reports', label: t('guard.reports'), icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
+                { key: 'back', label: t('common.back'), icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
               ].map(button => (
                 <Button
                   key={button.key}
@@ -1551,9 +1582,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号/实体卡编号：</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeInput')}</Text>
               <Input
-                placeholder="请输入二维码编号或实体卡编号（必填）"
+                placeholder={t('guard.qrCodePlaceholder')}
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
@@ -1564,7 +1595,7 @@ const Guard: React.FC = () => {
                     onClick={handleScanWorkerId}
                     style={{ marginRight: '-8px' }}
                   >
-                    查询
+                    {t('guard.query')}
                   </Button>
                 }
                 style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
@@ -1575,7 +1606,7 @@ const Guard: React.FC = () => {
             {selectedWorker && (
               <>
                 <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>2. 工人信息确认：</Text>
+                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step2WorkerInfo')}</Text>
                   <Card size="small" style={{ marginTop: '8px' }}>
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                       <div>
@@ -1583,15 +1614,15 @@ const Guard: React.FC = () => {
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>身份证号：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.idCardLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.idCard}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>联系方式：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.contactLabel')}</Text>
                         <Input
                           value={phoneNumber}
                           onChange={(e) => setPhoneNumber(e.target.value)}
-                          placeholder="请输入联系电话"
+                          placeholder={t('guard.phonePlaceholder')}
                           prefix={<PhoneOutlined />}
                           style={{ width: '250px', marginLeft: '8px', height: '40px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
                         />
@@ -1601,9 +1632,9 @@ const Guard: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>3. 实体卡编号：</Text>
+                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step3PhysicalCard')}</Text>
                   <Input
-                    placeholder="请输入实体卡编号（必填）"
+                    placeholder={t('guard.physicalCardPlaceholder')}
                     value={physicalCardId}
                     onChange={(e) => setPhysicalCardId(e.target.value)}
                     prefix={<IdcardOutlined />}
@@ -1618,7 +1649,7 @@ const Guard: React.FC = () => {
                   onClick={handleCompleteEntry}
                   style={{ width: '100%', height: '56px', fontSize: 'clamp(18px, 3vw, 24px)' }}
                 >
-                  登记入场
+                  {t('guard.completeEntry')}
                 </Button>
               </>
             )}
@@ -1650,14 +1681,14 @@ const Guard: React.FC = () => {
             marginBottom: '16px',
             gap: window.innerWidth < 768 ? '12px' : '0'
           }}>
-            <Title level={2} style={{ margin: 0 }}>借/还物品</Title>
+            <Title level={2} style={{ margin: 0 }}>{t('guard.borrowReturn')}</Title>
             <Space wrap>
               {[
-                { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
-                { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
-                { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
-                { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
+                { key: 'entry', label: t('guard.entryRegistration'), icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
+                { key: 'borrow', label: t('guard.borrowReturn'), icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                { key: 'exit', label: t('guard.exitRegistration'), icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
+                { key: 'reports', label: t('guard.reports'), icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
+                { key: 'back', label: t('common.back'), icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
               ].map(button => (
                 <Button
                   key={button.key}
@@ -1690,9 +1721,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号/实体卡编号：</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeInput')}</Text>
               <Input
-                placeholder="请输入二维码编号或实体卡编号（必填）"
+                placeholder={t('guard.qrCodePlaceholder')}
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
@@ -1703,7 +1734,7 @@ const Guard: React.FC = () => {
                     onClick={handleScanForBorrow}
                     style={{ marginRight: '-8px' }}
                   >
-                    查询
+                    {t('guard.query')}
                   </Button>
                 }
                 style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
@@ -1714,7 +1745,7 @@ const Guard: React.FC = () => {
             {selectedWorker && (
               <>
                 <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>2. 工人信息确认：</Text>
+                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step2WorkerInfo')}</Text>
                   <Card size="small" style={{ marginTop: '8px' }}>
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                       <div>
@@ -1722,7 +1753,7 @@ const Guard: React.FC = () => {
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>身份证号：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.idCardLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
                           {selectedWorker.idCard ? 
                             (selectedWorker.idCard.length >= 8 ? 
@@ -1733,11 +1764,11 @@ const Guard: React.FC = () => {
                         </Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>电话号码：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.phoneNumberLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.phone || '-'}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>入场时间：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.entryTimeLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.entryTime || '-'}</Text>
                       </div>
                     </Space>
@@ -1747,7 +1778,28 @@ const Guard: React.FC = () => {
                 {/* 当前借用物品列表 */}
                 {currentBorrowedItems.length > 0 && (
                   <div>
-                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>当前借用物品：</Text>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.currentBorrowedItems')}</Text>
+                      <Button 
+                        size="small"
+                        onClick={handleSelectAllCurrentBorrowedItems}
+                        style={{ 
+                          fontSize: 'clamp(12px, 2vw, 16px)',
+                          height: '32px',
+                          padding: '0 12px',
+                          backgroundColor: '#1890ff',
+                          borderColor: '#1890ff',
+                          color: '#fff'
+                        }}
+                      >
+                        {(() => {
+                          const allItemKeys = currentBorrowedItems.map(item => `${item.itemType}-${item.itemId}`)
+                          const isAllSelected = selectedReturnItems.length === allItemKeys.length && 
+                                               allItemKeys.every(key => selectedReturnItems.includes(key))
+                          return isAllSelected ? t('guard.selectNone') : t('guard.selectAll')
+                        })()}
+                      </Button>
+                    </div>
                     <Card size="small" style={{ marginTop: '8px' }}>
                       {currentBorrowedItems.map((item, index) => {
                         const itemKey = `${item.itemType}-${item.itemId}`
@@ -1782,18 +1834,18 @@ const Guard: React.FC = () => {
                               </div>
                               <div style={{ marginBottom: '4px' }}>
                                 <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                  编号：{item.itemId}
+                                  {t('guard.itemIdLabel')}{item.itemId}
                                 </Text>
                               </div>
                               <div>
                                 <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                  借用时间：{item.borrowTime}
+                                  {t('guard.borrowTimeLabel')}{item.borrowTime}
                                 </Text>
                               </div>
                               {item.remark && (
                                 <div>
                                   <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                    备注：{item.remark}
+                                    {t('guard.remark')}{item.remark}
                                   </Text>
                                 </div>
                               )}
@@ -1814,16 +1866,16 @@ const Guard: React.FC = () => {
                           marginTop: '12px'
                         }}
                       >
-                        归还选中物品 ({selectedReturnItems.length}个)
+                        {t('guard.returnSelectedItemsWithCount').replace('{count}', selectedReturnItems.length.toString())}
                       </Button>
                     )}
                   </div>
                 )}
 
                 <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>3. 物品类型：</Text>
+                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step3ItemType')}</Text>
                   <Select
-                    placeholder="请选择物品类型（必填）"
+                    placeholder={t('guard.itemTypePlaceholder')}
                     value={selectedItemType}
                     onChange={setSelectedItemType}
                     style={{ 
@@ -1844,9 +1896,9 @@ const Guard: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>4. 物品编号：</Text>
+                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step4ItemNumber')}</Text>
                   <Input
-                    placeholder="请输入物品编号（必填）"
+                    placeholder={t('guard.itemNumberPlaceholder')}
                     value={itemNumber}
                     onChange={(e) => setItemNumber(e.target.value)}
                     style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(18px, 3vw, 24px)' }}
@@ -1867,13 +1919,13 @@ const Guard: React.FC = () => {
                     color: '#fff'
                   }}
                 >
-                  添加物品到借用列表
+                  {t('guard.addItemToList')}
                 </Button>
 
                 {/* 借用物品列表 */}
                 {borrowItemsList.length > 0 && (
                   <div style={{ marginTop: '16px' }}>
-                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>借用物品列表：</Text>
+                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.borrowItemsList')}</Text>
                     <Card size="small" style={{ marginTop: '8px' }}>
                       {borrowItemsList.map((item, index) => (
                         <div key={index} style={{ 
@@ -1899,7 +1951,7 @@ const Guard: React.FC = () => {
                               </div>
                               <div>
                                 <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                  编号：{item.itemId}
+                                  {t('guard.itemIdLabel')}{item.itemId}
                                 </Text>
                               </div>
                             </div>
@@ -1910,7 +1962,7 @@ const Guard: React.FC = () => {
                               onClick={() => handleRemoveItemFromList(index)}
                               style={{ fontSize: 'clamp(14px, 2vw, 18px)', marginLeft: '8px' }}
                             >
-                              删除
+                              {t('common.delete')}
                             </Button>
                           </div>
                           <div>
@@ -1935,17 +1987,17 @@ const Guard: React.FC = () => {
                                   color: item.showRemark ? '#1890ff' : '#666'
                                 }}
                               >
-                                {item.showRemark ? '收起备注' : '添加备注'}
+                                {item.showRemark ? t('guard.hideRemark') : t('guard.addRemark')}
                               </Button>
                               {item.remark && !item.showRemark && (
                                 <Text type="secondary" style={{ fontSize: 'clamp(12px, 1.8vw, 16px)' }}>
-                                  已填写备注
+                                  {t('guard.remarkFilled')}
                                 </Text>
                               )}
                             </div>
                             {item.showRemark && (
                               <Input.TextArea
-                                placeholder="请输入该物品的备注信息（可选）"
+                                placeholder={t('guard.itemRemarkPlaceholder')}
                                 value={item.remark}
                                 onChange={(e) => {
                                   const newList = [...borrowItemsList]
@@ -1979,7 +2031,7 @@ const Guard: React.FC = () => {
                     marginTop: '16px'
                   }}
                 >
-                  完成借物登记 {borrowItemsList.length > 0 && `(${borrowItemsList.length}个物品)`}
+                  {t('guard.completeBorrowWithItems').replace('{count}', borrowItemsList.length.toString())}
                 </Button>
               </>
             )}
@@ -2011,14 +2063,14 @@ const Guard: React.FC = () => {
             marginBottom: '16px',
             gap: window.innerWidth < 768 ? '12px' : '0'
           }}>
-            <Title level={2} style={{ margin: 0 }}>离场登记</Title>
+            <Title level={2} style={{ margin: 0 }}>{t('guard.exitRegistration')}</Title>
             <Space wrap>
               {[
-                { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
-                { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
-                { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
-                { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
+                { key: 'entry', label: t('guard.entryRegistration'), icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
+                { key: 'borrow', label: t('guard.borrowReturn'), icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                { key: 'exit', label: t('guard.exitRegistration'), icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
+                { key: 'reports', label: t('guard.reports'), icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
+                { key: 'back', label: t('common.back'), icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
               ].map(button => (
                 <Button
                   key={button.key}
@@ -2051,9 +2103,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>1. 输入二维码编号/实体卡编号：</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeInput')}</Text>
               <Input
-                placeholder="请输入二维码编号或实体卡编号（必填）"
+                placeholder={t('guard.qrCodePlaceholder')}
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
@@ -2064,7 +2116,7 @@ const Guard: React.FC = () => {
                     onClick={handleScanForExit}
                     style={{ marginRight: '-8px' }}
                   >
-                    查询
+                    {t('guard.query')}
                   </Button>
                 }
                 style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
@@ -2075,7 +2127,7 @@ const Guard: React.FC = () => {
             {selectedWorker && (
               <>
                 <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>2. 工人信息确认：</Text>
+                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step2WorkerInfo')}</Text>
                   <Card size="small" style={{ marginTop: '8px' }}>
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                       <div>
@@ -2083,7 +2135,7 @@ const Guard: React.FC = () => {
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>身份证号：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.idCardLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
                           {selectedWorker.idCard ? 
                             (selectedWorker.idCard.length >= 8 ? 
@@ -2094,11 +2146,11 @@ const Guard: React.FC = () => {
                         </Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>电话号码：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.phoneNumberLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.phone || '-'}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>入场时间：</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.entryTimeLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.entryTime || '-'}</Text>
                       </div>
                     </Space>
@@ -2106,7 +2158,31 @@ const Guard: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>3. 借物明细：</Text>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.borrowDetails')}</Text>
+                    {selectedWorker.borrowedItems && selectedWorker.borrowedItems.some((item: any) => !item.returnTime) && (
+                      <Button 
+                        size="small"
+                        onClick={handleSelectAllBorrowedItems}
+                        style={{ 
+                          fontSize: 'clamp(12px, 2vw, 16px)',
+                          height: '32px',
+                          padding: '0 12px',
+                          backgroundColor: '#1890ff',
+                          borderColor: '#1890ff',
+                          color: '#fff'
+                        }}
+                      >
+                        {(() => {
+                          const unreturnedItems = selectedWorker.borrowedItems?.filter((item: any) => !item.returnTime) || []
+                          const allItemIds = unreturnedItems.map((item: any) => item.itemId)
+                          const isAllSelected = selectedBorrowedItems.length === allItemIds.length && 
+                                               allItemIds.every(id => selectedBorrowedItems.includes(id))
+                          return isAllSelected ? t('guard.selectNone') : t('guard.selectAll')
+                        })()}
+                      </Button>
+                    )}
+                  </div>
                   <Card size="small" style={{ marginTop: '8px' }}>
                     {selectedWorker.borrowedItems && selectedWorker.borrowedItems.length > 0 ? (
                       <Space direction="vertical" size="small" style={{ width: '100%' }}>
@@ -2130,14 +2206,14 @@ const Guard: React.FC = () => {
                                 {item.remark && (
                                   <div>
                                     <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                      备注：{item.remark}
+                                      {t('guard.remark')}{item.remark}
                                     </Text>
                                   </div>
                                 )}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 {item.returnTime ? (
-                                  <Tag color="green" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>已归还</Tag>
+                                  <Tag color="green" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>{t('guard.returned')}</Tag>
                                 ) : (
                                   <>
                                     <input
@@ -2152,7 +2228,7 @@ const Guard: React.FC = () => {
                                       }}
                                       style={{ transform: 'scale(1.2)' }}
                                     />
-                                    <Tag color="orange" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>未归还</Tag>
+                                    <Tag color="orange" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>{t('guard.notReturnedTag')}</Tag>
                                   </>
                                 )}
                               </div>
@@ -2160,10 +2236,10 @@ const Guard: React.FC = () => {
                             {!item.returnTime && !selectedBorrowedItems.includes(item.itemId) && (
                               <div>
                                 <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                  未归还原因备注（必填）：
+                                  {t('guard.unreturnedReasonRequired')}
                                 </Text>
                                 <Input.TextArea
-                                  placeholder="请填写未归还原因..."
+                                  placeholder={t('guard.unreturnedReasonPlaceholder')}
                                   value={unreturnedItemRemarks[item.itemId] || ''}
                                   onChange={(e) => {
                                     setUnreturnedItemRemarks({
@@ -2183,14 +2259,14 @@ const Guard: React.FC = () => {
                         ))}
                       </Space>
                     ) : (
-                      <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>无借物记录</Text>
+                      <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.noBorrowRecords')}</Text>
                     )}
                   </Card>
                 </div>
 
                 {selectedWorker.borrowedItems && selectedWorker.borrowedItems.some((item: any) => !item.returnTime) && (
                   <div>
-                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>4. 物品归还：</Text>
+                    <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.itemReturn')}</Text>
                     <div style={{ marginTop: '8px' }}>
                       <Button 
                         type="primary"
@@ -2202,10 +2278,10 @@ const Guard: React.FC = () => {
                           marginRight: '12px'
                         }}
                       >
-                        归还选中物品 ({selectedBorrowedItems.length})
+                        {t('guard.returnSelectedItemsCount').replace('{count}', selectedBorrowedItems.length.toString())}
                       </Button>
                       <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                        请勾选要归还的物品，然后点击归还按钮
+                        {t('guard.returnSelectedItemsHelp')}
                       </Text>
                     </div>
                   </div>
@@ -2213,7 +2289,7 @@ const Guard: React.FC = () => {
 
                 <div>
                   <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>
-                    {selectedWorker.borrowedItems && selectedWorker.borrowedItems.some((item: any) => !item.returnTime) ? '5. 实体卡归还：' : '4. 实体卡归还：'}
+                    {selectedWorker.borrowedItems && selectedWorker.borrowedItems.some((item: any) => !item.returnTime) ? t('guard.physicalCardReturnStep5') : t('guard.physicalCardReturnStep4')}
                   </Text>
                   <Card size="small" style={{ marginTop: '8px' }}>
                     <div style={{ 
@@ -2224,11 +2300,11 @@ const Guard: React.FC = () => {
                     }}>
                       <div>
                         <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
-                          实体卡：{selectedWorker.physicalCardId}
+                          {t('guard.physicalCard')}：{selectedWorker.physicalCardId}
                         </Text>
                         <div>
                           <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                            请确认实体卡已收回
+                            {t('guard.pleaseConfirmPhysicalCardReturned')}
                           </Text>
                         </div>
                       </div>
@@ -2240,7 +2316,7 @@ const Guard: React.FC = () => {
                           style={{ transform: 'scale(1.2)' }}
                         />
                         <Tag color={physicalCardReturned ? "green" : "orange"} style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                          {physicalCardReturned ? '已归还' : '未归还'}
+                          {physicalCardReturned ? t('guard.returned') : t('guard.notReturned')}
                         </Tag>
                       </div>
                     </div>
@@ -2259,7 +2335,7 @@ const Guard: React.FC = () => {
                   }}
                   disabled={!canCompleteExit()}
                 >
-                  完成离场登记
+                  {t('guard.completeExit')}
                 </Button>
               </>
             )}
@@ -2275,19 +2351,19 @@ const Guard: React.FC = () => {
   if (currentView === 'reports') {
     const columns = [
       {
-        title: '工号',
+        title: t('guard.workerId'),
         dataIndex: 'workerId',
         key: 'workerId',
         width: 100,
       },
       {
-        title: '姓名',
+        title: t('guard.name'),
         dataIndex: 'workerName',
         key: 'workerName',
         width: 100,
       },
       {
-        title: '身份证号',
+        title: t('guard.idCard'),
         dataIndex: 'idCard',
         key: 'idCard',
         width: 140,
@@ -2301,43 +2377,43 @@ const Guard: React.FC = () => {
         },
       },
       {
-        title: '入场时间',
+        title: t('guard.entryTime'),
         dataIndex: 'entryTime',
         key: 'entryTime',
         width: 150,
       },
       {
-        title: '离场时间',
+        title: t('guard.exitTime'),
         dataIndex: 'exitTime',
         key: 'exitTime',
         width: 150,
         render: (text: string) => text || '-',
       },
       {
-        title: '实体卡编号',
+        title: t('guard.physicalCardId'),
         dataIndex: 'physicalCardId',
         key: 'physicalCardId',
         width: 120,
       },
       {
-        title: '联系电话',
+        title: t('guard.contactPhone'),
         dataIndex: 'phone',
         key: 'phone',
         width: 120,
       },
       {
-        title: '状态',
+        title: t('guard.status'),
         dataIndex: 'status',
         key: 'status',
         width: 80,
         render: (status: string) => (
           <Tag color={status === 'in' ? 'green' : 'red'}>
-            {status === 'in' ? '在场' : '已离场'}
+            {status === 'in' ? t('guard.onSite') : t('guard.exited')}
           </Tag>
         ),
       },
       {
-        title: '借用物品',
+        title: t('guard.borrowedItems'),
         dataIndex: 'borrowedItems',
         key: 'borrowedItems',
         width: 100,
@@ -2370,13 +2446,13 @@ const Guard: React.FC = () => {
       {
         title: (
           <span>
-            已归还
+            {t('guard.returned')}
             <Tooltip 
               title={
                 <div>
-                  <div>绿色：✅ 完全归还</div>
-                  <div>橙色：⚠️ 部分归还</div>
-                  <div>红色：❌ 未归还</div>
+                  <div>{t('guard.fullyReturned')}</div>
+                  <div>{t('guard.partiallyReturned')}</div>
+                  <div>{t('guard.notReturnedStatus')}</div>
                 </div>
               }
               placement="top"
@@ -2483,7 +2559,7 @@ const Guard: React.FC = () => {
               marginBottom: '16px',
               gap: window.innerWidth < 768 ? '12px' : '0'
             }}>
-              <Title level={2} style={{ margin: 0 }}>今日访客记录</Title>
+              <Title level={2} style={{ margin: 0 }}>{t('guard.todayVisitorRecords')}</Title>
               <div               style={{ 
                 display: 'flex', 
                 alignItems: window.innerWidth < 768 ? 'flex-start' : 'center', 
@@ -2497,7 +2573,7 @@ const Guard: React.FC = () => {
                     alignItems: 'center', 
                     gap: '12px'
                   }}>
-                    <Text strong style={{ fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)' }}>状态筛选：</Text>
+                    <Text strong style={{ fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)' }}>{t('guard.statusFilter')}</Text>
                     <Select
                       value={statusFilter}
                       onChange={handleStatusFilterChange}
@@ -2507,23 +2583,23 @@ const Guard: React.FC = () => {
                       }}
                       size="small"
                     >
-                      <Option value="all">全部</Option>
-                      <Option value="in">在场</Option>
-                      <Option value="out">已离场</Option>
+                      <Option value="all">{t('common.all')}</Option>
+                      <Option value="in">{t('guard.onSite')}</Option>
+                      <Option value="out">{t('guard.exited')}</Option>
                     </Select>
                     <Text type="secondary">
-                      共 {filteredRecords.length} 条记录
+                      {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
                     </Text>
                   </div>
                 )}
                 
                 <Space wrap>
                   {[
-                    { key: 'entry', label: '入场登记', icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
-                    { key: 'borrow', label: '借/还物品', icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
-                    { key: 'exit', label: '离场登记', icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
-                    { key: 'reports', label: '报表查看', icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
-                    { key: 'back', label: '返回', icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
+                    { key: 'entry', label: t('guard.entryRegistration'), icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
+                    { key: 'borrow', label: t('guard.itemBorrowing'), icon: <ShoppingCartOutlined />, color: '#52c41a', onClick: handleItemBorrowing },
+                    { key: 'exit', label: t('guard.exitRegistration'), icon: <LogoutOutlined />, color: '#fa541c', onClick: handleExitProcess },
+                    { key: 'reports', label: t('guard.reportsView'), icon: <BarChartOutlined />, color: '#722ed1', onClick: handleReports },
+                    { key: 'back', label: t('guard.back'), icon: <ArrowLeftOutlined />, color: '#666', onClick: handleBackToMain }
                   ].map(button => (
                     <Button
                       key={button.key}
@@ -2562,19 +2638,19 @@ const Guard: React.FC = () => {
                 gap: '12px',
                 marginBottom: '16px'
               }}>
-                <Text strong>状态筛选：</Text>
+                <Text strong>{t('guard.statusFilter')}</Text>
                 <Select
                   value={statusFilter}
                   onChange={handleStatusFilterChange}
                   style={{ width: 120 }}
                   size="small"
                 >
-                  <Option value="all">全部</Option>
-                  <Option value="in">在场</Option>
-                  <Option value="out">已离场</Option>
+                  <Option value="all">{t('common.all')}</Option>
+                  <Option value="in">{t('guard.onSite')}</Option>
+                  <Option value="out">{t('guard.exited')}</Option>
                 </Select>
                 <Text type="secondary">
-                  共 {filteredRecords.length} 条记录
+                  {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
                 </Text>
               </div>
             )}
@@ -2622,10 +2698,18 @@ const Guard: React.FC = () => {
               <Text type="secondary" style={{ 
                 display: window.innerWidth < 768 ? 'none' : 'block'
               }}>
-                第 {((pagination.current - 1) * pagination.pageSize) + 1}-{Math.min(pagination.current * pagination.pageSize, filteredRecords.length)} 条，共 {filteredRecords.length} 条记录
+                {(() => {
+                  const start = ((pagination.current - 1) * pagination.pageSize) + 1;
+                  const end = Math.min(pagination.current * pagination.pageSize, filteredRecords.length);
+                  const total = filteredRecords.length;
+                  return t('guard.paginationInfo')
+                    .replace('{start}', start.toString())
+                    .replace('{end}', end.toString())
+                    .replace('{total}', total.toString());
+                })()}
               </Text>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Text type="secondary">每页显示：</Text>
+                <Text type="secondary">{t('guard.itemsPerPage')}</Text>
                 <Select
                   value={pagination.pageSize}
                   onChange={(value) => handleTableChange(1, value)}
@@ -2644,7 +2728,7 @@ const Guard: React.FC = () => {
                     disabled={pagination.current === 1}
                     onClick={() => handleTableChange(pagination.current - 1)}
                   >
-                    上一页
+                    {t('guard.previousPage')}
                   </Button>
                   <span style={{ margin: '0 8px' }}>
                     {pagination.current} / {Math.ceil(filteredRecords.length / pagination.pageSize)}
@@ -2654,7 +2738,7 @@ const Guard: React.FC = () => {
                     disabled={pagination.current >= Math.ceil(filteredRecords.length / pagination.pageSize)}
                     onClick={() => handleTableChange(pagination.current + 1)}
                   >
-                    下一页
+                    {t('guard.nextPage')}
                   </Button>
                   <div style={{ 
                     display: window.innerWidth < 768 ? 'none' : 'flex', 
@@ -2662,12 +2746,12 @@ const Guard: React.FC = () => {
                     gap: '4px', 
                     marginLeft: '8px' 
                   }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>跳转至</Text>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>{t('guard.jumpTo')}</Text>
                     <Input
                       size="small"
                       value={jumpPage}
                       onChange={(e) => setJumpPage(e.target.value)}
-                      placeholder="页码"
+                      placeholder={t('guard.pageNumber')}
                       style={{ width: 60 }}
                       onPressEnter={() => handleJumpToPage(filteredRecords.length)}
                     />
@@ -2675,7 +2759,7 @@ const Guard: React.FC = () => {
                       size="small"
                       onClick={() => handleJumpToPage(filteredRecords.length)}
                     >
-                      确定
+                      {t('guard.confirm')}
                     </Button>
                   </div>
                 </div>

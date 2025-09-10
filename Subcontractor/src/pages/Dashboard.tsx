@@ -24,7 +24,6 @@ import ItemBorrowRecords from './ItemBorrowRecords'
 import AccountSettings from './AccountSettings'
 
 import Reports from './Reports'
-import Guard from './Guard'
 import { mockSites } from '../data/mockData'
 import dayjs from 'dayjs'
 
@@ -328,7 +327,6 @@ const Dashboard: React.FC = () => {
             <Route path="/item-categories" element={<ItemCategoryManagement />} />
             <Route path="/item-borrow-records" element={<ItemBorrowRecords />} />
             <Route path="/account" element={<AccountSettings />} />
-            <Route path="/guard" element={<Guard />} />
             <Route path="*" element={<Navigate to="/reports" replace />} />
           </Routes>
         </Content>
