@@ -11,9 +11,25 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [captchaCode, setCaptchaCode] = useState('')
   const [captchaImage, setCaptchaImage] = useState('')
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [retryCount, setRetryCount] = useState(0)
   const navigate = useNavigate()
   const { login, isAuthenticated, user, isLoading } = useAuth()
   const { t, setLocale } = useLocale()
+
+  // 监听网络状态
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   // 生成验证码
   const generateCaptcha = () => {
@@ -89,9 +105,10 @@ const Login: React.FC = () => {
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
       console.log('Auto redirecting user:', user)
-      if (user.role === 'subcontractor') {
+      const userRole = user.role.toLowerCase()
+      if (userRole === 'distributor') {
         navigate('/distributor/workers', { replace: true })
-      } else if (user.role === 'guard') {
+      } else if (userRole === 'guard') {
         navigate('/guard', { replace: true })
       } else {
         navigate('/dashboard', { replace: true })
@@ -100,6 +117,12 @@ const Login: React.FC = () => {
   }, [isAuthenticated, user, isLoading, navigate])
 
   const onFinish = async (values: { username: string; password: string; captcha: string }) => {
+    // 检查网络状态
+    if (!isOnline) {
+      message.error(t('login.networkDisconnected'))
+      return
+    }
+
     // 验证验证码
     if (values.captcha.toUpperCase() !== captchaCode.toUpperCase()) {
       message.error(t('login.captchaError'))
@@ -108,19 +131,43 @@ const Login: React.FC = () => {
     }
 
     setLoading(true)
+    setRetryCount(0) // 重置重试计数
+    
     try {
       const result = await login(values.username, values.password)
       console.log('Login result:', result)
+      
       if (result.success) {
         message.success(t('login.loginSuccess'))
+        setRetryCount(0) // 登录成功，重置重试计数
         // 不在这里手动跳转，让useEffect处理跳转
         // 这样可以避免双重跳转逻辑冲突
       } else {
-        console.log('Login failed')
-        message.error(t('login.loginFailed'))
+        console.log('Login failed:', result)
+        
+        // 根据错误代码显示不同的错误信息
+        let errorMessage = result.error || t('login.loginFailed')
+        
+        if (result.errorCode === 401) {
+          errorMessage = t('login.usernamePasswordError')
+          setRetryCount(0) // 认证错误，不重试
+        } else if (result.errorCode === 0) {
+          errorMessage = t('login.networkConnectionFailed')
+          setRetryCount(prev => prev + 1) // 网络错误，增加重试计数
+        } else if (result.errorCode === 500) {
+          errorMessage = t('login.serverError')
+          setRetryCount(prev => prev + 1) // 服务器错误，增加重试计数
+        } else if (result.errorCode === 400) {
+          errorMessage = result.error || t('login.inputError')
+          setRetryCount(0) // 输入错误，不重试
+        }
+        
+        message.error(errorMessage)
         generateCaptcha() // 登录失败时重新生成验证码
       }
     } catch (error) {
+      console.error('Login error:', error)
+      setRetryCount(prev => prev + 1) // 异常错误，增加重试计数
       message.error(t('login.loginError'))
       generateCaptcha() // 发生错误时重新生成验证码
     } finally {
@@ -251,22 +298,38 @@ const Login: React.FC = () => {
             <Form.Item
               name="username"
               label={t('login.username')}
-              rules={[{ required: true, message: t('login.usernamePlaceholder') + '!' }]}
+              rules={[
+                { required: true, message: t('login.usernameRequired') },
+                { min: 2, message: t('login.usernameMinLength') },
+                { max: 50, message: t('login.usernameMaxLength') },
+                { 
+                  pattern: /^[a-zA-Z0-9_\u4e00-\u9fa5]+$/, 
+                  message: t('login.usernameFormat')
+                }
+              ]}
             >
               <Input
                 prefix={<UserOutlined />}
                 placeholder={t('login.usernamePlaceholder')}
+                maxLength={50}
+                autoComplete="username"
               />
             </Form.Item>
 
             <Form.Item
               name="password"
               label={t('login.password')}
-              rules={[{ required: true, message: t('login.passwordPlaceholder') + '!' }]}
+              rules={[
+                { required: true, message: t('login.passwordRequired') },
+                { min: 6, message: t('login.passwordMinLength') },
+                { max: 100, message: t('login.passwordMaxLength') }
+              ]}
             >
               <Input.Password
                 prefix={<LockOutlined />}
                 placeholder={t('login.passwordPlaceholder')}
+                maxLength={100}
+                autoComplete="current-password"
               />
             </Form.Item>
 
@@ -333,11 +396,44 @@ const Login: React.FC = () => {
               </Row>
             </Form.Item>
 
+            {/* 网络状态指示器 */}
+            {!isOnline && (
+              <div style={{
+                padding: '8px 12px',
+                backgroundColor: '#fff2e8',
+                border: '1px solid #ffd591',
+                borderRadius: '6px',
+                color: '#d46b08',
+                fontSize: '14px',
+                textAlign: 'center',
+                marginBottom: '16px'
+              }}>
+                ⚠️ {t('login.networkDisconnected')}
+              </div>
+            )}
+
+            {/* 重试计数提示 */}
+            {retryCount > 0 && (
+              <div style={{
+                padding: '8px 12px',
+                backgroundColor: '#f6ffed',
+                border: '1px solid #b7eb8f',
+                borderRadius: '6px',
+                color: '#52c41a',
+                fontSize: '14px',
+                textAlign: 'center',
+                marginBottom: '16px'
+              }}>
+                ℹ️ {t('login.retryCount').replace('{count}', retryCount.toString())}
+              </div>
+            )}
+
             <Form.Item style={{ marginBottom: 0 }}>
               <Button
                 type="primary"
                 htmlType="submit"
                 loading={loading}
+                disabled={!isOnline}
                 block
                 style={{
                   height: 48,

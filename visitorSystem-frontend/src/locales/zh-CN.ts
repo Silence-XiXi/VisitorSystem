@@ -172,6 +172,44 @@ export default {
     captchaError: '验证码错误，请重新输入',
     languageChanged: '语言已切换',
     logoutSuccess: '已退出',
+    // 网络状态相关
+    networkDisconnected: '网络连接已断开，请检查网络设置',
+    networkConnectionFailed: '网络连接失败，请检查网络设置',
+    serverError: '服务器错误，请稍后重试',
+    inputError: '输入信息有误',
+    // 错误消息
+    usernamePasswordError: '用户名或密码错误，或账户已被禁用',
+    // 表单验证消息
+    usernameRequired: '请输入用户名!',
+    usernameMinLength: '用户名至少2个字符!',
+    usernameMaxLength: '用户名不能超过50个字符!',
+    usernameFormat: '用户名只能包含字母、数字、下划线和中文!',
+    passwordRequired: '请输入密码!',
+    passwordMinLength: '密码至少6个字符!',
+    passwordMaxLength: '密码不能超过100个字符!',
+    // 重试相关
+    retryCount: '已重试 {count} 次，请稍后重试',
+  },
+  auth: {
+    // 输入验证错误
+    usernameRequired: '用户名不能为空',
+    passwordRequired: '密码不能为空',
+    passwordMinLength: '密码长度不能少于6位',
+    // 服务器响应错误
+    serverDataFormatError: '服务器返回数据格式错误',
+    userInfoIncomplete: '用户信息不完整',
+    // 网络错误
+    networkConnectionFailed: '网络连接失败，请检查网络设置',
+    // 通用错误
+    loginFailed: '登录失败',
+    logoutFailed: '登出失败',
+    tokenValidationFailed: 'Token验证失败',
+    // 成功消息
+    loginSuccess: '登录成功',
+    logoutSuccess: '登出成功',
+    // 其他
+    parsingUserDataError: '解析用户数据时发生错误',
+    tokenExpired: '登录已过期，请重新登录',
   },
   guard: {
     title: '门卫管理系统',

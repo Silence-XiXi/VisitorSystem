@@ -1,5 +1,20 @@
 import { useState, useEffect } from 'react'
 import { apiService } from '../services/api'
+import { useLocale } from '../contexts/LocaleContext'
+
+interface Distributor {
+  id: string
+  name: string
+  contact?: string
+  email?: string
+}
+
+interface Guard {
+  id: string
+  name: string
+  siteId?: string
+  siteName?: string
+}
 
 interface User {
   id: string
@@ -8,14 +23,39 @@ interface User {
   status: string
   siteId?: string
   siteName?: string
-  distributor?: any
-  guard?: any
+  distributor?: Distributor
+  guard?: Guard
 }
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  
+  // 安全地获取翻译函数，如果不在LocaleProvider中则使用默认值
+  let t: (key: string) => string
+  try {
+    const localeContext = useLocale()
+    t = localeContext.t
+  } catch (error) {
+    // 如果不在LocaleProvider中，使用默认的中文翻译
+    const translations: Record<string, string> = {
+      'auth.usernameRequired': '用户名不能为空',
+      'auth.passwordRequired': '密码不能为空',
+      'auth.passwordMinLength': '密码长度不能少于6位',
+      'auth.serverDataFormatError': '服务器返回数据格式错误',
+      'auth.userInfoIncomplete': '用户信息不完整',
+      'auth.networkConnectionFailed': '网络连接失败，请检查网络设置',
+      'auth.loginFailed': '登录失败',
+      'auth.logoutFailed': '登出失败',
+      'auth.tokenValidationFailed': 'Token验证失败',
+      'auth.loginSuccess': '登录成功',
+      'auth.logoutSuccess': '登出成功',
+      'auth.parsingUserDataError': '解析用户数据时发生错误',
+      'auth.tokenExpired': '登录已过期，请重新登录',
+    }
+    t = (key: string) => translations[key] || key
+  }
 
   useEffect(() => {
     // 检查本地存储中是否有用户信息和token
@@ -51,9 +91,52 @@ export const useAuth = () => {
     setIsLoading(false)
   }, [])
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; role?: string; error?: string }> => {
+  const login = async (username: string, password: string): Promise<{ success: boolean; role?: string; error?: string; errorCode?: number }> => {
     try {
-      const response = await apiService.login({ username, password })
+      // 基本输入验证
+      if (!username.trim()) {
+        return { 
+          success: false, 
+          error: t('auth.usernameRequired'),
+          errorCode: 400
+        }
+      }
+      
+      if (!password.trim()) {
+        return { 
+          success: false, 
+          error: t('auth.passwordRequired'),
+          errorCode: 400
+        }
+      }
+
+      if (password.length < 6) {
+        return { 
+          success: false, 
+          error: t('auth.passwordMinLength'),
+          errorCode: 400
+        }
+      }
+
+      const response = await apiService.login({ username: username.trim(), password })
+      
+      // 验证响应数据
+      if (!response.access_token || !response.user) {
+        return { 
+          success: false, 
+          error: t('auth.serverDataFormatError'),
+          errorCode: 500
+        }
+      }
+
+      // 验证用户数据完整性
+      if (!response.user.id || !response.user.username || !response.user.role) {
+        return { 
+          success: false, 
+          error: t('auth.userInfoIncomplete'),
+          errorCode: 500
+        }
+      }
       
       // 保存token和用户信息
       localStorage.setItem('access_token', response.access_token)
@@ -66,11 +149,29 @@ export const useAuth = () => {
         success: true, 
         role: response.user.role.toLowerCase() // 转换为小写以匹配前端逻辑
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Login failed:', error)
+      
+      // 根据错误类型提供更具体的错误信息
+      let errorMessage = t('auth.loginFailed')
+      let errorCode = 500
+      
+      if (error && typeof error === 'object' && 'statusCode' in error) {
+        errorCode = (error as { statusCode: number }).statusCode
+        if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
+          errorMessage = (error as { message: string }).message
+        }
+      } else if (error && typeof error === 'object' && 'isNetworkError' in error) {
+        errorMessage = t('auth.networkConnectionFailed')
+        errorCode = 0
+      } else if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : '登录失败'
+        error: errorMessage,
+        errorCode
       }
     }
   }
@@ -80,7 +181,7 @@ export const useAuth = () => {
       // 调用后端登出API
       await apiService.logout()
     } catch (error) {
-      console.error('Logout API call failed:', error)
+      console.error(t('auth.logoutFailed'), error)
     } finally {
       // 清除本地存储
       localStorage.removeItem('user')

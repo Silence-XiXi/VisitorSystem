@@ -60,7 +60,7 @@ export class CacheExampleService {
    */
   async cacheUserActivity(userId: string, activity: string) {
     const key = `user:${userId}:activity`;
-    const activities = await this.redisService.get(key) || [];
+    const activities = (await this.redisService.get(key) as any[]) || [];
     
     activities.push({
       activity,

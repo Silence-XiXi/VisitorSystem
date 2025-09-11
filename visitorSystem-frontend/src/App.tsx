@@ -19,25 +19,7 @@ function App() {
     return <LoadingSpinner />
   }
 
-  // 如果用户已登录，根据角色重定向到默认页面
-  if (isAuthenticated && user) {
-    const currentPath = window.location.pathname
-    console.log('Current path:', currentPath, 'User role:', user.role)
-    
-    // 如果用户在登录页面，重定向到对应角色页面
-    if (currentPath === '/login') {
-      if (user.role === 'subcontractor') {
-        window.location.replace('/distributor/workers')
-        return null
-      } else if (user.role === 'guard') {
-        window.location.replace('/guard')
-        return null
-      } else {
-        window.location.replace('/dashboard')
-        return null
-      }
-    }
-  }
+  // 移除App.tsx中的重定向逻辑，由Login.tsx处理
 
   return (
     <LocaleProvider>
@@ -64,7 +46,7 @@ function App() {
             {/* 门卫路由 */}
             <Route 
               path="/guard" 
-              element={isAuthenticated && user?.role === 'guard' ? <Guard /> : <Navigate to="/login" replace />} 
+              element={isAuthenticated && user?.role?.toLowerCase() === 'guard' ? <Guard /> : <Navigate to="/login" replace />} 
             />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>

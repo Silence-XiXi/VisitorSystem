@@ -5,6 +5,9 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RedisModule } from './redis/redis.module';
 import { CacheExampleModule } from './cache/cache-example.module';
+import { DistributorsModule } from './distributors/distributors.module';
+import { GuardsModule } from './guards/guards.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -16,6 +19,9 @@ import { CacheExampleModule } from './cache/cache-example.module';
     AuthModule,
     UsersModule,
     CacheExampleModule,
+    DistributorsModule,
+    GuardsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

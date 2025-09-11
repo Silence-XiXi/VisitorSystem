@@ -842,10 +842,15 @@ const Guard: React.FC = () => {
   }
 
   // 登出功能
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-    message.success(t('login.logoutSuccess'))
+  const handleLogout = async () => {
+    try {
+      await logout()
+      message.success(t('login.logoutSuccess'))
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      message.error(t('login.logoutFailed'))
+    }
   }
 
   // 用户中心相关处理函数
@@ -1119,7 +1124,7 @@ const Guard: React.FC = () => {
                 fontSize: 'clamp(10px, 2vw, 14px)',
                 whiteSpace: 'nowrap'
               }}>
-                ({user?.role === 'guard' ? t('common.guard') : t('common.unknownRole')})
+                ({user?.role?.toLowerCase() === 'guard' ? t('common.guard') : t('common.unknownRole')})
               </Text>
             </div>
           </div>
@@ -1276,7 +1281,7 @@ const Guard: React.FC = () => {
           <Avatar size={64} icon={<UserOutlined />} />
           <div>
             <Title level={4} style={{ margin: 0 }}>{user?.username || t('common.guard')}</Title>
-            <Text type="secondary">{user?.role === 'guard' ? t('common.guard') : t('common.unknownRole')}</Text>
+            <Text type="secondary">{user?.role?.toLowerCase() === 'guard' ? t('common.guard') : t('common.unknownRole')}</Text>
             <br />
             <Text type="secondary">{t('guard.site')}：{user?.siteName || t('guard.unknownSite')}</Text>
           </div>

@@ -7,6 +7,7 @@ import DistributorWorkerUpload from '../pages/DistributorWorkerUpload'
 import DistributorAccountSettings from '../pages/DistributorAccountSettings'
 import { useAuth } from '../hooks/useAuth'
 import { useLocale } from '../contexts/LocaleContext'
+import { apiService } from '../services/api'
 
 const { Header, Content } = Layout
 const { Text } = Typography
@@ -32,8 +33,8 @@ const DistributorLayout: React.FC = () => {
   // 检查用户角色，只有分判商才能访问
   useEffect(() => {
     console.log('DistributorLayout - User:', user)
-    if (user && user.role !== 'subcontractor') {
-      console.log('User role is not subcontractor, redirecting to login')
+    if (user && user.role?.toLowerCase() !== 'distributor') {
+      console.log('User role is not distributor, redirecting to login')
       navigate('/login', { replace: true })
     }
   }, [user, navigate])
@@ -48,29 +49,40 @@ const DistributorLayout: React.FC = () => {
 
   // 获取分判商信息
   useEffect(() => {
-    // 根据用户名获取分判商信息
-    if (user && user.role === 'subcontractor') {
-      const distributorMap: { [key: string]: any } = {
-        'bjadmin': { id: '1', name: '北京建筑公司', username: 'bjadmin' },
-        'shadmin': { id: '2', name: '上海建设集团', username: 'shadmin' },
-        'gzadmin': { id: '3', name: '广州工程公司', username: 'gzadmin' },
-        'szadmin': { id: '4', name: '深圳建筑集团', username: 'szadmin' },
-        'cdadmin': { id: '5', name: '成都建设公司', username: 'cdadmin' }
-      }
-      
-      const distributorInfo = distributorMap[user.username]
-      if (distributorInfo) {
-        setDistributorInfo(distributorInfo)
+    const fetchDistributorInfo = async () => {
+      if (user && user.role?.toLowerCase() === 'distributor') {
+        try {
+          console.log('获取分判商信息...', user)
+          const profile = await apiService.getProfile()
+          console.log('用户资料:', profile)
+          
+          if (profile.distributor) {
+            setDistributorInfo(profile.distributor)
+          } else {
+            console.warn('用户资料中没有分判商信息')
+            message.error('无法获取分判商信息')
+          }
+        } catch (error) {
+          console.error('获取分判商信息失败:', error)
+          message.error('获取分判商信息失败')
+        }
       }
     }
+
+    fetchDistributorInfo()
   }, [user])
 
 
   // 处理退出登录
-  const handleLogout = () => {
-    logout()
-    message.success(t('login.logoutSuccess'))
-    navigate('/login')
+  const handleLogout = async () => {
+    try {
+      await logout()
+      message.success(t('login.logoutSuccess'))
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      message.error(t('login.logoutFailed'))
+    }
   }
 
   // 语言切换处理函数

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Tabs, Upload } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, HomeOutlined, TeamOutlined, UploadOutlined, DownloadOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons'
 import { Site, Distributor, Guard } from '../types/worker'
@@ -12,6 +12,7 @@ import {
   generateDistributorImportTemplate
 } from '../utils/excelUtils'
 import { useLocale } from '../contexts/LocaleContext'
+import { apiService } from '../services/api'
 
 const AdminSites: React.FC = () => {
   const { t } = useLocale()
@@ -52,6 +53,73 @@ const AdminSites: React.FC = () => {
   
   // 标签页状态
   const [activeTab, setActiveTab] = useState<string>('distributors')
+  
+  // 加载状态
+  const [loading, setLoading] = useState(false)
+
+  // 加载数据
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [sitesData, distributorsData, guardsData] = await Promise.all([
+        apiService.getAllSites(),
+        apiService.getAllDistributors(),
+        apiService.getAllGuards()
+      ])
+      
+      // 转换数据格式以匹配前端期望的格式
+      const transformedSites = sitesData.map(site => ({
+        id: site.id,
+        name: site.name,
+        address: site.address,
+        code: site.code || '',
+        manager: site.manager,
+        phone: site.phone,
+        status: site.status || 'active',
+        distributorIds: site.distributorIds || []
+      }))
+      
+      const transformedDistributors = distributorsData.map(distributor => ({
+        id: distributor.id,
+        name: distributor.name,
+        contactName: distributor.contactName,
+        phone: distributor.phone,
+        email: distributor.email,
+        whatsapp: distributor.whatsapp,
+        accountUsername: distributor.accountUsername,
+        accountStatus: (distributor.accountStatus || 'active') as 'active' | 'disabled',
+        siteIds: distributor.sites?.map(s => s.id) || []
+      }))
+      
+      const transformedGuards = guardsData.map(guard => ({
+        id: guard.id,
+        guardId: guard.guardId,
+        name: guard.name,
+        siteId: guard.siteId,
+        phone: guard.phone,
+        email: guard.email,
+        whatsapp: guard.whatsapp,
+        accountUsername: guard.user?.username || guard.guardId,
+        accountStatus: (guard.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+        createdAt: guard.createdAt,
+        updatedAt: guard.updatedAt
+      }))
+      
+      setSites(transformedSites)
+      setDistributors(transformedDistributors)
+      setGuards(transformedGuards)
+    } catch (error) {
+      console.error('Failed to load data:', error)
+      message.error('加载数据失败，使用本地数据')
+      // 如果API调用失败，继续使用mock数据
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // 显示发送方式选择对话框（新增分判商时使用）
   const showSendMethodModal = (distributor: Distributor, password: string) => {
@@ -435,49 +503,100 @@ const AdminSites: React.FC = () => {
 
   // 分判商表单提交
   const onDistributorSubmit = async () => {
-    const v = await distributorForm.validateFields()
-    if (editingDistributor) {
-      setDistributors(prev => prev.map(d => d.id === editingDistributor.id ? { ...editingDistributor, ...v } : d))
-      message.success(t('admin.distributorUpdated'))
-    } else {
-      const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
-      const newItem: Distributor = { id: (Date.now()).toString(), name: v.name, siteIds: v.siteIds, contactName: v.contactName, phone: v.phone, email: v.email, whatsapp: v.whatsapp, accountUsername: v.accountUsername, accountStatus: v.accountStatus }
-      setDistributors(prev => [newItem, ...prev])
-      // 显示发送方式选择对话框
-      showSendMethodModal(newItem, defaultPwd)
+    try {
+      const v = await distributorForm.validateFields()
+      
+      if (editingDistributor) {
+        // 编辑分判商 - 暂时使用本地更新，后续可以添加编辑API
+        setDistributors(prev => prev.map(d => d.id === editingDistributor.id ? { ...editingDistributor, ...v } : d))
+        message.success(t('admin.distributorUpdated'))
+      } else {
+        // 新增分判商 - 调用后端API
+        const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
+        
+        const distributorData = {
+          name: v.name,
+          contactName: v.contactName,
+          phone: v.phone,
+          email: v.email,
+          whatsapp: v.whatsapp,
+          username: v.accountUsername || v.name.toLowerCase().replace(/\s+/g, ''),
+          password: defaultPwd,
+          siteIds: v.siteIds
+        }
+        
+        const newDistributor = await apiService.createDistributor(distributorData)
+        setDistributors(prev => [newDistributor, ...prev])
+        
+        // 显示发送方式选择对话框
+        showSendMethodModal(newDistributor, defaultPwd)
+        message.success(t('admin.distributorAdded'))
+      }
+      
+      setDistributorModalOpen(false)
+      setEditingDistributor(null)
+      distributorForm.resetFields()
+    } catch (error: any) {
+      console.error('Failed to submit distributor:', error)
+      
+      if (error.statusCode === 400) {
+        message.error('输入数据有误，请检查表单')
+      } else if (error.statusCode === 409) {
+        message.error('用户名已存在，请使用其他用户名')
+      } else if (error.statusCode === 403) {
+        message.error('权限不足，无法创建分判商')
+      } else {
+        message.error('创建分判商失败，请重试')
+      }
     }
-    setDistributorModalOpen(false)
-    setEditingDistributor(null)
-    distributorForm.resetFields()
   }
 
   // 门卫表单提交
   const onGuardSubmit = async () => {
-    const v = await guardForm.validateFields()
-    if (editingGuard) {
-      setGuards(prev => prev.map(g => g.id === editingGuard.id ? { ...editingGuard, ...v } : g))
-      message.success(t('admin.guardUpdated'))
-    } else {
-      const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
-      const newItem: Guard = { 
-        id: (Date.now()).toString(), 
-        guardId: v.guardId,
-        name: v.name, 
-        siteId: v.siteId, 
-        phone: v.phone, 
-        email: v.email, 
-        whatsapp: v.whatsapp, 
-        accountUsername: v.accountUsername, 
-        accountStatus: v.accountStatus || 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+    try {
+      const v = await guardForm.validateFields()
+      
+      if (editingGuard) {
+        // 编辑门卫 - 暂时使用本地更新，后续可以添加编辑API
+        setGuards(prev => prev.map(g => g.id === editingGuard.id ? { ...editingGuard, ...v } : g))
+        message.success(t('admin.guardUpdated'))
+      } else {
+        // 新增门卫 - 调用后端API
+        const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
+        
+        const guardData = {
+          guardId: v.guardId,
+          name: v.name,
+          siteId: v.siteId,
+          phone: v.phone,
+          email: v.email,
+          whatsapp: v.whatsapp,
+          username: v.accountUsername || v.guardId,
+          password: defaultPwd
+        }
+        
+        const newGuard = await apiService.createGuard(guardData)
+        setGuards(prev => [newGuard, ...prev])
+        
+        message.success(t('admin.guardAddedSuccess').replace('{username}', v.accountUsername || v.guardId).replace('{password}', defaultPwd))
       }
-      setGuards(prev => [newItem, ...prev])
-      message.success(t('admin.guardAddedSuccess').replace('{username}', v.accountUsername || v.guardId).replace('{password}', defaultPwd))
+      
+      setGuardModalOpen(false)
+      setEditingGuard(null)
+      guardForm.resetFields()
+    } catch (error: any) {
+      console.error('Failed to submit guard:', error)
+      
+      if (error.statusCode === 400) {
+        message.error('输入数据有误，请检查表单')
+      } else if (error.statusCode === 409) {
+        message.error('门卫ID或用户名已存在，请使用其他ID或用户名')
+      } else if (error.statusCode === 403) {
+        message.error('权限不足，无法创建门卫')
+      } else {
+        message.error('创建门卫失败，请重试')
+      }
     }
-    setGuardModalOpen(false)
-    setEditingGuard(null)
-    guardForm.resetFields()
   }
 
   // Excel导入导出处理函数
@@ -767,6 +886,7 @@ const AdminSites: React.FC = () => {
          rowKey="id" 
          columns={siteColumns} 
          dataSource={filteredSites} 
+         loading={loading}
          pagination={{ pageSize: 10, showSizeChanger: true }}
          rowSelection={{
            selectedRowKeys: selectedSiteIds,
@@ -897,6 +1017,7 @@ const AdminSites: React.FC = () => {
          rowKey="id" 
          columns={distributorColumns} 
          dataSource={filteredDistributors} 
+         loading={loading}
          pagination={{ pageSize: 10, showSizeChanger: true }}
          rowSelection={{
            selectedRowKeys: selectedDistributorIds,
@@ -983,6 +1104,7 @@ const AdminSites: React.FC = () => {
         rowKey="id" 
         columns={guardColumns} 
         dataSource={filteredGuards} 
+        loading={loading}
         pagination={{ pageSize: 10, showSizeChanger: true }}
         rowSelection={{
           selectedRowKeys: selectedGuardIds,
@@ -1033,19 +1155,29 @@ const AdminSites: React.FC = () => {
           }
         ]}
         tabBarExtraContent={
-          activeTab === 'sites' ? (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingSite(null); siteForm.resetFields(); setSiteModalOpen(true) }}>
-              {t('admin.addSite')}
+          <Space>
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={loadData}
+              loading={loading}
+              title="刷新数据"
+            >
+              刷新
             </Button>
-          ) : activeTab === 'guards' ? (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingGuard(null); guardForm.resetFields(); setGuardModalOpen(true) }}>
-              {t('admin.addGuard')}
-            </Button>
-          ) : (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDistributor(null); distributorForm.resetFields(); setDistributorModalOpen(true) }}>
-              {t('admin.addDistributor')}
-            </Button>
-          )
+            {activeTab === 'sites' ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingSite(null); siteForm.resetFields(); setSiteModalOpen(true) }}>
+                {t('admin.addSite')}
+              </Button>
+            ) : activeTab === 'guards' ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingGuard(null); guardForm.resetFields(); setGuardModalOpen(true) }}>
+                {t('admin.addGuard')}
+              </Button>
+            ) : (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDistributor(null); distributorForm.resetFields(); setDistributorModalOpen(true) }}>
+                {t('admin.addDistributor')}
+              </Button>
+            )}
+          </Space>
         }
         style={{ 
           background: '#fff', 

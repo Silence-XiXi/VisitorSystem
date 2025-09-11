@@ -81,10 +81,15 @@ const Dashboard: React.FC = () => {
     return 'reports'
   }
 
-  const handleLogout = () => {
-    logout()
-    message.success(t('login.logoutSuccess'))
-    navigate('/login')
+  const handleLogout = async () => {
+    try {
+      await logout()
+      message.success(t('login.logoutSuccess'))
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      message.error(t('login.logoutFailed'))
+    }
   }
 
   const handleMenuClick = (key: string) => {

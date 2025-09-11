@@ -172,6 +172,44 @@ export default {
     captchaError: 'Captcha error, please re-enter',
     languageChanged: 'Language switched',
     logoutSuccess: 'Logged out',
+    // Network status related
+    networkDisconnected: 'Network connection is disconnected, please check your network settings',
+    networkConnectionFailed: 'Network connection failed, please check your network settings',
+    serverError: 'Server error, please try again later',
+    inputError: 'Input information is incorrect',
+    // Error messages
+    usernamePasswordError: 'Username or password is incorrect, or account has been disabled',
+    // Form validation messages
+    usernameRequired: 'Please enter username!',
+    usernameMinLength: 'Username must be at least 2 characters!',
+    usernameMaxLength: 'Username cannot exceed 50 characters!',
+    usernameFormat: 'Username can only contain letters, numbers, underscores and Chinese characters!',
+    passwordRequired: 'Please enter password!',
+    passwordMinLength: 'Password must be at least 6 characters!',
+    passwordMaxLength: 'Password cannot exceed 100 characters!',
+    // Retry related
+    retryCount: 'Retried {count} times, please try again later',
+  },
+  auth: {
+    // Input validation errors
+    usernameRequired: 'Username cannot be empty',
+    passwordRequired: 'Password cannot be empty',
+    passwordMinLength: 'Password must be at least 6 characters',
+    // Server response errors
+    serverDataFormatError: 'Server returned invalid data format',
+    userInfoIncomplete: 'User information is incomplete',
+    // Network errors
+    networkConnectionFailed: 'Network connection failed, please check your network settings',
+    // General errors
+    loginFailed: 'Login failed',
+    logoutFailed: 'Logout failed',
+    tokenValidationFailed: 'Token validation failed',
+    // Success messages
+    loginSuccess: 'Login successful',
+    logoutSuccess: 'Logout successful',
+    // Others
+    parsingUserDataError: 'Error occurred while parsing user data',
+    tokenExpired: 'Login has expired, please login again',
   },
   guard: {
     title: 'Guard Management System',

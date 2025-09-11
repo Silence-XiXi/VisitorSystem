@@ -101,6 +101,7 @@ model Guard {
   userId        String   @unique // 关联的用户ID
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联的用户
   itemBorrowRecords ItemBorrowRecord[] // 经办的物品借用记录
+  returnRecords ItemBorrowRecord[] @relation("ReturnHandler") // 经办的物品归还记录
 
   @@map("guards")
 }
@@ -188,6 +189,8 @@ model ItemBorrowRecord {
   item            Item @relation(fields: [itemId], references: [id], onDelete: Cascade) // 关联的物品
   borrowHandlerId String? // 经办人（门卫）ID
   borrowHandler   Guard? @relation(fields: [borrowHandlerId], references: [id], onDelete: SetNull) // 关联的经办门卫
+  returnHandlerId String? // 归还经办人（门卫）ID
+  returnHandler   Guard? @relation("ReturnHandler", fields: [returnHandlerId], references: [id], onDelete: SetNull) // 关联的归还经办门卫
 
   @@map("item_borrow_records")
 }

@@ -172,6 +172,44 @@ export default {
     captchaError: '驗證碼錯誤，請重新輸入',
     languageChanged: '語言已切換',
     logoutSuccess: '已登出',
+    // 網路狀態相關
+    networkDisconnected: '網路連線已斷開，請檢查網路設定',
+    networkConnectionFailed: '網路連線失敗，請檢查網路設定',
+    serverError: '伺服器錯誤，請稍後重試',
+    inputError: '輸入資訊有誤',
+    // 錯誤訊息
+    usernamePasswordError: '使用者名稱或密碼錯誤，或帳戶已被禁用',
+    // 表單驗證訊息
+    usernameRequired: '請輸入使用者名稱!',
+    usernameMinLength: '使用者名稱至少2個字元!',
+    usernameMaxLength: '使用者名稱不能超過50個字元!',
+    usernameFormat: '使用者名稱只能包含字母、數字、底線和中文!',
+    passwordRequired: '請輸入密碼!',
+    passwordMinLength: '密碼至少6個字元!',
+    passwordMaxLength: '密碼不能超過100個字元!',
+    // 重試相關
+    retryCount: '已重試 {count} 次，請稍後重試',
+  },
+  auth: {
+    // 輸入驗證錯誤
+    usernameRequired: '使用者名稱不能為空',
+    passwordRequired: '密碼不能為空',
+    passwordMinLength: '密碼長度不能少於6位',
+    // 伺服器回應錯誤
+    serverDataFormatError: '伺服器返回資料格式錯誤',
+    userInfoIncomplete: '使用者資訊不完整',
+    // 網路錯誤
+    networkConnectionFailed: '網路連線失敗，請檢查網路設定',
+    // 通用錯誤
+    loginFailed: '登入失敗',
+    logoutFailed: '登出失敗',
+    tokenValidationFailed: 'Token驗證失敗',
+    // 成功訊息
+    loginSuccess: '登入成功',
+    logoutSuccess: '登出成功',
+    // 其他
+    parsingUserDataError: '解析使用者資料時發生錯誤',
+    tokenExpired: '登入已過期，請重新登入',
   },
   guard: {
     title: '門衛管理系統',

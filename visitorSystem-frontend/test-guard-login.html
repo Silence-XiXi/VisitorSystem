@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>门卫登录测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background: #1890ff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+        }
+        .error {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+        }
+        .info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            color: #1890ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>门卫登录测试</h1>
+        
+        <div class="form-group">
+            <label for="username">用户名:</label>
+            <input type="text" id="username" value="guard001" placeholder="请输入用户名">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">密码:</label>
+            <input type="password" id="password" value="guard123" placeholder="请输入密码">
+        </div>
+        
+        <button onclick="testLogin()">测试登录</button>
+        <button onclick="testProfile()">测试获取资料</button>
+        <button onclick="testGuardAPI()">测试门卫API</button>
+        <button onclick="clearResult()">清除结果</button>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000';
+        let currentToken = null;
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+
+        function clearResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showResult('请输入用户名和密码', 'error');
+                return;
+            }
+
+            try {
+                showResult('正在登录...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentToken = data.access_token;
+                    showResult(`登录成功！
+用户名: ${data.user.username}
+角色: ${data.user.role}
+状态: ${data.user.status}
+Token: ${data.access_token.substring(0, 50)}...`, 'success');
+                } else {
+                    showResult(`登录失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProfile() {
+            if (!currentToken) {
+                showResult('请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('正在获取用户资料...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult(`用户资料获取成功:
+ID: ${data.id}
+用户名: ${data.username}
+角色: ${data.role}
+状态: ${data.status}
+门卫信息: ${data.guard ? data.guard.name : '无'}`, 'success');
+                } else {
+                    showResult(`获取资料失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testGuardAPI() {
+            if (!currentToken) {
+                showResult('请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('正在测试门卫API...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/guards/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult(`门卫API测试成功:
+门卫ID: ${data.id}
+门卫编号: ${data.guardId}
+姓名: ${data.name}
+电话: ${data.phone || '无'}
+邮箱: ${data.email || '无'}`, 'success');
+                } else {
+                    showResult(`门卫API测试失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`网络错误: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
