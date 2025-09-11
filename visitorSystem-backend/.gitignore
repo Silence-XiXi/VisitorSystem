@@ -3,9 +3,15 @@ node_modules/
 
 # 编译产物
 dist/
-dist-ssr/
 build/
-*.local
+*.tsbuildinfo
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # 日志文件
 logs/
@@ -56,19 +62,6 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Windows 图像文件缓存
-Thumbs.db
-ehthumbs.db
-
-# 文件夹配置文件
-Desktop.ini
-
-# 回收站
-$RECYCLE.BIN/
-
-# Windows 快捷方式
-*.lnk
-
 # 数据库文件
 *.db
 *.sqlite
@@ -79,29 +72,5 @@ $RECYCLE.BIN/
 *.backup
 *.old
 
-# 压缩文件
-*.zip
-*.tar.gz
-*.rar
-
-# 测试文件
-test-results/
-playwright-report/
-test-results.xml
-
-# 环境变量文件
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Vite 缓存
-.vite/
-
-# 其他临时文件
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Prisma 生成的文件
+/generated/prisma
