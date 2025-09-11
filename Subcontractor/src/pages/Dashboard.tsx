@@ -184,7 +184,7 @@ const Dashboard: React.FC = () => {
           borderBottom: '1px solid #f0f0f0'
         }}>
           <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
-            {collapsed ? '分判' : t('navigation.system')}
+            {collapsed ? t('navigation.shortTitle') : t('navigation.system')}
           </Title>
         </div>
         

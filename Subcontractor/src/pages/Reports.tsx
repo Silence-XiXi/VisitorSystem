@@ -181,7 +181,7 @@ const Reports: React.FC = () => {
 
   // 生成物品数据
   const generateItemData = (record: AttendanceRecord) => {
-    const itemTypes = ['门禁卡', '钥匙', '梯子', '安全帽', '工具包', '防护服', '手套', '护目镜']
+    const itemTypes = [t('reports.accessCard'), t('reports.key'), t('reports.ladder'), t('reports.safetyHelmet'), t('reports.toolKit'), t('reports.protectiveSuit'), t('reports.gloves'), t('reports.goggles')]
     const items = []
     
     for (let i = 0; i < record.borrowedItems; i++) {
@@ -205,12 +205,12 @@ const Reports: React.FC = () => {
         id: `${record.key}-item-${i}`,
         name: `${itemType} #${i + 1}`,
         type: itemType,
-        category: category?.name || '未分类',
-        categoryDescription: category?.description || '暂无描述',
+        category: category?.name || t('reports.uncategorized'),
+        categoryDescription: category?.description || t('reports.noDescription'),
         borrowedTime: record.checkIn || '08:30',
         returnedTime: isReturned ? (record.checkOut || '17:00') : null,
         status: isReturned ? 'returned' : 'borrowed',
-        borrowHandler: record.registrarName || '未指定'
+        borrowHandler: record.registrarName || t('reports.unspecified')
       })
     }
     
@@ -327,22 +327,22 @@ const Reports: React.FC = () => {
   const downloadExcel = () => {
     if (activeTab === 'site-summary') {
       // 下载工地访客统计数据
-      message.success('工地访客统计Excel文件下载中...')
+      message.success(t('reports.downloadVisitorStats'))
       // 这里应该调用实际的Excel导出API，导出filteredSiteSummaries数据
     } else if (activeTab === 'visitor-records') {
       // 下载访客记录数据
-      message.success('访客记录Excel文件下载中...')
+      message.success(t('reports.downloadVisitorRecords'))
       // 这里应该调用实际的Excel导出API，导出filteredData数据
     }
   }
 
   const siteColumns = [
-    { title: '工地名称', dataIndex: 'siteName', key: 'siteName', width: 150, sorter: (a: SiteSummary, b: SiteSummary) => a.siteName.localeCompare(b.siteName) },
-    { title: '总工人数', dataIndex: 'totalWorkers', key: 'totalWorkers', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.totalWorkers - b.totalWorkers },
-    { title: '已进场', dataIndex: 'checkedIn', key: 'checkedIn', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.checkedIn - b.checkedIn },
-    { title: '已离场', dataIndex: 'checkedOut', key: 'checkedOut', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.checkedOut - b.checkedOut },
-    { title: '当前在场', dataIndex: 'currentOnSite', key: 'currentOnSite', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.currentOnSite - b.currentOnSite },
-    { title: '在场和离场比例', key: 'onSiteAndLeftRatio', width: 150,
+    { title: t('reports.siteName'), dataIndex: 'siteName', key: 'siteName', width: 150, sorter: (a: SiteSummary, b: SiteSummary) => a.siteName.localeCompare(b.siteName) },
+    { title: t('reports.totalWorkers'), dataIndex: 'totalWorkers', key: 'totalWorkers', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.totalWorkers - b.totalWorkers },
+    { title: t('reports.checkedIn'), dataIndex: 'checkedIn', key: 'checkedIn', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.checkedIn - b.checkedIn },
+    { title: t('reports.checkedOut'), dataIndex: 'checkedOut', key: 'checkedOut', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.checkedOut - b.checkedOut },
+    { title: t('reports.currentOnSite'), dataIndex: 'currentOnSite', key: 'currentOnSite', width: 100, sorter: (a: SiteSummary, b: SiteSummary) => a.currentOnSite - b.currentOnSite },
+    { title: t('reports.onSiteAndLeftRatio'), key: 'onSiteAndLeftRatio', width: 150,
       render: (_: any, record: SiteSummary) => {
         const onSiteRate = record.totalWorkers > 0 ? Math.round((record.currentOnSite / record.totalWorkers) * 100) : 0
         const leftRate = record.totalWorkers > 0 ? Math.round((record.checkedOut / record.totalWorkers) * 100) : 0
@@ -350,7 +350,7 @@ const Reports: React.FC = () => {
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#666', minWidth: '40px' }}>在场:</span>
+              <span style={{ fontSize: '12px', color: '#666', minWidth: '40px' }}>{t('reports.onSite')}</span>
               <Progress 
                 percent={onSiteRate} 
                 size="small" 
@@ -361,7 +361,7 @@ const Reports: React.FC = () => {
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#666', minWidth: '40px' }}>离场:</span>
+              <span style={{ fontSize: '12px', color: '#666', minWidth: '40px' }}>{t('reports.left')}</span>
               <Progress 
                 percent={leftRate} 
                 size="small" 
@@ -378,15 +378,15 @@ const Reports: React.FC = () => {
   ]
 
   const attendanceColumns = [
-    { title: '日期', dataIndex: 'date', key: 'date', width: 90, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.date.localeCompare(b.date) },
+    { title: t('reports.date'), dataIndex: 'date', key: 'date', width: 90, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.date.localeCompare(b.date) },
     { title: t('worker.name'), dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.name.localeCompare(b.name) },
     { title: t('reports.distributor'), dataIndex: 'distributorName', key: 'distributorName', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.distributorName.localeCompare(b.distributorName) },
-    { title: '联系方式', dataIndex: 'contact', key: 'contact', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.contact.localeCompare(b.contact) },
-    { title: '证件类型', dataIndex: 'idType', key: 'idType', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idType.localeCompare(b.idType) },
-    { title: '证件号码', dataIndex: 'idNumber', key: 'idNumber', width: 160, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idNumber.localeCompare(b.idNumber) },
-    { title: '实体卡ID', dataIndex: 'physicalCardId', key: 'physicalCardId', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.physicalCardId || '').localeCompare(b.physicalCardId || '') },
+    { title: t('reports.contact'), dataIndex: 'contact', key: 'contact', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.contact.localeCompare(b.contact) },
+    { title: t('reports.idType'), dataIndex: 'idType', key: 'idType', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idType.localeCompare(b.idType) },
+    { title: t('reports.idNumber'), dataIndex: 'idNumber', key: 'idNumber', width: 160, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.idNumber.localeCompare(b.idNumber) },
+    { title: t('reports.physicalCardId'), dataIndex: 'physicalCardId', key: 'physicalCardId', width: 100, sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.physicalCardId || '').localeCompare(b.physicalCardId || '') },
     { 
-      title: '登记人', 
+      title: t('reports.registrar'), 
       dataIndex: 'registrarName', 
       key: 'registrarName', 
       width: 100,
@@ -394,7 +394,7 @@ const Reports: React.FC = () => {
       render: (name: string) => name || '-'
     },
     { 
-      title: '进场时间', 
+      title: t('reports.checkInTime'), 
       key: 'checkIn', 
       width: 90,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkIn || '').localeCompare(b.checkIn || ''),
@@ -403,7 +403,7 @@ const Reports: React.FC = () => {
       }
     },
     { 
-      title: '离场时间', 
+      title: t('reports.checkOutTime'), 
       key: 'checkOut', 
       width: 90,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkOut || '').localeCompare(b.checkOut || ''),
@@ -412,7 +412,7 @@ const Reports: React.FC = () => {
       }
     },
     { 
-      title: '借用物品', 
+      title: t('reports.borrowedItems'), 
       key: 'borrowedItems', 
       width: 100,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.borrowedItems - b.borrowedItems,
@@ -447,13 +447,13 @@ const Reports: React.FC = () => {
     { 
       title: (
         <span>
-          已归还
+          {t('reports.returned')}
           <Tooltip 
             title={
               <div>
-                <div>绿色：✅ 完全归还</div>
-                <div>橙色：⚠️ 部分归还</div>
-                <div>红色：❌ 未归还</div>
+                <div>{t('reports.fullyReturned')}</div>
+                <div>{t('reports.partiallyReturned')}</div>
+                <div>{t('reports.notReturned')}</div>
               </div>
             }
             placement="top"
@@ -564,7 +564,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="当日进场人数"
+              title={t('reports.dailyEnteredCount')}
               value={totalEntered}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#52c41a', fontWeight: 700 }}
@@ -574,7 +574,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="当前在场人数"
+              title={t('reports.currentOnSiteCount')}
               value={currentOnSite}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#1890ff', fontWeight: 700 }}
@@ -584,7 +584,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="未离场人数"
+              title={t('reports.pendingCount')}
               value={pending.length}
               prefix={<TeamOutlined />}
               valueStyle={{ color: pending.length > 0 ? '#fa541c' : '#52c41a', fontWeight: 700 }}
@@ -594,7 +594,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="已借出物品"
+              title={t('reports.borrowedItemsCount')}
               value={totalBorrowedItems}
               prefix={<ShoppingOutlined />}
               valueStyle={{ color: '#1890ff', fontWeight: 700 }}
@@ -604,7 +604,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="已归还物品"
+              title={t('reports.returnedItemsCount')}
               value={totalReturnedItems}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: '#52c41a', fontWeight: 700 }}
@@ -614,7 +614,7 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title="未归还物品"
+              title={t('reports.unreturnedItemsCount')}
               value={totalUnreturnedItems}
               prefix={<ExclamationCircleOutlined />}
               valueStyle={{ color: totalUnreturnedItems > 0 ? '#fa541c' : '#52c41a', fontWeight: 700 }}
@@ -627,13 +627,13 @@ const Reports: React.FC = () => {
       <Card style={{ marginBottom: 8 }}>
         <Row gutter={8} align="middle">
           <Col span={8}>
-            <div style={{ marginBottom: 4 }}>日期选择</div>
+            <div style={{ marginBottom: 4 }}>{t('reports.dateSelection')}</div>
             {dateType === 'single' ? (
               <DatePicker 
                 value={singleDate} 
                 onChange={(d) => d && setSingleDate(d)} 
                 style={{ width: '100%' }} 
-                placeholder="选择日期"
+                placeholder={t('reports.selectDate')}
                 onOpenChange={(open) => {
                   if (open) {
                     // 当日期选择器打开时，显示模式切换选项
@@ -649,7 +649,7 @@ const Reports: React.FC = () => {
                         color: #1890ff;
                         font-size: 12px;
                       `;
-                      modeSwitch.textContent = '切换到范围选择';
+                      modeSwitch.textContent = t('reports.switchToRange');
                       modeSwitch.onclick = () => {
                         setDateType('range');
                         // 关闭当前选择器
@@ -674,19 +674,19 @@ const Reports: React.FC = () => {
                       size="small" 
                       onClick={() => setDateRange([dayjs().startOf('week'), dayjs().endOf('week')])}
                     >
-                      本周
+                      {t('reports.thisWeek')}
                     </Button>
                     <Button 
                       size="small" 
                       onClick={() => setDateRange([dayjs().startOf('month'), dayjs().endOf('month')])}
                     >
-                      本月
+                      {t('reports.thisMonth')}
                     </Button>
                     <Button 
                       size="small" 
                       onClick={() => setDateRange([dayjs().subtract(7, 'day'), dayjs()])}
                     >
-                      最近7天
+                      {t('reports.last7Days')}
                     </Button>
                   </Space>
                 </div>
@@ -698,7 +698,7 @@ const Reports: React.FC = () => {
                     }
                   }}
                   style={{ width: '100%' }}
-                  placeholder={['开始日期', '结束日期']}
+                  placeholder={[t('reports.startDate'), t('reports.endDate')]}
                   onOpenChange={(open) => {
                     if (open) {
                       // 当范围选择器打开时，显示模式切换选项
@@ -714,7 +714,7 @@ const Reports: React.FC = () => {
                           color: #1890ff;
                           font-size: 12px;
                         `;
-                        modeSwitch.textContent = '切换到单日选择';
+                        modeSwitch.textContent = t('reports.switchToSingle');
                         modeSwitch.onclick = () => {
                           setDateType('single');
                           // 关闭当前选择器
@@ -735,9 +735,9 @@ const Reports: React.FC = () => {
             )}
           </Col>
           <Col span={8}>
-            <div style={{ marginBottom: 4 }}>搜索工人</div>
+            <div style={{ marginBottom: 4 }}>{t('reports.searchWorkers')}</div>
             <Input.Search
-              placeholder="姓名、工号、身份证号码、实体卡ID或登记人"
+              placeholder={t('reports.searchPlaceholder')}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               onSearch={setSearchKeyword}
@@ -747,10 +747,10 @@ const Reports: React.FC = () => {
             />
           </Col>
           <Col span={8}>
-            <div style={{ marginBottom: 4 }}>选择分判商</div>
+            <div style={{ marginBottom: 4 }}>{t('reports.selectDistributors')}</div>
             <Select
               mode="multiple"
-              placeholder="全部分判商"
+              placeholder={t('reports.allDistributors')}
               value={selectedDistributors}
               onChange={setSelectedDistributors}
               style={{ width: '100%' }}
@@ -770,7 +770,7 @@ const Reports: React.FC = () => {
                 borderRadius: '6px',
                 color: '#52c41a'
               }}>
-                搜索结果：找到 <strong>{filteredData.length}</strong> 条记录
+                {t('reports.searchResults').replace('{count}', filteredData.length.toString())}
                 {searchKeyword.trim() && (
                   <Button 
                     type="link" 
@@ -778,7 +778,7 @@ const Reports: React.FC = () => {
                     onClick={clearSearch}
                     style={{ marginLeft: 8, padding: 0, height: 'auto' }}
                   >
-                    清空搜索
+                    {t('reports.clearSearch')}
                   </Button>
                 )}
               </div>
@@ -798,13 +798,13 @@ const Reports: React.FC = () => {
             icon={<DownloadOutlined />} 
             onClick={downloadExcel}
           >
-            下载Excel
+            {t('reports.downloadExcel')}
           </Button>
         }
         items={[
           {
             key: 'visitor-records',
-            label: '访客记录',
+            label: t('reports.visitorRecords'),
             children: (
               <div style={{ height: tableHeight, display: 'flex', flexDirection: 'column' }}>
                 <Table
@@ -818,7 +818,7 @@ const Reports: React.FC = () => {
                     total: filteredData.length,
                     showSizeChanger: true,
                     showQuickJumper: true,
-                    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+                    showTotal: (total, range) => t('reports.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
                     pageSizeOptions: ['10', '20', '50', '100'],
                     onChange: handlePageChange,
                     onShowSizeChange: handlePageSizeChange
@@ -829,7 +829,7 @@ const Reports: React.FC = () => {
           },
           {
             key: 'site-summary',
-            label: '工地访客统计',
+            label: t('reports.siteVisitorStats'),
             children: (
               <div style={{ height: tableHeight, display: 'flex', flexDirection: 'column' }}>
                 <Table
@@ -842,7 +842,7 @@ const Reports: React.FC = () => {
                     pageSize: 10,
                     showSizeChanger: true,
                     showQuickJumper: true,
-                    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+                    showTotal: (total, range) => t('reports.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
                     pageSizeOptions: ['5', '10', '20'],
                     size: 'small'
                   }}
@@ -855,12 +855,12 @@ const Reports: React.FC = () => {
 
       {/* 物品详情弹窗 */}
       <Modal
-        title={`${selectedRecord?.name} - 借用物品详情`}
+        title={`${selectedRecord?.name} - ${t('reports.itemDetails')}`}
         open={itemDetailModalVisible}
         onCancel={() => setItemDetailModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setItemDetailModalVisible(false)}>
-            关闭
+            {t('reports.close')}
           </Button>
         ]}
         width={600}
@@ -870,16 +870,16 @@ const Reports: React.FC = () => {
             <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
               <Row gutter={16}>
                 <Col span={12}>
-                  <strong>工人姓名：</strong>{selectedRecord.name}
+                  <strong>{t('reports.workerName')}：</strong>{selectedRecord.name}
                 </Col>
                 <Col span={12}>
-                  <strong>分判商：</strong>{selectedRecord.distributorName}
+                  <strong>{t('reports.distributor')}：</strong>{selectedRecord.distributorName}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>进场时间：</strong>{selectedRecord.checkIn || '-'}
+                  <strong>{t('reports.checkInTime')}：</strong>{selectedRecord.checkIn || '-'}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>离场时间：</strong>{selectedRecord.checkOut || '-'}
+                  <strong>{t('reports.checkOutTime')}：</strong>{selectedRecord.checkOut || '-'}
                 </Col>
               </Row>
             </div>
@@ -893,16 +893,16 @@ const Reports: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span>{item.name}</span>
                         <Tag color={item.status === 'returned' ? 'green' : 'orange'}>
-                          {item.status === 'returned' ? '已归还' : '未归还'}
+                          {item.status === 'returned' ? t('reports.returnedStatus') : t('reports.notReturnedStatus')}
                         </Tag>
                       </div>
                     }
                     description={
                       <div>
-                        <div><strong>物品分类：</strong>{item.category}</div>
-                        <div><strong>经办人：</strong>{item.borrowHandler}</div>
-                        <div><strong>借用时间：</strong>{item.borrowedTime}</div>
-                        <div><strong>归还时间：</strong>{item.returnedTime || '-'}</div>
+                        <div><strong>{t('reports.itemCategory')}：</strong>{item.category}</div>
+                        <div><strong>{t('reports.handler')}：</strong>{item.borrowHandler}</div>
+                        <div><strong>{t('reports.borrowTime')}：</strong>{item.borrowedTime}</div>
+                        <div><strong>{t('reports.returnTime')}：</strong>{item.returnedTime || '-'}</div>
                       </div>
                     }
                   />

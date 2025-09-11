@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import WorkerManagement from './pages/WorkerManagement'
 import DistributorLayout from './components/DistributorLayout'
 import Guard from './pages/Guard'
+import LoadingSpinner from './components/LoadingSpinner'
 import { useAuth } from './hooks/useAuth'
 
 function App() {
@@ -15,22 +16,7 @@ function App() {
 
   // 在认证状态初始化完成前显示加载状态
   if (isLoading) {
-    return (
-      <LocaleProvider>
-        <SiteFilterProvider>
-          <div className="App" style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            height: '100vh',
-            fontSize: '16px',
-            color: '#666'
-          }}>
-            加载中...
-          </div>
-        </SiteFilterProvider>
-      </LocaleProvider>
-    )
+    return <LoadingSpinner />
   }
 
   // 如果用户已登录，根据角色重定向到默认页面

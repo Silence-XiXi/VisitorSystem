@@ -11,8 +11,10 @@ import {
   generateSiteImportTemplate,
   generateDistributorImportTemplate
 } from '../utils/excelUtils'
+import { useLocale } from '../contexts/LocaleContext'
 
 const AdminSites: React.FC = () => {
+  const { t } = useLocale()
   // 工地管理状态
   const [sites, setSites] = useState<Site[]>(mockSites)
   const [siteModalOpen, setSiteModalOpen] = useState(false)
@@ -58,21 +60,21 @@ const AdminSites: React.FC = () => {
     
     if (!hasEmail && !hasWhatsApp) {
       // 如果没有联系方式，直接显示成功信息
-      message.success(`分判商「${distributor.name}」已新增成功！账号：${distributor.accountUsername}，密码：${password}`)
+      message.success(t('admin.noContactInfo').replace('{name}', distributor.name).replace('{username}', distributor.accountUsername || '').replace('{password}', password))
       return
     }
     
     if (hasEmail && !hasWhatsApp) {
       // 只有Email，直接发送
       // TODO: 调用后端API发送Email
-      message.success(`分判商「${distributor.name}」已新增成功！已通过Email发送账号信息给 ${distributor.contactName}`)
+      message.success(t('admin.sendByEmailSuccess').replace('{name}', distributor.contactName || ''))
       return
     }
     
     if (!hasEmail && hasWhatsApp) {
       // 只有WhatsApp，直接发送
       // TODO: 调用后端API发送WhatsApp
-      message.success(`分判商「${distributor.name}」已新增成功！已通过WhatsApp发送账号信息给 ${distributor.contactName}`)
+      message.success(t('admin.sendByWhatsAppSuccess').replace('{name}', distributor.contactName || ''))
       return
     }
     
@@ -80,7 +82,7 @@ const AdminSites: React.FC = () => {
     Modal.confirm({
       title: (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>选择发送方式</span>
+          <span>{t('admin.selectSendMethod')}</span>
           <Button 
             type="text" 
             size="small" 
@@ -92,21 +94,21 @@ const AdminSites: React.FC = () => {
       ),
       content: (
         <div>
-          <p>分判商「{distributor.name}」已新增成功！</p>
-          <p>账号：<strong>{distributor.accountUsername}</strong></p>
-          <p>密码：<strong>{password}</strong></p>
-          <p style={{ marginTop: '16px', color: '#666' }}>请选择发送账号信息的方式：</p>
+          <p>{t('admin.distributorAddedSuccess').replace('{name}', distributor.name)}</p>
+          <p>{t('admin.accountInfo').replace('{username}', distributor.accountUsername || '')}</p>
+          <p>{t('admin.passwordInfo').replace('{password}', password)}</p>
+          <p style={{ marginTop: '16px', color: '#666' }}>{t('admin.selectSendMethodTip')}</p>
         </div>
       ),
-      okText: '通过Email发送',
-      cancelText: '通过WhatsApp发送',
+      okText: t('admin.sendByEmail'),
+      cancelText: t('admin.sendByWhatsApp'),
       onCancel: () => {
         // TODO: 调用后端API发送WhatsApp
-        message.success(`已通过WhatsApp发送账号信息给 ${distributor.contactName}`)
+        message.success(t('admin.sendByWhatsAppSuccess').replace('{name}', distributor.contactName || ''))
       },
       onOk: () => {
         // TODO: 调用后端API发送Email
-        message.success(`已通过Email发送账号信息给 ${distributor.contactName}`)
+        message.success(t('admin.sendByEmailSuccess').replace('{name}', distributor.contactName || ''))
       }
     })
   }
@@ -116,18 +118,18 @@ const AdminSites: React.FC = () => {
   // 重置分判商密码
   const handleResetPassword = (record: Distributor) => {
     Modal.confirm({
-      title: '重置默认密码',
+      title: t('admin.resetPasswordTitle'),
       content: (
         <div>
-          <p>确定要为分判商「{record.name}」重置密码吗？</p>
-          <p style={{ color: '#999' }}>重置后默认密码将设置为 Pass@123，请尽快通知对方修改。</p>
+          <p>{t('admin.resetPasswordConfirm').replace('{name}', record.name)}</p>
+          <p style={{ color: '#999' }}>{t('admin.resetPasswordTip')}</p>
         </div>
       ),
-      okText: '确定',
-      cancelText: '取消',
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
       onOk: () => {
         // TODO: 调用后端API执行重置
-        message.success(`已为 ${record.name} 重置密码，默认密码：Pass@123`)
+        message.success(t('admin.resetPasswordSuccess').replace('{name}', record.name))
       }
     })
   }
@@ -135,20 +137,22 @@ const AdminSites: React.FC = () => {
   // 切换工地状态
   const handleToggleSiteStatus = (record: Site) => {
     const newStatus = record.status === 'active' ? 'inactive' : 'active'
-    const statusText = newStatus === 'active' ? '启用' : '停用'
+    const statusText = newStatus === 'active' ? t('admin.enableSiteTitle') : t('admin.disableSiteTitle')
+    const statusAction = newStatus === 'active' ? t('admin.enableSiteConfirm') : t('admin.disableSiteConfirm')
     
     Modal.confirm({
-      title: `${statusText}工地`,
+      title: statusText,
       content: (
         <div>
-          <p>确定要{statusText}工地「{record.name}」吗？</p>
+          <p>{statusAction.replace('{name}', record.name)}</p>
         </div>
       ),
-      okText: '确定',
-      cancelText: '取消',
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
       onOk: () => {
         setSites(prev => prev.map(s => s.id === record.id ? { ...s, status: newStatus } : s))
-        message.success(`工地「${record.name}」已${statusText}`)
+        const successMessage = newStatus === 'active' ? t('admin.enableSiteSuccess') : t('admin.disableSiteSuccess')
+        message.success(successMessage.replace('{name}', record.name))
       }
     })
   }
@@ -156,33 +160,35 @@ const AdminSites: React.FC = () => {
   // 切换分判商账号状态
   const handleToggleDistributorStatus = (record: Distributor) => {
     const newStatus = record.accountStatus === 'active' ? 'disabled' : 'active'
-    const statusText = newStatus === 'active' ? '启用' : '禁用'
+    const statusText = newStatus === 'active' ? t('admin.enableDistributorTitle') : t('admin.disableDistributorTitle')
+    const statusAction = newStatus === 'active' ? t('admin.enableDistributorConfirm') : t('admin.disableDistributorConfirm')
     
     Modal.confirm({
-      title: `${statusText}分判商账号`,
+      title: statusText,
       content: (
         <div>
-          <p>确定要{statusText}分判商「{record.name}」的账号吗？</p>
+          <p>{statusAction.replace('{name}', record.name)}</p>
         </div>
       ),
-      okText: '确定',
-      cancelText: '取消',
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
       onOk: () => {
         setDistributors(prev => prev.map(d => d.id === record.id ? { ...d, accountStatus: newStatus } : d))
-        message.success(`分判商「${record.name}」账号已${statusText}`)
+        const successMessage = newStatus === 'active' ? t('admin.enableDistributorSuccess') : t('admin.disableDistributorSuccess')
+        message.success(successMessage.replace('{name}', record.name))
       }
     })
   }
 
   // 工地表格列定义
   const siteColumns = [
-    { title: '工地ID', dataIndex: 'id', key: 'id', width: 100 },
-    { title: '名称', dataIndex: 'name', key: 'name', width: 160 },
-    { title: '地址', dataIndex: 'address', key: 'address' },
-    { title: '负责人', dataIndex: 'manager', key: 'manager', width: 120 },
-    { title: '联系电话', dataIndex: 'phone', key: 'phone', width: 140 },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (s?: string) => {
-      const map: any = { active: { color: 'green', text: '启用' }, inactive: { color: 'red', text: '停用' }, suspended: { color: 'orange', text: '暂停' } }
+    { title: t('admin.siteId'), dataIndex: 'id', key: 'id', width: 100 },
+    { title: t('admin.siteName'), dataIndex: 'name', key: 'name', width: 160 },
+    { title: t('admin.siteAddress'), dataIndex: 'address', key: 'address' },
+    { title: t('admin.siteManager'), dataIndex: 'manager', key: 'manager', width: 120 },
+    { title: t('admin.sitePhone'), dataIndex: 'phone', key: 'phone', width: 140 },
+    { title: t('admin.siteStatus'), dataIndex: 'status', key: 'status', width: 100, render: (s?: string) => {
+      const map: any = { active: { color: 'green', text: t('admin.siteActive') }, inactive: { color: 'red', text: t('admin.siteInactive') }, suspended: { color: 'orange', text: t('admin.siteSuspended') } }
       const cfg = map[s || 'active']
       return <Tag color={cfg.color}>{cfg.text}</Tag>
     } },
@@ -202,27 +208,27 @@ const AdminSites: React.FC = () => {
     //     </div>
     //   )
     // } },
-    { title: '操作', key: 'actions', width: 180, render: (_: any, record: Site) => (
+    { title: t('common.actions'), key: 'actions', width: 180, render: (_: any, record: Site) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
           icon={<EditOutlined />} 
           onClick={() => { setEditingSite(record); siteForm.setFieldsValue(record); setSiteModalOpen(true) }}
-          title="编辑"
+          title={t('admin.editTooltip')}
         />
         <Button 
           size="small" 
           icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
           type={record.status === 'active' ? 'default' : 'primary'}
           onClick={() => handleToggleSiteStatus(record)}
-          title={record.status === 'active' ? '停用' : '启用'}
+          title={record.status === 'active' ? t('admin.disableTooltip') : t('admin.enableTooltip')}
         />
         <Button 
           danger 
           size="small" 
           icon={<DeleteOutlined />} 
           onClick={() => setSites(prev => prev.filter(s => s.id !== record.id))}
-          title="删除"
+          title={t('admin.deleteTooltip')}
         />
       </Space>
     )}
@@ -230,12 +236,12 @@ const AdminSites: React.FC = () => {
 
   // 分判商表格列定义
   const distributorColumns = [
-    { title: '分判商ID', dataIndex: 'id', key: 'id', width: 100 },
-    { title: '名称', dataIndex: 'name', key: 'name', width: 160 },
-    { title: '联系人', dataIndex: 'contactName', key: 'contactName', width: 120 },
-    { title: '电话', dataIndex: 'phone', key: 'phone', width: 140 },
-    { title: '邮箱', dataIndex: 'email', key: 'email', width: 200 },
-    { title: '服务工地', dataIndex: 'siteIds', key: 'siteIds', width: 200, render: (siteIds?: string[]) => {
+    { title: t('admin.distributorId'), dataIndex: 'id', key: 'id', width: 100 },
+    { title: t('admin.distributorName'), dataIndex: 'name', key: 'name', width: 160 },
+    { title: t('admin.distributorContact'), dataIndex: 'contactName', key: 'contactName', width: 120 },
+    { title: t('admin.distributorPhone'), dataIndex: 'phone', key: 'phone', width: 140 },
+    { title: t('admin.distributorEmail'), dataIndex: 'email', key: 'email', width: 200 },
+    { title: t('admin.distributorSite'), dataIndex: 'siteIds', key: 'siteIds', width: 200, render: (siteIds?: string[]) => {
       if (!siteIds || siteIds.length === 0) return '-'
       return (
         <div>
@@ -250,39 +256,39 @@ const AdminSites: React.FC = () => {
         </div>
       )
     } },
-    { title: '账号', dataIndex: 'accountUsername', key: 'accountUsername', width: 140 },
-    { title: '账号状态', dataIndex: 'accountStatus', key: 'accountStatus', width: 100, render: (s?: string) => {
-      const map: any = { active: { color: 'green', text: '启用' }, disabled: { color: 'red', text: '禁用' } }
+    { title: t('admin.distributorAccount'), dataIndex: 'accountUsername', key: 'accountUsername', width: 140 },
+    { title: t('admin.distributorAccountStatus'), dataIndex: 'accountStatus', key: 'accountStatus', width: 100, render: (s?: string) => {
+      const map: any = { active: { color: 'green', text: t('admin.distributorActive') }, disabled: { color: 'red', text: t('admin.distributorDisabled') } }
       const cfg = map[s || 'active']
       return <Tag color={cfg.color}>{cfg.text}</Tag>
     } },
-         { title: '操作', key: 'actions', width: 280, render: (_: any, record: Distributor) => (
+         { title: t('common.actions'), key: 'actions', width: 280, render: (_: any, record: Distributor) => (
        <Space style={{ justifyContent: 'flex-end' }}>
          <Button 
            size="small" 
            icon={<EditOutlined />} 
            onClick={() => { setEditingDistributor(record); distributorForm.setFieldsValue(record); setDistributorModalOpen(true) }}
-           title="编辑"
+           title={t('admin.editTooltip')}
          />
          <Button 
            size="small" 
            icon={record.accountStatus === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
            type={record.accountStatus === 'active' ? 'default' : 'primary'}
            onClick={() => handleToggleDistributorStatus(record)}
-           title={record.accountStatus === 'active' ? '禁用' : '启用'}
+           title={record.accountStatus === 'active' ? t('admin.disableAccountTooltip') : t('admin.enableAccountTooltip')}
          />
                    <Button 
             size="small" 
             icon={<KeyOutlined />} 
             onClick={() => handleResetPassword(record)}
-            title="重置密码"
+            title={t('admin.resetPasswordTooltip')}
           />
           <Button 
            danger 
            size="small" 
            icon={<DeleteOutlined />} 
            onClick={() => setDistributors(prev => prev.filter(d => d.id !== record.id))}
-           title="删除"
+           title={t('admin.deleteTooltip')}
          />
        </Space>
      )}
@@ -326,7 +332,7 @@ const AdminSites: React.FC = () => {
   // 批量发送账号密码到Email
   const handleBatchSendEmail = () => {
     if (selectedDistributorIds.length === 0) {
-      message.warning('请先选择要发送的分判商')
+      message.warning(t('admin.pleaseSelectDistributorsToSend'))
       return
     }
 
@@ -335,33 +341,33 @@ const AdminSites: React.FC = () => {
     const noEmailDistributors = selectedDistributors.filter(d => !d.email || !d.email.trim())
 
     if (hasEmailDistributors.length === 0) {
-      message.warning('选中的分判商都没有填写Email联系方式')
+      message.warning(t('admin.noEmailDistributors'))
       return
     }
 
     Modal.confirm({
-      title: '批量发送账号密码到Email',
+      title: t('admin.batchSendEmailTitle'),
       icon: <ExclamationCircleOutlined />,
       content: (
         <div>
-          <p>确定要批量发送账号密码到Email吗？</p>
+          <p>{t('admin.batchSendEmailConfirm')}</p>
           <p style={{ marginTop: '8px', color: '#1890ff' }}>
-            将发送给 {hasEmailDistributors.length} 个分判商
+            {t('admin.willSendTo').replace('{count}', hasEmailDistributors.length.toString())}
           </p>
           {noEmailDistributors.length > 0 && (
             <p style={{ marginTop: '8px', color: '#ff4d4f' }}>
-              注意：{noEmailDistributors.length} 个分判商没有Email联系方式，将跳过发送
+              {t('admin.noEmailWarning').replace('{count}', noEmailDistributors.length.toString())}
             </p>
           )}
         </div>
       ),
-      okText: '确定发送',
-      cancelText: '取消',
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
       onOk: () => {
         // TODO: 调用后端API批量发送Email
-        message.success(`已批量发送账号密码到 ${hasEmailDistributors.length} 个分判商的Email`)
+        message.success(t('admin.batchSendEmailSuccess').replace('{count}', hasEmailDistributors.length.toString()))
         if (noEmailDistributors.length > 0) {
-          message.warning(`${noEmailDistributors.length} 个分判商因无Email联系方式而跳过`)
+          message.warning(t('admin.noEmailSkipped').replace('{count}', noEmailDistributors.length.toString()))
         }
       }
     })
@@ -370,7 +376,7 @@ const AdminSites: React.FC = () => {
   // 批量发送账号密码到WhatsApp
   const handleBatchSendWhatsApp = () => {
     if (selectedDistributorIds.length === 0) {
-      message.warning('请先选择要发送的分判商')
+      message.warning(t('admin.pleaseSelectDistributorsToSend'))
       return
     }
 
@@ -379,33 +385,33 @@ const AdminSites: React.FC = () => {
     const noWhatsAppDistributors = selectedDistributors.filter(d => !d.whatsapp || !d.whatsapp.trim())
 
     if (hasWhatsAppDistributors.length === 0) {
-      message.warning('选中的分判商都没有填写WhatsApp联系方式')
+      message.warning(t('admin.noWhatsAppDistributors'))
       return
     }
 
     Modal.confirm({
-      title: '批量发送账号密码到WhatsApp',
+      title: t('admin.batchSendWhatsAppTitle'),
       icon: <ExclamationCircleOutlined />,
       content: (
         <div>
-          <p>确定要批量发送账号密码到WhatsApp吗？</p>
+          <p>{t('admin.batchSendWhatsAppConfirm')}</p>
           <p style={{ marginTop: '8px', color: '#1890ff' }}>
-            将发送给 {hasWhatsAppDistributors.length} 个分判商
+            {t('admin.willSendTo').replace('{count}', hasWhatsAppDistributors.length.toString())}
           </p>
           {noWhatsAppDistributors.length > 0 && (
             <p style={{ marginTop: '8px', color: '#ff4d4f' }}>
-              注意：{noWhatsAppDistributors.length} 个分判商没有WhatsApp联系方式，将跳过发送
+              {t('admin.noWhatsAppWarning').replace('{count}', noWhatsAppDistributors.length.toString())}
             </p>
           )}
         </div>
       ),
-      okText: '确定发送',
-      cancelText: '取消',
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
       onOk: () => {
         // TODO: 调用后端API批量发送WhatsApp
-        message.success(`已批量发送账号密码到 ${hasWhatsAppDistributors.length} 个分判商的WhatsApp`)
+        message.success(t('admin.batchSendWhatsAppSuccess').replace('{count}', hasWhatsAppDistributors.length.toString()))
         if (noWhatsAppDistributors.length > 0) {
-          message.warning(`${noWhatsAppDistributors.length} 个分判商因无WhatsApp联系方式而跳过`)
+          message.warning(t('admin.noWhatsAppSkipped').replace('{count}', noWhatsAppDistributors.length.toString()))
         }
       }
     })
@@ -416,11 +422,11 @@ const AdminSites: React.FC = () => {
     const v = await siteForm.validateFields()
     if (editingSite) {
       setSites(prev => prev.map(s => s.id === editingSite.id ? { ...editingSite, ...v } : s))
-      message.success('工地已更新')
+      message.success(t('admin.siteUpdated'))
     } else {
       const newItem: Site = { id: (Date.now()).toString(), code: v.code || '', name: v.name, address: v.address, manager: v.manager, phone: v.phone, status: v.status, distributorIds: v.distributorIds }
       setSites(prev => [newItem, ...prev])
-      message.success('工地已新增')
+      message.success(t('admin.siteAdded'))
     }
     setSiteModalOpen(false)
     setEditingSite(null)
@@ -432,7 +438,7 @@ const AdminSites: React.FC = () => {
     const v = await distributorForm.validateFields()
     if (editingDistributor) {
       setDistributors(prev => prev.map(d => d.id === editingDistributor.id ? { ...editingDistributor, ...v } : d))
-      message.success('分判商已更新')
+      message.success(t('admin.distributorUpdated'))
     } else {
       const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
       const newItem: Distributor = { id: (Date.now()).toString(), name: v.name, siteIds: v.siteIds, contactName: v.contactName, phone: v.phone, email: v.email, whatsapp: v.whatsapp, accountUsername: v.accountUsername, accountStatus: v.accountStatus }
@@ -450,7 +456,7 @@ const AdminSites: React.FC = () => {
     const v = await guardForm.validateFields()
     if (editingGuard) {
       setGuards(prev => prev.map(g => g.id === editingGuard.id ? { ...editingGuard, ...v } : g))
-      message.success('门卫已更新')
+      message.success(t('admin.guardUpdated'))
     } else {
       const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
       const newItem: Guard = { 
@@ -467,7 +473,7 @@ const AdminSites: React.FC = () => {
         updatedAt: new Date().toISOString()
       }
       setGuards(prev => [newItem, ...prev])
-      message.success(`门卫已新增！账号：${v.accountUsername || v.guardId}，密码：${defaultPwd}`)
+      message.success(t('admin.guardAddedSuccess').replace('{username}', v.accountUsername || v.guardId).replace('{password}', defaultPwd))
     }
     setGuardModalOpen(false)
     setEditingGuard(null)
@@ -479,24 +485,24 @@ const AdminSites: React.FC = () => {
     const dataToExport = exportAll ? sites : sites.filter(site => selectedSiteIds.includes(site.id))
     
     if (!exportAll && selectedSiteIds.length === 0) {
-      message.warning('请先选择要导出的工地')
+      message.warning(t('admin.pleaseSelectSitesToExport'))
       return
     }
     
     exportSitesToExcel(dataToExport, distributors)
-    message.success(`已导出 ${dataToExport.length} 条工地信息`)
+    message.success(t('admin.sitesExported').replace('{count}', dataToExport.length.toString()))
   }
 
   const handleDistributorExport = (exportAll: boolean = true) => {
     const dataToExport = exportAll ? distributors : distributors.filter(distributor => selectedDistributorIds.includes(distributor.id))
     
     if (!exportAll && selectedDistributorIds.length === 0) {
-      message.warning('请先选择要导出的分判商')
+      message.warning(t('admin.pleaseSelectDistributorsToExport'))
       return
     }
     
     exportDistributorsToExcel(dataToExport, sites)
-    message.success(`已导出 ${dataToExport.length} 条分判商信息`)
+    message.success(t('admin.distributorsExported').replace('{count}', dataToExport.length.toString()))
   }
 
   const handleSiteImport = async (file: File) => {
@@ -504,19 +510,19 @@ const AdminSites: React.FC = () => {
       const { sites: importedSites, errors } = await readSiteExcelFile(file)
       
       if (errors.length > 0) {
-        message.error(`导入失败：${errors.join('; ')}`)
+        message.error(t('admin.importFailed').replace('{errors}', errors.join('; ')))
         return
       }
       
       if (importedSites.length === 0) {
-        message.warning('没有有效数据可导入')
+        message.warning(t('admin.noValidData'))
         return
       }
       
       setSites(prev => [...importedSites, ...prev])
-      message.success(`成功导入 ${importedSites.length} 条工地信息`)
+      message.success(t('admin.importSuccess').replace('{count}', importedSites.length.toString()))
     } catch (error) {
-      message.error('导入失败：' + (error as Error).message)
+      message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
     }
   }
 
@@ -525,55 +531,60 @@ const AdminSites: React.FC = () => {
       const { distributors: importedDistributors, errors } = await readDistributorExcelFile(file)
       
       if (errors.length > 0) {
-        message.error(`导入失败：${errors.join('; ')}`)
+        message.error(t('admin.importFailed').replace('{errors}', errors.join('; ')))
         return
       }
       
       if (importedDistributors.length === 0) {
-        message.warning('没有有效数据可导入')
+        message.warning(t('admin.noValidData'))
         return
       }
       
       setDistributors(prev => [...importedDistributors, ...prev])
-      message.success(`成功导入 ${importedDistributors.length} 条分判商信息`)
+      message.success(t('admin.distributorImportSuccess').replace('{count}', importedDistributors.length.toString()))
     } catch (error) {
-      message.error('导入失败：' + (error as Error).message)
+      message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
     }
   }
 
   const handleDownloadSiteTemplate = () => {
     generateSiteImportTemplate()
-    message.success('工地导入模板已下载')
+    message.success(t('admin.siteTemplateDownloaded'))
   }
 
   const handleDownloadDistributorTemplate = () => {
     generateDistributorImportTemplate()
-    message.success('分判商导入模板已下载')
+    message.success(t('admin.distributorTemplateDownloaded'))
   }
 
   const handleGuardExport = (exportAll: boolean = true) => {
     if (!exportAll && selectedGuardIds.length === 0) {
-      message.warning('请先选择要导出的门卫')
+      message.warning(t('admin.pleaseSelectGuardsToExport'))
       return
     }
     
     // 这里应该调用实际的Excel导出API
-    message.success('门卫Excel文件下载中...')
+    message.success(t('admin.guardsExported'))
   }
 
   // 门卫管理相关函数
   const handleToggleGuardAccountStatus = (record: Guard) => {
     const newStatus = record.accountStatus === 'active' ? 'disabled' : 'active'
-    const statusText = newStatus === 'active' ? '启用' : '禁用'
+    
+    const statusTitle = newStatus === 'active' ? t('admin.enableGuardTitle') : t('admin.disableGuardTitle')
+    const statusConfirm = newStatus === 'active' ? t('admin.enableGuardConfirm') : t('admin.disableGuardConfirm')
+    const statusSuccess = newStatus === 'active' ? t('admin.enableGuardSuccess') : t('admin.disableGuardSuccess')
     
     Modal.confirm({
-      title: `${statusText}门卫账号`,
-      content: `确定要${statusText}门卫「${record.name}」的账号吗？`,
+      title: statusTitle,
+      content: statusConfirm.replace('{name}', record.name),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
       onOk: () => {
         setGuards(prev => prev.map(g => 
           g.id === record.id ? { ...g, accountStatus: newStatus } : g
         ))
-        message.success(`门卫「${record.name}」的账号已${statusText}`)
+        message.success(statusSuccess.replace('{name}', record.name))
       }
     })
   }
@@ -581,20 +592,22 @@ const AdminSites: React.FC = () => {
   // 重置门卫密码
   const handleResetGuardPassword = (record: Guard) => {
     Modal.confirm({
-      title: '重置门卫密码',
-      content: `确定要重置门卫「${record.name}」的密码吗？重置后密码将恢复为默认密码。`,
+      title: t('admin.resetGuardPasswordTitle'),
+      content: t('admin.resetGuardPasswordConfirm').replace('{name}', record.name),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
       onOk: () => {
         // 这里应该调用后端API重置密码
-        message.success(`门卫「${record.name}」的密码已重置为默认密码`)
+        message.success(t('admin.resetGuardPasswordSuccess').replace('{name}', record.name))
       }
     })
   }
 
   // 门卫列定义
   const guardColumns = [
-    { title: '门卫编号', dataIndex: 'guardId', key: 'guardId', width: 120, sorter: (a: Guard, b: Guard) => a.guardId.localeCompare(b.guardId) },
-    { title: '姓名', dataIndex: 'name', key: 'name', width: 120, sorter: (a: Guard, b: Guard) => a.name.localeCompare(b.name) },
-    { title: '所属工地', dataIndex: 'siteId', key: 'siteId', width: 150, 
+    { title: t('admin.guardId'), dataIndex: 'guardId', key: 'guardId', width: 120, sorter: (a: Guard, b: Guard) => a.guardId.localeCompare(b.guardId) },
+    { title: t('admin.guardName'), dataIndex: 'name', key: 'name', width: 120, sorter: (a: Guard, b: Guard) => a.name.localeCompare(b.name) },
+    { title: t('admin.guardSite'), dataIndex: 'siteId', key: 'siteId', width: 150, 
       render: (siteId: string) => {
         const site = sites.find(s => s.id === siteId)
         return site ? site.name : '-'
@@ -605,45 +618,45 @@ const AdminSites: React.FC = () => {
         return (siteA?.name || '').localeCompare(siteB?.name || '')
       }
     },
-    { title: '联系电话', dataIndex: 'phone', key: 'phone', width: 130, sorter: (a: Guard, b: Guard) => a.phone.localeCompare(b.phone) },
-    { title: '邮箱', dataIndex: 'email', key: 'email', width: 180, sorter: (a: Guard, b: Guard) => (a.email || '').localeCompare(b.email || '') },
-    { title: 'WhatsApp', dataIndex: 'whatsapp', key: 'whatsapp', width: 130, sorter: (a: Guard, b: Guard) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
-    { title: '账号', dataIndex: 'accountUsername', key: 'accountUsername', width: 120, sorter: (a: Guard, b: Guard) => (a.accountUsername || '').localeCompare(b.accountUsername || '') },
-    { title: '账号状态', dataIndex: 'accountStatus', key: 'accountStatus', width: 100,
+    { title: t('admin.guardPhone'), dataIndex: 'phone', key: 'phone', width: 130, sorter: (a: Guard, b: Guard) => a.phone.localeCompare(b.phone) },
+    { title: t('admin.guardEmail'), dataIndex: 'email', key: 'email', width: 180, sorter: (a: Guard, b: Guard) => (a.email || '').localeCompare(b.email || '') },
+    { title: t('admin.guardWhatsApp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 130, sorter: (a: Guard, b: Guard) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
+    { title: t('admin.guardAccount'), dataIndex: 'accountUsername', key: 'accountUsername', width: 120, sorter: (a: Guard, b: Guard) => (a.accountUsername || '').localeCompare(b.accountUsername || '') },
+    { title: t('admin.guardAccountStatus'), dataIndex: 'accountStatus', key: 'accountStatus', width: 100,
       render: (status: string) => (
         <Tag color={status === 'active' ? 'green' : 'red'}>
-          {status === 'active' ? '启用' : '禁用'}
+          {status === 'active' ? t('admin.distributorActive') : t('admin.distributorDisabled')}
         </Tag>
       ),
       sorter: (a: Guard, b: Guard) => (a.accountStatus || '').localeCompare(b.accountStatus || '')
     },
-    { title: '操作', key: 'actions', width: 200, render: (_: any, record: Guard) => (
+    { title: t('common.actions'), key: 'actions', width: 200, render: (_: any, record: Guard) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
           icon={<EditOutlined />} 
           onClick={() => { setEditingGuard(record); guardForm.setFieldsValue(record); setGuardModalOpen(true) }}
-          title="编辑"
+          title={t('admin.editTooltip')}
         />
         <Button 
           size="small" 
           icon={<KeyOutlined />}
           onClick={() => handleResetGuardPassword(record)}
-          title="重置密码"
+          title={t('admin.resetPasswordTooltip')}
         />
         <Button 
           size="small" 
           icon={record.accountStatus === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
           type={record.accountStatus === 'active' ? 'default' : 'primary'}
           onClick={() => handleToggleGuardAccountStatus(record)}
-          title={record.accountStatus === 'active' ? '禁用账号' : '启用账号'}
+          title={record.accountStatus === 'active' ? t('admin.disableAccountTooltip') : t('admin.enableAccountTooltip')}
         />
         <Button 
           danger 
           size="small" 
           icon={<DeleteOutlined />} 
           onClick={() => setGuards(prev => prev.filter(g => g.id !== record.id))}
-          title="删除"
+          title={t('admin.deleteTooltip')}
         />
       </Space>
     )}
@@ -668,16 +681,16 @@ const AdminSites: React.FC = () => {
     <Card>
       <Row gutter={12} style={{ marginBottom: 12 }}>
         <Col span={5}>
-          <Input placeholder="关键词（名称/地址/编码）" value={siteKeyword} onChange={e => setSiteKeyword(e.target.value)} allowClear />
+          <Input placeholder={t('admin.siteKeywordPlaceholder')} value={siteKeyword} onChange={e => setSiteKeyword(e.target.value)} allowClear />
         </Col>
         <Col span={5}>
           <Select
             mode="multiple"
             style={{ width: '100%' }}
-            placeholder="状态筛选（可多选）"
+            placeholder={t('admin.statusFilterPlaceholder')}
             value={siteStatusFilters}
             onChange={setSiteStatusFilters}
-            options={[{ value: 'active', label: '启用' }, { value: 'suspended', label: '暂停' }, { value: 'inactive', label: '停用' }]}
+            options={[{ value: 'active', label: t('admin.active') }, { value: 'suspended', label: t('admin.suspended') }, { value: 'inactive', label: t('admin.inactive') }]}
             allowClear
           />
         </Col>
@@ -685,7 +698,7 @@ const AdminSites: React.FC = () => {
           <Select
             mode="multiple"
             style={{ width: '100%' }}
-            placeholder="负责人筛选（可多选）"
+            placeholder={t('admin.managerFilterPlaceholder')}
             value={siteManagerFilters}
             onChange={setSiteManagerFilters}
             options={siteManagerOptions}
@@ -694,7 +707,7 @@ const AdminSites: React.FC = () => {
         </Col>
         <Col span={9}>
            <Space wrap>
-             <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadSiteTemplate}>下载模板</Button>
+             <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadSiteTemplate}>{t('admin.downloadTemplate')}</Button>
              <Upload
                accept=".xlsx,.xls"
                showUploadList={false}
@@ -703,14 +716,14 @@ const AdminSites: React.FC = () => {
                  return false
                }}
              >
-               <Button size="small" icon={<UploadOutlined />}>导入Excel</Button>
+               <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
              </Upload>
              <Button 
                size="small"
                icon={<DownloadOutlined />} 
                onClick={() => handleSiteExport(selectedSiteIds.length === 0)}
              >
-               {selectedSiteIds.length === 0 ? '导出全部' : `导出已选(${selectedSiteIds.length})`}
+               {selectedSiteIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedSiteIds.length})`}
              </Button>
            </Space>
          </Col>
@@ -719,10 +732,10 @@ const AdminSites: React.FC = () => {
       {/* 筛选结果统计 */}
       <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ color: '#666', fontSize: '14px' }}>
-          筛选结果：共 <strong style={{ color: '#1890ff' }}>{filteredSites.length}</strong> 条记录
+          {t('admin.filterResults').replace('{count}', filteredSites.length.toString())}
           {sites.length !== filteredSites.length && (
             <span style={{ marginLeft: 8, color: '#999' }}>
-              （从 {sites.length} 条记录中筛选）
+              {t('admin.fromTotalRecords').replace('{total}', sites.length.toString())}
             </span>
           )}
         </span>
@@ -736,7 +749,7 @@ const AdminSites: React.FC = () => {
                  setSiteKeyword('')
                }}
              >
-               清除筛选
+               {t('admin.clearFilter')}
              </Button>
            )}
            {selectedSiteIds.length > 0 && (
@@ -744,7 +757,7 @@ const AdminSites: React.FC = () => {
                size="small" 
                onClick={() => setSelectedSiteIds([])}
              >
-               清除选择({selectedSiteIds.length})
+               {t('admin.clearSelection')}({selectedSiteIds.length})
              </Button>
            )}
          </Space>
@@ -771,16 +784,16 @@ const AdminSites: React.FC = () => {
     <Card>
       <Row gutter={12} style={{ marginBottom: 12 }}>
         <Col span={5}>
-          <Input placeholder="关键词（名称/联系人）" value={distributorKeyword} onChange={e => setDistributorKeyword(e.target.value)} allowClear />
+          <Input placeholder={t('admin.distributorKeywordPlaceholder')} value={distributorKeyword} onChange={e => setDistributorKeyword(e.target.value)} allowClear />
         </Col>
         <Col span={5}>
           <Select
             mode="multiple"
             style={{ width: '100%' }}
-            placeholder="账号状态（可多选）"
+            placeholder={t('admin.accountStatusFilterPlaceholder')}
             value={distributorStatusFilters}
             onChange={setDistributorStatusFilters}
-            options={[{ value: 'active', label: '启用' }, { value: 'disabled', label: '禁用' }]}
+            options={[{ value: 'active', label: t('admin.active') }, { value: 'disabled', label: t('admin.disabled') }]}
             allowClear
           />
         </Col>
@@ -788,7 +801,7 @@ const AdminSites: React.FC = () => {
           <Select
             mode="multiple"
             style={{ width: '100%' }}
-            placeholder="服务工地（可多选）"
+            placeholder={t('admin.siteFilterPlaceholder')}
             value={distributorSiteFilters}
             onChange={setDistributorSiteFilters}
             options={sites.map(s => ({ value: s.id, label: s.name }))}
@@ -797,7 +810,7 @@ const AdminSites: React.FC = () => {
         </Col>
         <Col span={9}>
            <Space wrap>
-             <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadDistributorTemplate}>下载模板</Button>
+             <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadDistributorTemplate}>{t('admin.downloadTemplate')}</Button>
              <Upload
                accept=".xlsx,.xls"
                showUploadList={false}
@@ -806,14 +819,14 @@ const AdminSites: React.FC = () => {
                  return false
                }}
              >
-               <Button size="small" icon={<UploadOutlined />}>导入Excel</Button>
+               <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
              </Upload>
              <Button 
                size="small"
                icon={<DownloadOutlined />} 
                onClick={() => handleDistributorExport(selectedDistributorIds.length === 0)}
              >
-               {selectedDistributorIds.length === 0 ? '导出全部' : `导出已选(${selectedDistributorIds.length})`}
+               {selectedDistributorIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedDistributorIds.length})`}
              </Button>
            </Space>
          </Col>
@@ -823,10 +836,10 @@ const AdminSites: React.FC = () => {
       <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ color: '#666', fontSize: '14px' }}>
-            筛选结果：共 <strong style={{ color: '#1890ff' }}>{filteredDistributors.length}</strong> 条记录
+            {t('admin.filterResults').replace('{count}', filteredDistributors.length.toString())}
             {distributors.length !== filteredDistributors.length && (
               <span style={{ marginLeft: 8, color: '#999' }}>
-                （从 {distributors.length} 条记录中筛选）
+                {t('admin.fromTotalRecords').replace('{total}', distributors.length.toString())}
               </span>
             )}
           </span>
@@ -839,18 +852,18 @@ const AdminSites: React.FC = () => {
                 type="primary"
                 icon={<SendOutlined />}
                 onClick={() => handleBatchSendEmail()}
-                title="批量发送账号密码到Email"
+                title={t('admin.batchSendEmailTitle')}
               >
-                批量发送Email
+                {t('admin.batchSendEmail')}
               </Button>
               <Button 
                 size="small" 
                 type="primary"
                 icon={<SendOutlined />}
                 onClick={() => handleBatchSendWhatsApp()}
-                title="批量发送账号密码到WhatsApp"
+                title={t('admin.batchSendWhatsAppTitle')}
               >
-                批量发送WhatsApp
+                {t('admin.batchSendWhatsApp')}
               </Button>
             </Space>
           )}
@@ -866,7 +879,7 @@ const AdminSites: React.FC = () => {
                 setDistributorKeyword('')
               }}
             >
-              清除筛选
+              {t('admin.clearFilter')}
             </Button>
           )}
           {selectedDistributorIds.length > 0 && (
@@ -874,7 +887,7 @@ const AdminSites: React.FC = () => {
               size="small" 
               onClick={() => setSelectedDistributorIds([])}
             >
-              清除选择({selectedDistributorIds.length})
+              {t('admin.clearSelection')}({selectedDistributorIds.length})
             </Button>
           )}
         </Space>
@@ -901,13 +914,13 @@ const AdminSites: React.FC = () => {
     <Card>
       <Row gutter={12} style={{ marginBottom: 12 }}>
         <Col span={6}>
-          <Input placeholder="关键词（编号/姓名/电话）" value={guardKeyword} onChange={e => setGuardKeyword(e.target.value)} allowClear />
+          <Input placeholder={t('admin.guardKeywordPlaceholder')} value={guardKeyword} onChange={e => setGuardKeyword(e.target.value)} allowClear />
         </Col>
         <Col span={6}>
           <Select
             mode="multiple"
             style={{ width: '100%' }}
-            placeholder="工地筛选（可多选）"
+            placeholder={t('admin.guardSiteFilterPlaceholder')}
             value={guardSiteFilters}
             onChange={setGuardSiteFilters}
             allowClear
@@ -924,7 +937,7 @@ const AdminSites: React.FC = () => {
               icon={<DownloadOutlined />} 
               onClick={() => handleGuardExport(selectedGuardIds.length === 0)}
             >
-              {selectedGuardIds.length === 0 ? '导出全部' : `导出已选(${selectedGuardIds.length})`}
+              {selectedGuardIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedGuardIds.length})`}
             </Button>
           </Space>
         </Col>
@@ -934,10 +947,10 @@ const AdminSites: React.FC = () => {
       <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ color: '#666', fontSize: '14px' }}>
-            筛选结果：共 <strong style={{ color: '#1890ff' }}>{filteredGuards.length}</strong> 条记录
+            {t('admin.filterResults').replace('{count}', filteredGuards.length.toString())}
             {guards.length !== filteredGuards.length && (
               <span style={{ marginLeft: 8, color: '#999' }}>
-                （从 {guards.length} 条记录中筛选）
+                {t('admin.fromTotalRecords').replace('{total}', guards.length.toString())}
               </span>
             )}
           </span>
@@ -952,7 +965,7 @@ const AdminSites: React.FC = () => {
                 setGuardKeyword('')
               }}
             >
-              清除筛选
+              {t('admin.clearFilter')}
             </Button>
           )}
           {selectedGuardIds.length > 0 && (
@@ -960,7 +973,7 @@ const AdminSites: React.FC = () => {
               size="small" 
               onClick={() => setSelectedGuardIds([])}
             >
-              清除选择({selectedGuardIds.length})
+              {t('admin.clearSelection')}({selectedGuardIds.length})
             </Button>
           )}
         </Space>
@@ -993,7 +1006,7 @@ const AdminSites: React.FC = () => {
             label: (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
                 <TeamOutlined style={{ color: '#52c41a', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>分判商管理（{distributors.length}）</span>
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.distributorManagement')}（{distributors.length}）</span>
               </div>
             ),
             children: distributorManagementTab
@@ -1003,7 +1016,7 @@ const AdminSites: React.FC = () => {
             label: (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
                 <KeyOutlined style={{ color: '#fa8c16', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>门卫管理（{guards.length}）</span>
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.guardManagement')}（{guards.length}）</span>
               </div>
             ),
             children: guardManagementTab
@@ -1013,7 +1026,7 @@ const AdminSites: React.FC = () => {
             label: (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
                 <HomeOutlined style={{ color: '#1890ff', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>工地管理（{sites.length}）</span>
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.siteManagement')}（{sites.length}）</span>
               </div>
             ),
             children: siteManagementTab
@@ -1022,15 +1035,15 @@ const AdminSites: React.FC = () => {
         tabBarExtraContent={
           activeTab === 'sites' ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingSite(null); siteForm.resetFields(); setSiteModalOpen(true) }}>
-              新增工地
+              {t('admin.addSite')}
             </Button>
           ) : activeTab === 'guards' ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingGuard(null); guardForm.resetFields(); setGuardModalOpen(true) }}>
-              新增门卫
+              {t('admin.addGuard')}
             </Button>
           ) : (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDistributor(null); distributorForm.resetFields(); setDistributorModalOpen(true) }}>
-              新增分判商
+              {t('admin.addDistributor')}
             </Button>
           )
         }
@@ -1047,30 +1060,30 @@ const AdminSites: React.FC = () => {
       />
 
       {/* 工地管理模态框 */}
-      <Modal title={editingSite ? '编辑工地' : '新增工地'} open={siteModalOpen} onCancel={() => { setSiteModalOpen(false); setEditingSite(null) }} onOk={onSiteSubmit} destroyOnClose>
+      <Modal title={editingSite ? t('admin.editSite') : t('admin.addSite')} open={siteModalOpen} onCancel={() => { setSiteModalOpen(false); setEditingSite(null) }} onOk={onSiteSubmit} destroyOnClose>
         <Form form={siteForm} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input placeholder="请输入工地名称" />
+          <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
+            <Input placeholder={t('admin.siteNamePlaceholder')} />
           </Form.Item>
-          <Form.Item name="code" label="编码">
-            <Input placeholder="例如：BJ-CBD-001" />
+          <Form.Item name="code" label={t('admin.codeLabel')}>
+            <Input placeholder={t('admin.codePlaceholder')} />
           </Form.Item>
-          <Form.Item name="address" label="地址" rules={[{ required: true, message: '请输入地址' }]}>
-            <Input placeholder="请输入工地地址" />
+          <Form.Item name="address" label={t('admin.addressLabel')} rules={[{ required: true, message: t('form.required') }]}>
+            <Input placeholder={t('admin.addressPlaceholder')} />
           </Form.Item>
-          <Form.Item name="manager" label="负责人">
-            <Input placeholder="责任人姓名" />
+          <Form.Item name="manager" label={t('admin.managerLabel')}>
+            <Input placeholder={t('admin.managerPlaceholder')} />
           </Form.Item>
-          <Form.Item name="phone" label="联系电话">
-            <Input placeholder="电话" />
+          <Form.Item name="phone" label={t('admin.phoneLabel')}>
+            <Input placeholder={t('admin.phonePlaceholder')} />
           </Form.Item>
-          <Form.Item name="status" label="状态" initialValue={'active'}>
-            <Select options={[{ value: 'active', label: '启用' }, { value: 'suspended', label: '暂停' }, { value: 'inactive', label: '停用' }]} />
+          <Form.Item name="status" label={t('admin.statusLabel')} initialValue={'active'}>
+            <Select options={[{ value: 'active', label: t('admin.active') }, { value: 'suspended', label: t('admin.suspended') }, { value: 'inactive', label: t('admin.inactive') }]} />
           </Form.Item>
-          <Form.Item name="distributorIds" label="关联分判商">
+          <Form.Item name="distributorIds" label={t('admin.distributorIdsLabel')}>
             <Select 
               mode="multiple" 
-              placeholder="请选择分判商（可多选）" 
+              placeholder={t('admin.distributorSelectPlaceholder')} 
               options={distributors.map(d => ({ value: d.id, label: d.name }))} 
             />
           </Form.Item>
@@ -1078,78 +1091,78 @@ const AdminSites: React.FC = () => {
       </Modal>
 
       {/* 分判商管理模态框 */}
-      <Modal title={editingDistributor ? '编辑分判商' : '新增分判商'} open={distributorModalOpen} onCancel={() => { setDistributorModalOpen(false); setEditingDistributor(null) }} onOk={onDistributorSubmit} destroyOnClose>
+      <Modal title={editingDistributor ? t('admin.editDistributor') : t('admin.addDistributor')} open={distributorModalOpen} onCancel={() => { setDistributorModalOpen(false); setEditingDistributor(null) }} onOk={onDistributorSubmit} destroyOnClose>
         <Form form={distributorForm} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input placeholder="请输入分判商名称" />
+          <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
+            <Input placeholder={t('admin.distributorNamePlaceholder')} />
           </Form.Item>
-          <Form.Item name="contactName" label="联系人">
-            <Input placeholder="联系人姓名" />
+          <Form.Item name="contactName" label={t('admin.contactLabel')}>
+            <Input placeholder={t('admin.contactPlaceholder')} />
           </Form.Item>
-          <Form.Item name="siteIds" label="服务工地">
+          <Form.Item name="siteIds" label={t('admin.siteIdsLabel')}>
             <Select 
               mode="multiple" 
-              placeholder="请选择工地（可多选）" 
+              placeholder={t('admin.siteMultiSelectPlaceholder')} 
               options={sites.map(s => ({ value: s.id, label: s.name }))} 
             />
           </Form.Item>
-          <Form.Item name="phone" label="电话">
-            <Input placeholder="联系电话" />
+          <Form.Item name="phone" label={t('admin.phoneLabel')}>
+            <Input placeholder={t('admin.phonePlaceholder')} />
           </Form.Item>
-          <Form.Item name="email" label="邮箱">
-            <Input placeholder="邮箱" />
+          <Form.Item name="email" label={t('admin.emailLabel')}>
+            <Input placeholder={t('admin.emailPlaceholder')} />
           </Form.Item>
-          <Form.Item name="whatsapp" label="WhatsApp">
-            <Input placeholder="WhatsApp号码（例如：+86 13800138000）" />
+          <Form.Item name="whatsapp" label={t('admin.whatsAppLabel')}>
+            <Input placeholder={t('admin.whatsAppPlaceholder')} />
           </Form.Item>
-          <Form.Item name="accountUsername" label="账号">
-            <Input placeholder="登录账号" />
+          <Form.Item name="accountUsername" label={t('admin.accountLabel')}>
+            <Input placeholder={t('admin.accountPlaceholder')} />
           </Form.Item>
           {!editingDistributor && (
-            <Form.Item name="defaultPassword" label="默认密码" tooltip="若不填写将使用默认密码 Pass@123">
-              <Input.Password placeholder="默认密码（留空则使用 Pass@123）" />
+            <Form.Item name="defaultPassword" label={t('admin.defaultPasswordLabel')} tooltip={t('admin.defaultPasswordTooltip')}>
+              <Input.Password placeholder={t('admin.defaultPasswordPlaceholder')} />
             </Form.Item>
           )}
-          <Form.Item name="accountStatus" label="账号状态" initialValue={'active'}>
-            <Select options={[{ value: 'active', label: '启用' }, { value: 'disabled', label: '禁用' }]} />
+          <Form.Item name="accountStatus" label={t('admin.accountStatusLabel')} initialValue={'active'}>
+            <Select options={[{ value: 'active', label: t('admin.active') }, { value: 'disabled', label: t('admin.disabled') }]} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* 门卫管理模态框 */}
-      <Modal title={editingGuard ? '编辑门卫' : '新增门卫'} open={guardModalOpen} onCancel={() => { setGuardModalOpen(false); setEditingGuard(null) }} onOk={onGuardSubmit} destroyOnClose>
+      <Modal title={editingGuard ? t('admin.editGuard') : t('admin.addGuard')} open={guardModalOpen} onCancel={() => { setGuardModalOpen(false); setEditingGuard(null) }} onOk={onGuardSubmit} destroyOnClose>
         <Form form={guardForm} layout="vertical">
-          <Form.Item name="guardId" label="门卫编号" rules={[{ required: true, message: '请输入门卫编号' }]}>
-            <Input placeholder="请输入门卫编号（如：G001）" />
+          <Form.Item name="guardId" label={t('admin.guardIdLabel')} rules={[{ required: true, message: t('form.required') }]}>
+            <Input placeholder={t('admin.guardIdPlaceholder')} />
           </Form.Item>
-          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
-            <Input placeholder="请输入门卫姓名" />
+          <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
+            <Input placeholder={t('admin.guardNamePlaceholder')} />
           </Form.Item>
-          <Form.Item name="siteId" label="所属工地" rules={[{ required: true, message: '请选择工地' }]}>
+          <Form.Item name="siteId" label={t('admin.siteIdLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Select 
-              placeholder="请选择工地" 
+              placeholder={t('admin.siteSelectPlaceholder')} 
               options={sites.map(s => ({ value: s.id, label: s.name }))} 
             />
           </Form.Item>
-          <Form.Item name="phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}>
-            <Input placeholder="联系电话" />
+          <Form.Item name="phone" label={t('admin.phoneLabel')} rules={[{ required: true, message: t('form.required') }]}>
+            <Input placeholder={t('admin.phonePlaceholder')} />
           </Form.Item>
-          <Form.Item name="email" label="邮箱">
-            <Input placeholder="邮箱" />
+          <Form.Item name="email" label={t('admin.emailLabel')}>
+            <Input placeholder={t('admin.emailPlaceholder')} />
           </Form.Item>
-          <Form.Item name="whatsapp" label="WhatsApp">
-            <Input placeholder="WhatsApp号码（例如：+86 13800138000）" />
+          <Form.Item name="whatsapp" label={t('admin.whatsAppLabel')}>
+            <Input placeholder={t('admin.whatsAppPlaceholder')} />
           </Form.Item>
-          <Form.Item name="accountUsername" label="账号">
-            <Input placeholder="登录账号" />
+          <Form.Item name="accountUsername" label={t('admin.accountLabel')}>
+            <Input placeholder={t('admin.accountPlaceholder')} />
           </Form.Item>
           {!editingGuard && (
-            <Form.Item name="defaultPassword" label="初始密码" tooltip="若不填写将使用默认密码 Pass@123">
-              <Input.Password placeholder="初始密码（留空则使用 Pass@123）" />
+            <Form.Item name="defaultPassword" label={t('admin.initialPasswordLabel')} tooltip={t('admin.initialPasswordTooltip')}>
+              <Input.Password placeholder={t('admin.initialPasswordPlaceholder')} />
             </Form.Item>
           )}
-          <Form.Item name="accountStatus" label="账号状态" initialValue={'active'}>
-            <Select options={[{ value: 'active', label: '启用' }, { value: 'disabled', label: '禁用' }]} />
+          <Form.Item name="accountStatus" label={t('admin.accountStatusLabel')} initialValue={'active'}>
+            <Select options={[{ value: 'active', label: t('admin.active') }, { value: 'disabled', label: t('admin.disabled') }]} />
           </Form.Item>
         </Form>
       </Modal>

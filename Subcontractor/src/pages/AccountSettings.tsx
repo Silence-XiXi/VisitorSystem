@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Form, Input, Button, Upload, Avatar, Row, Col, Select, message, Divider, Tabs } from 'antd'
+import { Card, Form, Input, Button, Upload, Avatar, Row, Col, Select, message, Tabs } from 'antd'
 import { UploadOutlined, UserOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
 
 const AccountSettings: React.FC = () => {
-  const { locale, setLocale } = useLocale()
+  const { locale, setLocale, t } = useLocale()
   const [form] = Form.useForm()
   const [avatarUrl, setAvatarUrl] = useState<string>('')
 
@@ -21,18 +21,18 @@ const AccountSettings: React.FC = () => {
     const values = await form.validateFields()
     localStorage.setItem('account_settings', JSON.stringify({ ...values, avatarUrl }))
     if (values.language && values.language !== locale) setLocale(values.language)
-    message.success('账户信息已保存')
+    message.success(t('distributor.accountInfoSaved'))
   }
 
   const onChangePassword = async () => {
-    const { oldPassword, newPassword, confirmPassword } = await form.validateFields(['oldPassword', 'newPassword', 'confirmPassword'])
+    const { newPassword, confirmPassword } = await form.validateFields(['oldPassword', 'newPassword', 'confirmPassword'])
     if (newPassword !== confirmPassword) {
-      message.error('两次输入的新密码不一致')
+      message.error(t('distributor.passwordMismatch'))
       return
     }
     // TODO: 接入后端修改密码接口
     form.resetFields(['oldPassword', 'newPassword', 'confirmPassword'])
-    message.success('密码已更新')
+    message.success(t('distributor.passwordUpdated'))
   }
 
   const uploadProps = {
@@ -53,65 +53,65 @@ const AccountSettings: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <Card title="用户中心">
+      <Card title={t('guard.userCenter')}>
         <Tabs defaultActiveKey="basic">
-          <Tabs.TabPane tab="基本信息设置" key="basic">
+          <Tabs.TabPane tab={t('distributor.basicInfoSettings')} key="basic">
             <Row gutter={16}>
               <Col xs={24} lg={8}>
-                <Card title="头像">
+                <Card title={t('distributor.avatarSettings')}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                     <Avatar size={80} src={avatarUrl} icon={<UserOutlined />} />
                     <Upload {...uploadProps}>
-                      <Button icon={<UploadOutlined />}>上传头像</Button>
+                      <Button icon={<UploadOutlined />}>{t('guard.uploadAvatar')}</Button>
                     </Upload>
                   </div>
                 </Card>
               </Col>
               <Col xs={24} lg={16}>
-                <Card title="基本信息" extra={<Button type="primary" onClick={onSave}>保存</Button>}>
+                <Card title={t('distributor.basicInfo')} extra={<Button type="primary" onClick={onSave}>{t('common.save')}</Button>}>
                   <Form form={form} layout="vertical">
                     <Row gutter={16}>
                       <Col span={12}>
-                        <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
-                          <Input placeholder="用户名" />
+                        <Form.Item name="username" label={t('distributor.username')} rules={[{ required: true, message: t('distributor.pleaseEnterUsername') }]}>
+                          <Input placeholder={t('distributor.username')} />
                         </Form.Item>
                       </Col>
                       <Col span={12}>
-                        <Form.Item name="displayName" label="显示名称">
-                          <Input placeholder="显示在界面的名称" />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Form.Item name="email" label="邮箱" rules={[{ type: 'email', message: '邮箱格式不正确' }]}>
-                          <Input placeholder="邮箱" />
-                        </Form.Item>
-                      </Col>
-                      <Col span={12}>
-                        <Form.Item name="phone" label="电话">
-                          <Input placeholder="电话" />
+                        <Form.Item name="displayName" label={t('distributor.displayName')}>
+                          <Input placeholder={t('distributor.displayNamePlaceholder')} />
                         </Form.Item>
                       </Col>
                     </Row>
                     <Row gutter={16}>
                       <Col span={12}>
-                        <Form.Item name="language" label="界面语言" initialValue={locale}>
+                        <Form.Item name="email" label={t('distributor.email')} rules={[{ type: 'email', message: t('form.invalidEmail') }]}>
+                          <Input placeholder={t('distributor.emailPlaceholder')} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item name="phone" label={t('distributor.phone')}>
+                          <Input placeholder={t('distributor.phonePlaceholder')} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item name="language" label={t('distributor.interfaceLanguage')} initialValue={locale}>
                           <Select
                             options={[
-                              { value: 'zh-CN', label: '简体中文' },
-                              { value: 'zh-TW', label: '香港繁体' },
-                              { value: 'en-US', label: 'English' }
+                              { value: 'zh-CN', label: t('languages.zhCN') },
+                              { value: 'zh-TW', label: t('languages.zhTW') },
+                              { value: 'en-US', label: t('languages.enUS') }
                             ]}
                           />
                         </Form.Item>
                       </Col>
                       <Col span={12}>
-                        <Form.Item name="theme" label="主题风格" initialValue={'light'}>
+                        <Form.Item name="theme" label={t('distributor.themeStyle')} initialValue={'light'}>
                           <Select
                             options={[
-                              { value: 'light', label: '浅色' },
-                              { value: 'dark', label: '深色' }
+                              { value: 'light', label: t('guard.lightTheme') },
+                              { value: 'dark', label: t('guard.darkTheme') }
                             ]}
                           />
                         </Form.Item>
@@ -123,19 +123,19 @@ const AccountSettings: React.FC = () => {
             </Row>
           </Tabs.TabPane>
 
-          <Tabs.TabPane tab="修改密码" key="password">
+          <Tabs.TabPane tab={t('guard.changePassword')} key="password">
             <Row gutter={16}>
               <Col xs={24} lg={12}>
-                <Card title="修改密码" extra={<Button onClick={onChangePassword}>更新密码</Button>}>
+                <Card title={t('guard.changePassword')} extra={<Button onClick={onChangePassword}>{t('guard.updatePassword')}</Button>}>
                   <Form form={form} layout="vertical">
-                    <Form.Item name="oldPassword" label="当前密码" rules={[{ required: true, message: '请输入当前密码' }]}>
-                      <Input.Password placeholder="当前密码" />
+                    <Form.Item name="oldPassword" label={t('distributor.currentPassword')} rules={[{ required: true, message: t('distributor.pleaseEnterCurrentPassword') }]}>
+                      <Input.Password placeholder={t('distributor.currentPasswordPlaceholder')} />
                     </Form.Item>
-                    <Form.Item name="newPassword" label="新密码" rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '至少6位' }]}>
-                      <Input.Password placeholder="新密码" />
+                    <Form.Item name="newPassword" label={t('distributor.newPassword')} rules={[{ required: true, message: t('distributor.pleaseEnterNewPassword') }, { min: 6, message: t('distributor.passwordMinLength') }]}>
+                      <Input.Password placeholder={t('distributor.newPasswordPlaceholder')} />
                     </Form.Item>
-                    <Form.Item name="confirmPassword" label="确认新密码" dependencies={["newPassword"]} rules={[{ required: true, message: '请再次输入新密码' }]}>
-                      <Input.Password placeholder="确认新密码" />
+                    <Form.Item name="confirmPassword" label={t('distributor.confirmNewPassword')} dependencies={["newPassword"]} rules={[{ required: true, message: t('distributor.pleaseEnterNewPasswordAgain') }]}>
+                      <Input.Password placeholder={t('distributor.confirmNewPasswordPlaceholder')} />
                     </Form.Item>
                   </Form>
                 </Card>

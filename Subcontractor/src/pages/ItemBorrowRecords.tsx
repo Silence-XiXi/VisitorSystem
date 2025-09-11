@@ -150,68 +150,68 @@ const ItemBorrowRecords: React.FC = () => {
       : filteredData
     
     if (dataToExport.length === 0) {
-      message.warning('没有数据可导出')
+      message.warning(t('itemBorrowRecords.noDataToExport'))
       return
     }
     
-    const exportType = selectedRowKeys.length > 0 ? '已选' : '全部'
-    message.success(`物品借用记录${exportType}数据Excel文件下载中...`)
+    const exportType = selectedRowKeys.length > 0 ? t('itemBorrowRecords.exportSelected').replace('({count})', '') : t('itemBorrowRecords.exportAll')
+    message.success(t('itemBorrowRecords.exportSuccess').replace('{type}', exportType))
     // 这里应该调用实际的Excel导出API，传入dataToExport
   }
 
   // 表格列定义
   const columns = [
     { 
-      title: '借用日期', 
+      title: t('itemBorrowRecords.borrowDate'), 
       dataIndex: 'borrowDate', 
       key: 'borrowDate', 
       width: 100,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => dayjs(a.borrowDate).unix() - dayjs(b.borrowDate).unix()
     },
     { 
-      title: '工人姓名', 
+      title: t('itemBorrowRecords.workerName'), 
       dataIndex: 'workerName', 
       key: 'workerName', 
       width: 120,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.workerName.localeCompare(b.workerName)
     },
     { 
-      title: '实体卡ID', 
+      title: t('itemBorrowRecords.physicalCardId'), 
       dataIndex: 'physicalCardId', 
       key: 'physicalCardId', 
       width: 120,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.physicalCardId || '').localeCompare(b.physicalCardId || '')
     },
     { 
-      title: '分判商', 
+      title: t('itemBorrowRecords.distributor'), 
       dataIndex: 'distributorName', 
       key: 'distributorName', 
       width: 140,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.distributorName.localeCompare(b.distributorName)
     },
     { 
-      title: '物品类型', 
+      title: t('itemBorrowRecords.itemType'), 
       dataIndex: 'itemType', 
       key: 'itemType', 
       width: 100,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.itemType.localeCompare(b.itemType)
     },
     { 
-      title: '物品编号', 
+      title: t('itemBorrowRecords.itemCode'), 
       dataIndex: 'itemCode', 
       key: 'itemCode', 
       width: 140,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.itemCode.localeCompare(b.itemCode)
     },
     { 
-      title: '借用时间', 
+      title: t('itemBorrowRecords.borrowTime'), 
       dataIndex: 'borrowTime', 
       key: 'borrowTime', 
       width: 100,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.borrowTime.localeCompare(b.borrowTime)
     },
     { 
-      title: '借用经办人', 
+      title: t('itemBorrowRecords.borrowHandler'), 
       dataIndex: 'borrowHandlerName', 
       key: 'borrowHandlerName', 
       width: 120,
@@ -219,7 +219,7 @@ const ItemBorrowRecords: React.FC = () => {
       render: (name: string) => name || '-'
     },
     { 
-      title: '归还时间', 
+      title: t('itemBorrowRecords.returnTime'), 
       dataIndex: 'returnTime', 
       key: 'returnTime', 
       width: 100,
@@ -227,27 +227,27 @@ const ItemBorrowRecords: React.FC = () => {
       render: (time: string) => time || '-'
     },
     { 
-      title: '状态', 
+      title: t('itemBorrowRecords.status'), 
       dataIndex: 'status', 
       key: 'status', 
       width: 100,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.status.localeCompare(b.status),
       render: (status: string) => (
         <Tag color={status === 'returned' ? 'green' : 'orange'}>
-          {status === 'returned' ? '已归还' : '未归还'}
+          {status === 'returned' ? t('itemBorrowRecords.returned') : t('itemBorrowRecords.notReturned')}
         </Tag>
       )
     },
     { 
-      title: '借用时长', 
+      title: t('itemBorrowRecords.borrowDuration'), 
       dataIndex: 'borrowDuration', 
       key: 'borrowDuration', 
       width: 100,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.borrowDuration || 0) - (b.borrowDuration || 0),
-      render: (duration: number) => duration ? `${duration}小时` : '-'
+      render: (duration: number) => duration ? `${duration}${t('itemBorrowRecords.hours')}` : '-'
     },
     {
-      title: '操作',
+      title: t('itemBorrowRecords.actions'),
       key: 'actions',
       width: 100,
       render: (_: any, record: ItemBorrowRecord) => (
@@ -257,7 +257,7 @@ const ItemBorrowRecords: React.FC = () => {
           onClick={() => showDetail(record)}
           size="small"
         >
-          查看详情
+          {t('itemBorrowRecords.viewDetail')}
         </Button>
       )
     }
@@ -269,10 +269,10 @@ const ItemBorrowRecords: React.FC = () => {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>
-            物品借用记录管理
+            {t('itemBorrowRecords.title')}
           </h2>
           <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '14px' }}>
-            查看和管理所有物品借用记录
+            {t('itemBorrowRecords.description')}
           </p>
         </div>
       </div>
@@ -282,9 +282,9 @@ const ItemBorrowRecords: React.FC = () => {
       <Card style={{ marginBottom: 16 }}>
         <Row gutter={16} align="middle">
           <Col xs={24} sm={12} md={4}>
-            <div style={{ marginBottom: 8 }}>搜索</div>
+            <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.search')}</div>
             <Input.Search
-              placeholder="工人姓名、编号、物品编号、经办人"
+              placeholder={t('itemBorrowRecords.searchPlaceholder')}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               onSearch={setSearchKeyword}
@@ -294,9 +294,9 @@ const ItemBorrowRecords: React.FC = () => {
             />
           </Col>
           <Col xs={24} sm={12} md={4}>
-            <div style={{ marginBottom: 8 }}>分判商</div>
+            <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.distributor')}</div>
             <Select
-              placeholder="全部分判商"
+              placeholder={t('itemBorrowRecords.allDistributors')}
               value={selectedDistributor}
               onChange={setSelectedDistributor}
               style={{ width: '100%' }}
@@ -310,9 +310,9 @@ const ItemBorrowRecords: React.FC = () => {
             </Select>
           </Col>
           <Col xs={24} sm={12} md={4}>
-            <div style={{ marginBottom: 8 }}>物品类型</div>
+            <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.itemType')}</div>
             <Select
-              placeholder="全部类型"
+              placeholder={t('itemBorrowRecords.allTypes')}
               value={selectedItemType}
               onChange={setSelectedItemType}
               style={{ width: '100%' }}
@@ -326,36 +326,36 @@ const ItemBorrowRecords: React.FC = () => {
             </Select>
           </Col>
           <Col xs={24} sm={12} md={4}>
-            <div style={{ marginBottom: 8 }}>状态</div>
+            <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.status')}</div>
             <Select
-              placeholder="全部状态"
+              placeholder={t('itemBorrowRecords.allStatus')}
               value={selectedStatus}
               onChange={setSelectedStatus}
               style={{ width: '100%' }}
               allowClear
             >
-              <Select.Option value="borrowed">未归还</Select.Option>
-              <Select.Option value="returned">已归还</Select.Option>
+              <Select.Option value="borrowed">{t('itemBorrowRecords.notReturned')}</Select.Option>
+              <Select.Option value="returned">{t('itemBorrowRecords.returned')}</Select.Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={4}>
-            <div style={{ marginBottom: 8 }}>借用日期</div>
+            <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.borrowDate')}</div>
             <DatePicker.RangePicker
               value={dateRange}
               onChange={(dates) => setDateRange(dates)}
               style={{ width: '100%' }}
-              placeholder={['开始日期', '结束日期']}
+              placeholder={[t('itemBorrowRecords.startDate'), t('itemBorrowRecords.endDate')]}
             />
           </Col>
           <Col xs={24} sm={12} md={4}>
-            <div style={{ marginBottom: 8 }}>操作</div>
+            <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.actions')}</div>
             <Space>
               <Button 
                 type="primary" 
                 icon={<DownloadOutlined />} 
                 onClick={exportToExcel}
               >
-                {selectedRowKeys.length > 0 ? `导出已选(${selectedRowKeys.length})` : '导出全部'}
+                {selectedRowKeys.length > 0 ? t('itemBorrowRecords.exportSelected').replace('{count}', selectedRowKeys.length.toString()) : t('itemBorrowRecords.exportAll')}
               </Button>
             </Space>
           </Col>
@@ -378,7 +378,7 @@ const ItemBorrowRecords: React.FC = () => {
             pageSize: 20,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`
+            showTotal: (total, range) => t('itemBorrowRecords.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString())
           }}
           scroll={{ x: 1400 }}
           size="small"
@@ -387,12 +387,12 @@ const ItemBorrowRecords: React.FC = () => {
 
       {/* 详情弹窗 */}
       <Modal
-        title={`物品借用详情 - ${selectedRecord?.itemCode}`}
+        title={t('itemBorrowRecords.detailTitle').replace('{itemCode}', selectedRecord?.itemCode || '')}
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setDetailModalVisible(false)}>
-            关闭
+            {t('itemBorrowRecords.close')}
           </Button>
         ]}
         width={600}
@@ -402,16 +402,16 @@ const ItemBorrowRecords: React.FC = () => {
             <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
               <Row gutter={16}>
                 <Col span={12}>
-                  <strong>工人姓名：</strong>{selectedRecord.workerName}
+                  <strong>{t('itemBorrowRecords.workerNameLabel')}</strong>{selectedRecord.workerName}
                 </Col>
                 <Col span={12}>
-                  <strong>工人编号：</strong>{selectedRecord.workerId}
+                  <strong>{t('itemBorrowRecords.workerIdLabel')}</strong>{selectedRecord.workerId}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>分判商：</strong>{selectedRecord.distributorName}
+                  <strong>{t('itemBorrowRecords.distributorLabel')}</strong>{selectedRecord.distributorName}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>工地：</strong>{selectedRecord.siteName}
+                  <strong>{t('itemBorrowRecords.siteLabel')}</strong>{selectedRecord.siteName}
                 </Col>
               </Row>
             </div>
@@ -419,39 +419,39 @@ const ItemBorrowRecords: React.FC = () => {
             <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
               <Row gutter={16}>
                 <Col span={12}>
-                  <strong>物品编号：</strong>{selectedRecord.itemCode}
+                  <strong>{t('itemBorrowRecords.itemCodeLabel')}</strong>{selectedRecord.itemCode}
                 </Col>
                 <Col span={12}>
-                  <strong>物品类型：</strong>{selectedRecord.itemType}
+                  <strong>{t('itemBorrowRecords.itemTypeLabel')}</strong>{selectedRecord.itemType}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>借用日期：</strong>{selectedRecord.borrowDate}
+                  <strong>{t('itemBorrowRecords.borrowDateLabel')}</strong>{selectedRecord.borrowDate}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>借用时间：</strong>{selectedRecord.borrowTime}
+                  <strong>{t('itemBorrowRecords.borrowTimeLabel')}</strong>{selectedRecord.borrowTime}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>借用经办人：</strong>{selectedRecord.borrowHandlerName || '未指定'}
+                  <strong>{t('itemBorrowRecords.borrowHandlerLabel')}</strong>{selectedRecord.borrowHandlerName || t('itemBorrowRecords.notSpecified')}
                 </Col>
                 {selectedRecord.returnDate && (
                   <>
                     <Col span={12} style={{ marginTop: 8 }}>
-                      <strong>归还日期：</strong>{selectedRecord.returnDate}
+                      <strong>{t('itemBorrowRecords.returnDateLabel')}</strong>{selectedRecord.returnDate}
                     </Col>
                     <Col span={12} style={{ marginTop: 8 }}>
-                      <strong>归还时间：</strong>{selectedRecord.returnTime}
+                      <strong>{t('itemBorrowRecords.returnTimeLabel')}</strong>{selectedRecord.returnTime}
                     </Col>
                   </>
                 )}
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>状态：</strong>
+                  <strong>{t('itemBorrowRecords.statusLabel')}</strong>
                   <Tag color={selectedRecord.status === 'returned' ? 'green' : 'orange'} style={{ marginLeft: 8 }}>
-                    {selectedRecord.status === 'returned' ? '已归还' : '未归还'}
+                    {selectedRecord.status === 'returned' ? t('itemBorrowRecords.returned') : t('itemBorrowRecords.notReturned')}
                   </Tag>
                 </Col>
                 {selectedRecord.borrowDuration && (
                   <Col span={12} style={{ marginTop: 8 }}>
-                    <strong>借用时长：</strong>{selectedRecord.borrowDuration}小时
+                    <strong>{t('itemBorrowRecords.borrowDurationLabel')}</strong>{selectedRecord.borrowDuration}{t('itemBorrowRecords.hours')}
                   </Col>
                 )}
               </Row>

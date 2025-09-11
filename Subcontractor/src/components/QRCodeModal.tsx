@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Modal, Button, message, Spin, Typography, Space, Tag } from 'antd';
 import { DownloadOutlined, CopyOutlined, QrcodeOutlined } from '@ant-design/icons';
 import { Worker } from '../types/worker';
+import { useLocale } from '../contexts/LocaleContext';
 import QRCode from 'qrcode';
 
 const { Title, Text } = Typography;
@@ -17,17 +18,12 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   visible,
   onClose
 }) => {
+  const { t } = useLocale();
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [qrCodeText, setQrCodeText] = useState<string>('');
 
-  useEffect(() => {
-    if (visible && worker) {
-      generateQRCode();
-    }
-  }, [visible, worker]);
-
-  const generateQRCode = async () => {
+  const generateQRCode = useCallback(async () => {
     if (!worker) return;
     
     setLoading(true);
@@ -57,12 +53,18 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
       
       setQrCodeDataUrl(dataUrl);
     } catch (error) {
-      message.error('生成二维码失败！');
+      message.error(t('qrcode.generateFailed'));
       console.error('QR Code generation error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [worker, t]);
+
+  useEffect(() => {
+    if (visible && worker) {
+      generateQRCode();
+    }
+  }, [visible, worker, generateQRCode]);
 
   const handleDownload = () => {
     if (!qrCodeDataUrl) return;
@@ -73,15 +75,15 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    message.success('二维码下载成功！');
+    message.success(t('qrcode.downloadSuccess'));
   };
 
   const handleCopyText = async () => {
     try {
       await navigator.clipboard.writeText(qrCodeText);
-      message.success('二维码数据已复制到剪贴板！');
+      message.success(t('qrcode.copyDataSuccess'));
     } catch (error) {
-      message.error('复制失败，请手动复制！');
+      message.error(t('qrcode.copyFailed'));
     }
   };
 
@@ -94,9 +96,9 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
           [blob.type]: blob
         })
       ]);
-      message.success('二维码图片已复制到剪贴板！');
+      message.success(t('qrcode.copyImageSuccess'));
     } catch (error) {
-      message.error('复制图片失败！');
+      message.error(t('qrcode.copyImageFailed'));
     }
   };
 
@@ -107,14 +109,14 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
       title={
         <Space>
           <QrcodeOutlined />
-          <span>工人二维码 - {worker.name}</span>
+          <span>{t('qrcode.workerQRCode')} - {worker.name}</span>
         </Space>
       }
       open={visible}
       onCancel={onClose}
       footer={[
         <Button key="close" onClick={onClose}>
-          关闭
+          {t('qrcode.close')}
         </Button>
       ]}
       width={600}
@@ -124,11 +126,11 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
         <div style={{ marginBottom: '20px' }}>
           <Title level={4}>{worker.name}</Title>
           <Space direction="vertical" size="small">
-            <Text>工人编号：{worker.workerId}</Text>
-            <Text>身份证号：{worker.idCard}</Text>
-            <Text>联系电话：{worker.phone}</Text>
-            <Text>状态：<Tag color={worker.status === 'active' ? 'green' : 'red'}>
-              {worker.status === 'active' ? '在职' : worker.status === 'inactive' ? '离职' : '暂停'}
+            <Text>{t('qrcode.workerId')}：{worker.workerId}</Text>
+            <Text>{t('qrcode.idCard')}：{worker.idCard}</Text>
+            <Text>{t('qrcode.contactPhone')}：{worker.phone}</Text>
+            <Text>{t('qrcode.status')}：<Tag color={worker.status === 'active' ? 'green' : 'red'}>
+              {worker.status === 'active' ? t('qrcode.active') : worker.status === 'inactive' ? t('qrcode.inactive') : t('qrcode.suspended')}
             </Tag></Text>
           </Space>
         </div>
@@ -136,14 +138,14 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
         {loading ? (
           <div style={{ padding: '40px' }}>
             <Spin size="large" />
-            <div style={{ marginTop: '16px' }}>正在生成二维码...</div>
+            <div style={{ marginTop: '16px' }}>{t('qrcode.generateQR')}</div>
           </div>
         ) : qrCodeDataUrl ? (
           <div>
             <div style={{ marginBottom: '20px' }}>
               <img
                 src={qrCodeDataUrl}
-                alt="工人二维码"
+                alt={t('qrcode.qrCodeAlt')}
                 style={{
                   maxWidth: '100%',
                   height: 'auto',
@@ -159,35 +161,35 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                 icon={<DownloadOutlined />}
                 onClick={handleDownload}
               >
-                下载二维码
+                {t('qrcode.downloadQR')}
               </Button>
               <Button
                 icon={<CopyOutlined />}
                 onClick={handleCopyText}
               >
-                复制数据
+                {t('qrcode.copyData')}
               </Button>
               <Button
                 icon={<CopyOutlined />}
                 onClick={handleCopyImage}
               >
-                复制图片
+                {t('qrcode.copyImage')}
               </Button>
             </Space>
             
             <div style={{ marginTop: '20px', textAlign: 'left' }}>
               <Text type="secondary">
-                <strong>二维码说明：</strong><br />
-                • 此二维码包含工人的基本信息<br />
-                • 门卫可通过扫描此二维码进行签到登记<br />
-                • 二维码数据已加密，确保信息安全<br />
-                • 建议定期更新二维码以确保安全性
+                <strong>{t('qrcode.qrDescription')}：</strong><br />
+                {t('qrcode.qrDescription1')}<br />
+                {t('qrcode.qrDescription2')}<br />
+                {t('qrcode.qrDescription3')}<br />
+                {t('qrcode.qrDescription4')}
               </Text>
             </div>
           </div>
         ) : (
           <div style={{ padding: '40px', color: '#999' }}>
-            二维码生成失败
+            {t('qrcode.qrCodeGenerationFailed')}
           </div>
         )}
       </div>
