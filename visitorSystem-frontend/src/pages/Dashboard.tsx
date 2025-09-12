@@ -24,7 +24,6 @@ import ItemBorrowRecords from './ItemBorrowRecords'
 import AccountSettings from './AccountSettings'
 
 import Reports from './Reports'
-import { mockSites } from '../data/mockData'
 import dayjs from 'dayjs'
 
 const { Header, Sider, Content } = Layout
@@ -37,7 +36,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { t, locale } = useLocale()
-  const { selectedSiteId, setSelectedSiteId } = useSiteFilter()
+  const { selectedSiteId, setSelectedSiteId, sites, loading } = useSiteFilter()
 
   // 根据语言格式化时间
   const formatTime = (time: dayjs.Dayjs) => {
@@ -298,7 +297,8 @@ const Dashboard: React.FC = () => {
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
-                options={mockSites.map(site => ({
+                loading={loading}
+                options={sites.map(site => ({
                   value: site.id,
                   label: site.name
                 }))}
@@ -324,7 +324,7 @@ const Dashboard: React.FC = () => {
                   textOverflow: 'ellipsis',
                   maxWidth: '80px'
                 }}>
-                  ({user?.role === 'admin' ? t('common.admin') : user?.role === 'subcontractor' ? t('common.subcontractor') : user?.role ? t(`common.${user.role}`) : t('common.unknownRole')})
+                  ({user?.role === 'admin' ? t('common.roleAdmin') : user?.role === 'subcontractor' ? t('common.subcontractor') : user?.role ? t(`common.${user.role}`) : t('common.unknownRole')})
                 </span>
               </Space>
             </Dropdown>

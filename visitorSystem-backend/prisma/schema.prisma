@@ -30,6 +30,7 @@ model User {
 // 分判商表
 model Distributor {
   id            String   @id @default(cuid()) // 分判商唯一标识
+  distributorId String   @unique // 分判商编号（业务唯一）
   name          String // 分判商公司名称
   contactName   String? // 联系人姓名
   phone         String? // 联系电话

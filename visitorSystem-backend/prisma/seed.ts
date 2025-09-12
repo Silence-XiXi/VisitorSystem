@@ -38,6 +38,7 @@ async function main() {
     where: { userId: distributorUser.id },
     update: {},
     create: {
+      distributorId: 'D1234567',
       name: '北京建筑公司',
       contactName: '刘强',
       phone: '010-88888888',

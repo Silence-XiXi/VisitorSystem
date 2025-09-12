@@ -58,37 +58,57 @@ export const useAuth = () => {
   }
 
   useEffect(() => {
-    // 检查本地存储中是否有用户信息和token
-    const storedUser = localStorage.getItem('user')
-    const storedToken = localStorage.getItem('access_token')
-    
-    if (storedUser && storedToken) {
-      try {
-        const userData = JSON.parse(storedUser)
-        setUser(userData)
-        setIsAuthenticated(true)
-        
-        // 验证token是否仍然有效
-        apiService.getProfile()
-          .then((profile) => {
+    const validateAuth = async () => {
+      console.log('useAuth: Starting authentication validation')
+      
+      // 检查本地存储中是否有用户信息和token
+      const storedUser = localStorage.getItem('user')
+      const storedToken = localStorage.getItem('access_token')
+      
+      console.log('useAuth: Stored user exists:', !!storedUser, 'Stored token exists:', !!storedToken)
+      
+      if (storedUser && storedToken) {
+        try {
+          const userData = JSON.parse(storedUser)
+          console.log('useAuth: Parsed user data:', userData)
+          setUser(userData)
+          setIsAuthenticated(true)
+          
+          // 验证token是否仍然有效
+          try {
+            console.log('useAuth: Validating token with server...')
+            const profile = await apiService.getProfile()
+            console.log('useAuth: Token validation successful, profile:', profile)
             // Token有效，更新用户信息
             setUser(profile)
             localStorage.setItem('user', JSON.stringify(profile))
-          })
-          .catch(() => {
+          } catch (error) {
+            console.log('useAuth: Token validation failed:', error)
             // Token无效，清除本地存储
             localStorage.removeItem('user')
             localStorage.removeItem('access_token')
             setUser(null)
             setIsAuthenticated(false)
-          })
-      } catch (error) {
-        console.error('Error parsing stored user data:', error)
-        localStorage.removeItem('user')
-        localStorage.removeItem('access_token')
+          }
+        } catch (error) {
+          console.error('useAuth: Error parsing stored user data:', error)
+          localStorage.removeItem('user')
+          localStorage.removeItem('access_token')
+          setUser(null)
+          setIsAuthenticated(false)
+        }
+      } else {
+        console.log('useAuth: No stored authentication data')
+        // 没有存储的认证信息
+        setUser(null)
+        setIsAuthenticated(false)
       }
+      
+      console.log('useAuth: Authentication validation complete, isLoading set to false')
+      setIsLoading(false)
     }
-    setIsLoading(false)
+
+    validateAuth()
   }, [])
 
   const login = async (username: string, password: string): Promise<{ success: boolean; role?: string; error?: string; errorCode?: number }> => {

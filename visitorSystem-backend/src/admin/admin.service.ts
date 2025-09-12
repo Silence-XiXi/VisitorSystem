@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as bcrypt from 'bcryptjs';
@@ -53,7 +53,7 @@ export class AdminService {
       throw new ForbiddenException('只有管理员可以访问所有分销商');
     }
 
-    return this.prisma.distributor.findMany({
+    const distributors = await this.prisma.distributor.findMany({
       include: {
         user: {
           select: {
@@ -78,6 +78,12 @@ export class AdminService {
         createdAt: 'desc'
       }
     });
+
+    // 转换数据格式以匹配前端期望
+    return distributors.map(distributor => ({
+      ...distributor,
+      siteIds: distributor.sites.map(sd => sd.siteId)
+    }));
   }
 
   // 获取所有工地列表
@@ -168,6 +174,54 @@ export class AdminService {
       throw new ForbiddenException('只有管理员可以创建分销商');
     }
 
+    console.log('创建分判商数据:', JSON.stringify(distributorData, null, 2));
+
+    // 数据验证
+    if (!distributorData.name || !distributorData.name.trim()) {
+      throw new BadRequestException('分判商名称不能为空');
+    }
+
+    if (!distributorData.username || !distributorData.username.trim()) {
+      throw new BadRequestException('用户名不能为空');
+    }
+
+    if (!distributorData.password || distributorData.password.length < 6) {
+      throw new BadRequestException('密码长度不能少于6位');
+    }
+
+    // 验证服务工地不能为空
+    if (!distributorData.siteIds || !Array.isArray(distributorData.siteIds) || distributorData.siteIds.length === 0) {
+      throw new BadRequestException('服务工地不能为空，请至少选择一个工地');
+    }
+
+    // 自动生成分判商编号
+    const distributorId = await this.generateDistributorId();
+
+    // 检查用户名是否已存在
+    const existingUser = await this.prisma.user.findUnique({
+      where: { username: distributorData.username }
+    });
+
+    if (existingUser) {
+      throw new ConflictException('用户名已存在');
+    }
+
+    const { siteIds = [], ...distributorInfo } = distributorData;
+    
+    // 确保siteIds是数组
+    const validSiteIds = Array.isArray(siteIds) ? siteIds : [];
+
+    // 验证工地ID是否有效
+    if (validSiteIds.length > 0) {
+      const existingSites = await this.prisma.site.findMany({
+        where: { id: { in: validSiteIds } }
+      });
+      
+      if (existingSites.length !== validSiteIds.length) {
+        throw new BadRequestException('部分工地ID无效');
+      }
+    }
+
     // 加密密码
     const hashedPassword = await bcrypt.hash(distributorData.password, 10);
 
@@ -182,8 +236,9 @@ export class AdminService {
     });
 
     // 创建分销商
-    return this.prisma.distributor.create({
+    const newDistributor = await this.prisma.distributor.create({
       data: {
+        distributorId: distributorId,
         name: distributorData.name,
         contactName: distributorData.contactName,
         phone: distributorData.phone,
@@ -200,6 +255,219 @@ export class AdminService {
         }
       }
     });
+
+    // 如果有关联的工地，创建关联关系
+    if (validSiteIds && validSiteIds.length > 0) {
+      try {
+        console.log('创建工地关联关系:', validSiteIds);
+        
+        const siteDistributorData = validSiteIds.map((siteId: string) => ({
+          siteId,
+          distributorId: newDistributor.id
+        }));
+
+        await this.prisma.siteDistributor.createMany({
+          data: siteDistributorData
+        });
+
+        console.log('工地关联关系创建成功');
+
+        // 重新查询以包含关联的工地
+        const distributorWithSites = await this.prisma.distributor.findUnique({
+          where: { id: newDistributor.id },
+          include: {
+            user: {
+              select: {
+                username: true,
+                status: true
+              }
+            },
+            sites: {
+              include: {
+                site: true
+              }
+            }
+          }
+        });
+
+        // 转换数据格式以匹配前端期望
+        return {
+          ...distributorWithSites,
+          siteIds: distributorWithSites.sites.map(sd => sd.siteId)
+        };
+      } catch (error) {
+        console.error('创建工地关联关系失败:', error);
+        // 即使关联关系创建失败，也返回分判商数据
+        return newDistributor;
+      }
+    }
+
+    return newDistributor;
+  }
+
+  // 更新分判商
+  async updateDistributor(user: CurrentUser, distributorId: string, distributorData: any) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以更新分判商');
+    }
+
+    // 检查分判商是否存在
+    const existingDistributor = await this.prisma.distributor.findUnique({
+      where: { id: distributorId },
+      include: { user: true }
+    });
+
+    if (!existingDistributor) {
+      throw new BadRequestException('分判商不存在');
+    }
+
+    const { siteIds = [], username, ...updateData } = distributorData;
+    
+    // 确保siteIds是数组
+    const validSiteIds = Array.isArray(siteIds) ? siteIds : [];
+
+    // 验证工地ID是否有效
+    if (validSiteIds.length > 0) {
+      const existingSites = await this.prisma.site.findMany({
+        where: { id: { in: validSiteIds } }
+      });
+      
+      if (existingSites.length !== validSiteIds.length) {
+        throw new BadRequestException('部分工地ID无效');
+      }
+    }
+
+    // 如果提供了新用户名，检查是否已存在
+    if (username && username !== existingDistributor.user.username) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { username: username }
+      });
+      
+      if (existingUser) {
+        throw new ConflictException('用户名已存在');
+      }
+    }
+
+    // 更新分判商基本信息和用户名
+    const updatePromises = [];
+    
+    // 更新分判商基本信息
+    const distributorUpdate = this.prisma.distributor.update({
+      where: { id: distributorId },
+      data: {
+        name: updateData.name,
+        contactName: updateData.contactName,
+        phone: updateData.phone,
+        email: updateData.email,
+        whatsapp: updateData.whatsapp
+      }
+    });
+    updatePromises.push(distributorUpdate);
+    
+    // 如果提供了新用户名，更新用户表中的用户名
+    if (username && username !== existingDistributor.user.username) {
+      const userUpdate = this.prisma.user.update({
+        where: { id: existingDistributor.userId },
+        data: { username: username }
+      });
+      updatePromises.push(userUpdate);
+    }
+    
+    // 等待所有更新完成
+    await Promise.all(updatePromises);
+    
+    // 获取更新后的完整数据
+    const updatedDistributor = await this.prisma.distributor.findUnique({
+      where: { id: distributorId },
+      include: {
+        user: {
+          select: {
+            username: true,
+            status: true,
+            createdAt: true
+          }
+        },
+        sites: {
+          include: {
+            site: true
+          }
+        }
+      }
+    });
+
+    // 更新工地关联关系
+    if (validSiteIds.length >= 0) {
+      // 删除现有关联关系
+      await this.prisma.siteDistributor.deleteMany({
+        where: { distributorId: distributorId }
+      });
+
+      // 创建新的关联关系
+      if (validSiteIds.length > 0) {
+        await this.prisma.siteDistributor.createMany({
+          data: validSiteIds.map(siteId => ({
+            siteId: siteId,
+            distributorId: distributorId
+          }))
+        });
+      }
+    }
+
+    // 转换数据格式以匹配前端期望
+    return {
+      ...updatedDistributor,
+      siteIds: validSiteIds
+    };
+  }
+
+  // 生成唯一的分判商编号
+  private async generateDistributorId(): Promise<string> {
+    let distributorId: string;
+    let isUnique = false;
+    
+    while (!isUnique) {
+      // 生成D开头的8位随机编号（包含数字和字母）
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let randomPart = '';
+      for (let i = 0; i < 7; i++) {
+        randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      distributorId = `D${randomPart}`;
+      
+      // 检查编号是否已存在
+      const existingDistributor = await this.prisma.distributor.findUnique({
+        where: { distributorId: distributorId }
+      });
+      
+      if (!existingDistributor) {
+        isUnique = true;
+      }
+    }
+    
+    return distributorId;
+  }
+
+  // 生成唯一的门卫编号
+  private async generateGuardId(): Promise<string> {
+    let guardId: string;
+    let isUnique = false;
+    
+    while (!isUnique) {
+      // 生成G开头的6位随机编号
+      const randomNumber = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+      guardId = `G${randomNumber}`;
+      
+      // 检查编号是否已存在
+      const existingGuard = await this.prisma.guard.findUnique({
+        where: { guardId: guardId }
+      });
+      
+      if (!existingGuard) {
+        isUnique = true;
+      }
+    }
+    
+    return guardId;
   }
 
   // 创建门卫
@@ -207,6 +475,9 @@ export class AdminService {
     if (user.role !== 'ADMIN') {
       throw new ForbiddenException('只有管理员可以创建门卫');
     }
+
+    // 自动生成门卫编号
+    const guardId = await this.generateGuardId();
 
     // 加密密码
     const hashedPassword = await bcrypt.hash(guardData.password, 10);
@@ -224,7 +495,7 @@ export class AdminService {
     // 创建门卫
     return this.prisma.guard.create({
       data: {
-        guardId: guardData.guardId,
+        guardId: guardId,
         name: guardData.name,
         siteId: guardData.siteId,
         phone: guardData.phone,
@@ -250,6 +521,20 @@ export class AdminService {
       throw new ForbiddenException('只有管理员可以更新用户状态');
     }
 
+    // 验证状态值
+    if (!['ACTIVE', 'DISABLED'].includes(status)) {
+      throw new BadRequestException('无效的状态值，只允许 ACTIVE 或 DISABLED');
+    }
+
+    // 检查用户是否存在
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!existingUser) {
+      throw new BadRequestException('用户不存在');
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
       data: { status: status as any },
@@ -272,6 +557,357 @@ export class AdminService {
       message: '系统日志功能待实现',
       lastLogin: new Date().toISOString(),
       systemUptime: '系统运行正常'
+    };
+  }
+
+  // 创建工地
+  async createSite(user: CurrentUser, siteData: any) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以创建工地');
+    }
+
+    const { name, address, code, manager, phone, status = 'ACTIVE', distributorIds = [] } = siteData;
+
+    // 验证必填字段
+    if (!name || !address) {
+      throw new BadRequestException('工地名称和地址为必填项');
+    }
+
+    // 检查工地代码是否已存在（如果提供了代码）
+    if (code) {
+      const existingSite = await this.prisma.site.findUnique({
+        where: { code }
+      });
+      if (existingSite) {
+        throw new ConflictException('工地代码已存在');
+      }
+    }
+
+    // 创建工地
+    const site = await this.prisma.site.create({
+      data: {
+        name,
+        address,
+        code,
+        manager,
+        phone,
+        status: status.toUpperCase() as any, // 转换为大写以匹配枚举
+      },
+      include: {
+        distributors: {
+          include: {
+            distributor: true
+          }
+        },
+        guards: true,
+        workers: {
+          select: {
+            id: true,
+            status: true
+          }
+        }
+      }
+    });
+
+    // 如果有关联的分判商，创建关联关系
+    if (distributorIds && distributorIds.length > 0) {
+      const siteDistributorData = distributorIds.map((distributorId: string) => ({
+        siteId: site.id,
+        distributorId
+      }));
+
+      await this.prisma.siteDistributor.createMany({
+        data: siteDistributorData
+      });
+
+      // 重新查询以包含关联的分判商
+      return this.prisma.site.findUnique({
+        where: { id: site.id },
+        include: {
+          distributors: {
+            include: {
+              distributor: true
+            }
+          },
+          guards: true,
+          workers: {
+            select: {
+              id: true,
+              status: true
+            }
+          }
+        }
+      });
+    }
+
+    return site;
+  }
+
+  // 重置分判商密码
+  async resetDistributorPassword(user: CurrentUser, distributorId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以重置分判商密码');
+    }
+
+    // 查找分判商
+    const distributor = await this.prisma.distributor.findUnique({
+      where: { id: distributorId },
+      include: { user: true }
+    });
+
+    if (!distributor) {
+      throw new BadRequestException('分判商不存在');
+    }
+
+    if (!distributor.user) {
+      throw new BadRequestException('分判商没有关联的用户账号');
+    }
+
+    // 生成新密码（默认密码）
+    const newPassword = 'Pass@123';
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // 更新用户密码
+    const updatedUser = await this.prisma.user.update({
+      where: { id: distributor.userId },
+      data: { password: hashedPassword }
+    });
+
+    return {
+      distributorId: distributor.id,
+      distributorName: distributor.name,
+      username: distributor.user.username,
+      newPassword: newPassword
+    };
+  }
+
+  // 重置门卫密码
+  async resetGuardPassword(user: CurrentUser, guardId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以重置门卫密码');
+    }
+
+    // 查找门卫
+    const guard = await this.prisma.guard.findUnique({
+      where: { id: guardId },
+      include: { user: true }
+    });
+
+    if (!guard) {
+      throw new BadRequestException('门卫不存在');
+    }
+
+    if (!guard.user) {
+      throw new BadRequestException('门卫没有关联的用户账号');
+    }
+
+    // 生成新密码（默认密码）
+    const newPassword = 'Pass@123';
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // 更新用户密码
+    const updatedUser = await this.prisma.user.update({
+      where: { id: guard.userId },
+      data: { password: hashedPassword }
+    });
+
+    return {
+      guardId: guard.id,
+      guardName: guard.name,
+      username: guard.user.username,
+      newPassword: newPassword
+    };
+  }
+
+  // 更新门卫信息
+  async updateGuard(user: CurrentUser, guardId: string, guardData: any) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以更新门卫');
+    }
+
+    // 查找门卫
+    const existingGuard = await this.prisma.guard.findUnique({
+      where: { id: guardId },
+      include: { user: true }
+    });
+
+    if (!existingGuard) {
+      throw new BadRequestException('门卫不存在');
+    }
+
+    const { username, ...updateData } = guardData;
+
+    // 如果提供了新用户名，检查是否已存在
+    if (username && username !== existingGuard.user.username) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { username: username }
+      });
+      
+      if (existingUser) {
+        throw new ConflictException('用户名已存在');
+      }
+    }
+
+    // 更新门卫基本信息和用户名
+    const updatePromises = [];
+    
+    // 更新门卫基本信息
+    const guardUpdate = this.prisma.guard.update({
+      where: { id: guardId },
+      data: {
+        name: updateData.name,
+        phone: updateData.phone,
+        email: updateData.email,
+        whatsapp: updateData.whatsapp,
+        siteId: updateData.siteId
+      }
+    });
+    updatePromises.push(guardUpdate);
+    
+    // 如果提供了新用户名，更新用户表中的用户名
+    if (username && username !== existingGuard.user.username) {
+      const userUpdate = this.prisma.user.update({
+        where: { id: existingGuard.userId },
+        data: { username: username }
+      });
+      updatePromises.push(userUpdate);
+    }
+    
+    // 等待所有更新完成
+    await Promise.all(updatePromises);
+    
+    // 获取更新后的完整数据
+    const updatedGuard = await this.prisma.guard.findUnique({
+      where: { id: guardId },
+      include: {
+        user: {
+          select: {
+            username: true,
+            status: true,
+            createdAt: true
+          }
+        },
+        site: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    return {
+      ...updatedGuard,
+      userId: updatedGuard.userId
+    };
+  }
+
+  // 删除门卫
+  async deleteGuard(user: CurrentUser, guardId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以删除门卫');
+    }
+
+    // 查找门卫
+    const guard = await this.prisma.guard.findUnique({
+      where: { id: guardId },
+      include: { user: true }
+    });
+
+    if (!guard) {
+      throw new BadRequestException('门卫不存在');
+    }
+
+    // 使用事务确保数据一致性
+    await this.prisma.$transaction(async (prisma) => {
+      // 先删除门卫记录
+      await prisma.guard.delete({
+        where: { id: guardId }
+      });
+      
+      // 再删除关联的用户账户
+      await prisma.user.delete({
+        where: { id: guard.userId }
+      });
+    });
+
+    return {
+      guardId: guard.id,
+      guardName: guard.name,
+      username: guard.user.username
+    };
+  }
+
+  // 删除分判商
+  async deleteDistributor(user: CurrentUser, distributorId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以删除分判商');
+    }
+
+    // 查找分判商
+    const distributor = await this.prisma.distributor.findUnique({
+      where: { id: distributorId },
+      include: { user: true }
+    });
+
+    if (!distributor) {
+      throw new BadRequestException('分判商不存在');
+    }
+
+    // 使用事务确保数据一致性
+    await this.prisma.$transaction(async (prisma) => {
+      // 先删除分判商记录
+      await prisma.distributor.delete({
+        where: { id: distributorId }
+      });
+      
+      // 再删除关联的用户账户
+      await prisma.user.delete({
+        where: { id: distributor.userId }
+      });
+    });
+
+    return {
+      distributorId: distributor.id,
+      distributorName: distributor.name,
+      username: distributor.user.username
+    };
+  }
+
+  // 切换门卫账户状态
+  async toggleGuardStatus(user: CurrentUser, guardId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以切换门卫状态');
+    }
+
+    // 查找门卫
+    const guard = await this.prisma.guard.findUnique({
+      where: { id: guardId },
+      include: { user: true }
+    });
+
+    if (!guard) {
+      throw new BadRequestException('门卫不存在');
+    }
+
+    if (!guard.user) {
+      throw new BadRequestException('门卫没有关联的用户账号');
+    }
+
+    // 切换状态
+    const newStatus = guard.user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    
+    const updatedUser = await this.prisma.user.update({
+      where: { id: guard.userId },
+      data: { status: newStatus }
+    });
+
+    return {
+      guardId: guard.id,
+      guardName: guard.name,
+      username: guard.user.username,
+      oldStatus: guard.user.status,
+      newStatus: newStatus
     };
   }
 }

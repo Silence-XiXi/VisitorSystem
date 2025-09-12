@@ -43,6 +43,7 @@ export interface UpdateWorkerRequest extends Partial<CreateWorkerRequest> {
 
 export interface Distributor {
   id: string;
+  distributorId: string; // 分判商编号
   name: string;
   siteIds?: string[]; // 服务的工地ID列表（多对多关系）
   contactName?: string; // 联系人
@@ -51,6 +52,7 @@ export interface Distributor {
   whatsapp?: string; // WhatsApp号码
   accountUsername?: string; // 账号
   accountStatus?: 'active' | 'disabled'; // 账号状态
+  userId?: string; // 关联的用户ID
 }
 
 export interface Site {
@@ -76,6 +78,7 @@ export interface Guard {
   accountStatus?: 'active' | 'disabled'; // 账号状态
   createdAt: string;
   updatedAt: string;
+  userId?: string; // 关联的用户ID
 }
 
 export interface CreateGuardRequest {

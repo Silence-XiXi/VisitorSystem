@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -76,6 +76,20 @@ export class AdminController {
     return this.adminService.createDistributor(user, distributorData);
   }
 
+  @Put('distributors/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '更新分销商' })
+  @ApiResponse({ status: 200, description: '更新成功' })
+  @ApiResponse({ status: 404, description: '分销商不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async updateDistributor(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') distributorId: string,
+    @Body() distributorData: any
+  ) {
+    return this.adminService.updateDistributor(user, distributorId, distributorData);
+  }
+
   @Post('guards')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: '创建门卫' })
@@ -86,6 +100,18 @@ export class AdminController {
     @Body() guardData: any
   ) {
     return this.adminService.createGuard(user, guardData);
+  }
+
+  @Post('sites')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '创建工地' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async createSite(
+    @GetCurrentUser() user: CurrentUser,
+    @Body() siteData: any
+  ) {
+    return this.adminService.createSite(user, siteData);
   }
 
   @Put('users/:id/status')
@@ -107,5 +133,86 @@ export class AdminController {
   @ApiResponse({ status: 200, description: '获取成功' })
   async getSystemLogs(@GetCurrentUser() user: CurrentUser) {
     return this.adminService.getSystemLogs(user);
+  }
+
+  @Post('distributors/:id/reset-password')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '重置分判商密码' })
+  @ApiResponse({ status: 200, description: '重置成功' })
+  @ApiResponse({ status: 404, description: '分判商不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async resetDistributorPassword(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') distributorId: string
+  ) {
+    return this.adminService.resetDistributorPassword(user, distributorId);
+  }
+
+  @Post('guards/:id/reset-password')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '重置门卫密码' })
+  @ApiResponse({ status: 200, description: '重置成功' })
+  @ApiResponse({ status: 404, description: '门卫不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async resetGuardPassword(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') guardId: string
+  ) {
+    return this.adminService.resetGuardPassword(user, guardId);
+  }
+
+  @Put('guards/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '更新门卫信息' })
+  @ApiResponse({ status: 200, description: '更新成功' })
+  @ApiResponse({ status: 404, description: '门卫不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  @ApiResponse({ status: 409, description: '用户名已存在' })
+  async updateGuard(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') guardId: string,
+    @Body() guardData: any
+  ) {
+    return this.adminService.updateGuard(user, guardId, guardData);
+  }
+
+  @Delete('guards/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '删除门卫' })
+  @ApiResponse({ status: 200, description: '删除成功' })
+  @ApiResponse({ status: 404, description: '门卫不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async deleteGuard(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') guardId: string
+  ) {
+    return this.adminService.deleteGuard(user, guardId);
+  }
+
+  @Patch('guards/:id/toggle-status')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '切换门卫账户状态' })
+  @ApiResponse({ status: 200, description: '状态切换成功' })
+  @ApiResponse({ status: 404, description: '门卫不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async toggleGuardStatus(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') guardId: string
+  ) {
+    return this.adminService.toggleGuardStatus(user, guardId);
+  }
+
+  // 删除分判商
+  @Delete('distributors/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '删除分判商' })
+  @ApiResponse({ status: 200, description: '删除成功' })
+  @ApiResponse({ status: 404, description: '分判商不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async deleteDistributor(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') distributorId: string
+  ) {
+    return this.adminService.deleteDistributor(user, distributorId);
   }
 }

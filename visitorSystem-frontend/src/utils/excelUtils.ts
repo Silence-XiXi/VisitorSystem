@@ -425,6 +425,7 @@ export const DISTRIBUTOR_EXCEL_COLUMNS = {
   contactName: '联系人',
   phone: '电话',
   email: '邮箱',
+  whatsapp: 'WhatsApp',
   siteIds: '服务工地',
   accountUsername: '账号',
   accountStatus: '账号状态'
@@ -502,14 +503,15 @@ export const convertExcelToDistributor = (row: any, rowIndex: number): { data: a
   const errors: string[] = [];
   
   const distributorData = {
-    id: String(row.id || '').trim() || (Date.now() + Math.random()).toString(),
-    name: String(row.name || '').trim(),
-    contactName: String(row.contactName || '').trim(),
-    phone: String(row.phone || '').trim(),
-    email: String(row.email || '').trim(),
-    siteIds: String(row.siteIds || '').trim().split(',').map((id: string) => id.trim()).filter((id: string) => id),
-    accountUsername: String(row.accountUsername || '').trim(),
-    accountStatus: DISTRIBUTOR_STATUS_MAP[row.accountStatus as keyof typeof DISTRIBUTOR_STATUS_MAP] || 'active'
+    id: String(row['分判商ID'] || '').trim() || (Date.now() + Math.random()).toString(),
+    name: String(row['名称'] || '').trim(),
+    contactName: String(row['联系人'] || '').trim(),
+    phone: String(row['电话'] || '').trim(),
+    email: String(row['邮箱'] || '').trim(),
+    whatsapp: String(row['WhatsApp'] || '').trim(),
+    siteIds: String(row['服务工地'] || '').trim().split(',').map((id: string) => id.trim()).filter((id: string) => id),
+    accountUsername: String(row['账号'] || '').trim(),
+    accountStatus: DISTRIBUTOR_STATUS_MAP[row['账号状态'] as keyof typeof DISTRIBUTOR_STATUS_MAP] || 'active'
   };
   
   const requiredErrors = validateDistributorRequiredFields(distributorData);
@@ -596,20 +598,37 @@ export const readDistributorExcelFile = (file: File): Promise<{ distributors: an
         const allErrors: string[] = [];
         
         dataRows.forEach((row: any, index) => {
-          if (row.some((cell: any) => cell !== null && cell !== undefined && cell !== '')) {
-            const rowData: any = {};
-            headers.forEach((header, colIndex) => {
-              if (header && row[colIndex] !== undefined) {
-                rowData[header] = row[colIndex];
-              }
-            });
-            
-            const { data, errors } = convertExcelToDistributor(rowData, index + 1);
-            if (errors.length === 0) {
-              distributors.push(data);
-            } else {
-              allErrors.push(...errors);
+          // 检查行是否为空（所有单元格都为空）
+          const isEmptyRow = !row.some((cell: any) => cell !== null && cell !== undefined && cell !== '');
+          if (isEmptyRow) {
+            return; // 跳过空行
+          }
+
+          const rowData: any = {};
+          headers.forEach((header, colIndex) => {
+            if (header && row[colIndex] !== undefined) {
+              rowData[header] = row[colIndex];
             }
+          });
+          
+          // 检查是否有必填字段
+          const hasName = rowData['名称'] && rowData['名称'].toString().trim() !== '';
+          const hasAccount = rowData['账号'] && rowData['账号'].toString().trim() !== '';
+          
+          if (!hasName || !hasAccount) {
+            // 如果缺少必填字段，记录警告信息
+            const missingFields = [];
+            if (!hasName) missingFields.push('名称');
+            if (!hasAccount) missingFields.push('账号');
+            allErrors.push(`第${index + 2}行：缺少必填字段（${missingFields.join('、')}），已跳过`);
+            return;
+          }
+          
+          const { data, errors } = convertExcelToDistributor(rowData, index + 1);
+          if (errors.length === 0) {
+            distributors.push(data);
+          } else {
+            allErrors.push(...errors);
           }
         });
         
@@ -678,6 +697,7 @@ export const exportDistributorsToExcel = (distributors: any[], sites: any[]) => 
       [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: distributor.contactName,
       [DISTRIBUTOR_EXCEL_COLUMNS.phone]: distributor.phone,
       [DISTRIBUTOR_EXCEL_COLUMNS.email]: distributor.email,
+      [DISTRIBUTOR_EXCEL_COLUMNS.whatsapp]: distributor.whatsapp,
       [DISTRIBUTOR_EXCEL_COLUMNS.siteIds]: siteNames,
       [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: distributor.accountUsername,
       [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: distributor.accountStatus === 'active' ? '启用' : '禁用'
@@ -759,6 +779,7 @@ export const generateDistributorImportTemplate = () => {
       [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: '王五',
       [DISTRIBUTOR_EXCEL_COLUMNS.phone]: '13800138003',
       [DISTRIBUTOR_EXCEL_COLUMNS.email]: 'wangwu@example.com',
+      [DISTRIBUTOR_EXCEL_COLUMNS.whatsapp]: '+86 13800138003',
       [DISTRIBUTOR_EXCEL_COLUMNS.siteIds]: '北京CBD工地,上海浦东工地',
       [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: 'bj001',
       [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: '启用'
@@ -769,6 +790,7 @@ export const generateDistributorImportTemplate = () => {
       [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: '赵六',
       [DISTRIBUTOR_EXCEL_COLUMNS.phone]: '13800138004',
       [DISTRIBUTOR_EXCEL_COLUMNS.email]: 'zhaoliu@example.com',
+      [DISTRIBUTOR_EXCEL_COLUMNS.whatsapp]: '+86 13800138004',
       [DISTRIBUTOR_EXCEL_COLUMNS.siteIds]: '上海浦东工地,广州天河工地',
       [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: 'sh001',
       [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: '启用'
@@ -784,9 +806,10 @@ export const generateDistributorImportTemplate = () => {
     { wch: 15 }, // 联系人
     { wch: 15 }, // 电话
     { wch: 25 }, // 邮箱
-    { wch: 20 }, // 归属工地
+    { wch: 20 }, // WhatsApp
+    { wch: 30 }, // 服务工地
     { wch: 15 }, // 账号
-    { wch: 10 }  // 账号状态
+    { wch: 12 }  // 账号状态
   ];
   worksheet['!cols'] = colWidths;
   

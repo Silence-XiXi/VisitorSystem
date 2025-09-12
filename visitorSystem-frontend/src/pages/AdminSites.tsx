@@ -12,10 +12,12 @@ import {
   generateDistributorImportTemplate
 } from '../utils/excelUtils'
 import { useLocale } from '../contexts/LocaleContext'
+import { useSiteFilter } from '../contexts/SiteFilterContext'
 import { apiService } from '../services/api'
 
 const AdminSites: React.FC = () => {
-  const { t } = useLocale()
+  const { t, locale, messages } = useLocale()
+  const { refreshSites, selectedSiteId } = useSiteFilter()
   // 工地管理状态
   const [sites, setSites] = useState<Site[]>(mockSites)
   const [siteModalOpen, setSiteModalOpen] = useState(false)
@@ -44,15 +46,30 @@ const AdminSites: React.FC = () => {
 
   // 分判商筛选状态
   const [distributorStatusFilters, setDistributorStatusFilters] = useState<string[]>([])
-  const [distributorSiteFilters, setDistributorSiteFilters] = useState<string[]>([])
   const [distributorKeyword, setDistributorKeyword] = useState<string>('')
 
   // 门卫筛选状态
-  const [guardSiteFilters, setGuardSiteFilters] = useState<string[]>([])
   const [guardKeyword, setGuardKeyword] = useState<string>('')
   
   // 标签页状态
   const [activeTab, setActiveTab] = useState<string>('distributors')
+  
+  // 分页状态
+  const [sitePagination, setSitePagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  })
+  const [distributorPagination, setDistributorPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  })
+  const [guardPagination, setGuardPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  })
   
   // 加载状态
   const [loading, setLoading] = useState(false)
@@ -61,6 +78,38 @@ const AdminSites: React.FC = () => {
   useEffect(() => {
     loadData()
   }, [])
+
+  // 监听全局工地筛选变化
+  useEffect(() => {
+    // 全局工地筛选变化时，数据会自动通过useMemo重新筛选
+    // 不需要额外的状态清理
+  }, [selectedSiteId])
+
+
+  // 分页处理函数
+  const handleSitePaginationChange = (page: number, pageSize?: number) => {
+    setSitePagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: pageSize || prev.pageSize
+    }))
+  }
+
+  const handleDistributorPaginationChange = (page: number, pageSize?: number) => {
+    setDistributorPagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: pageSize || prev.pageSize
+    }))
+  }
+
+  const handleGuardPaginationChange = (page: number, pageSize?: number) => {
+    setGuardPagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: pageSize || prev.pageSize
+    }))
+  }
 
   const loadData = async () => {
     try {
@@ -85,14 +134,16 @@ const AdminSites: React.FC = () => {
       
       const transformedDistributors = distributorsData.map(distributor => ({
         id: distributor.id,
+        distributorId: distributor.distributorId,
         name: distributor.name,
         contactName: distributor.contactName,
         phone: distributor.phone,
         email: distributor.email,
         whatsapp: distributor.whatsapp,
-        accountUsername: distributor.accountUsername,
-        accountStatus: (distributor.accountStatus || 'active') as 'active' | 'disabled',
-        siteIds: distributor.sites?.map(s => s.id) || []
+        accountUsername: distributor.user?.username || distributor.name,
+        accountStatus: (distributor.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+        siteIds: distributor.siteIds || [],
+        userId: distributor.userId // 保留用户ID用于状态更新
       }))
       
       const transformedGuards = guardsData.map(guard => ({
@@ -112,6 +163,11 @@ const AdminSites: React.FC = () => {
       setSites(transformedSites)
       setDistributors(transformedDistributors)
       setGuards(transformedGuards)
+      
+      // 更新分页总数
+      setSitePagination(prev => ({ ...prev, total: transformedSites.length }))
+      setDistributorPagination(prev => ({ ...prev, total: transformedDistributors.length }))
+      setGuardPagination(prev => ({ ...prev, total: transformedGuards.length }))
     } catch (error) {
       console.error('Failed to load data:', error)
       message.error('加载数据失败，使用本地数据')
@@ -195,9 +251,37 @@ const AdminSites: React.FC = () => {
       ),
       okText: t('admin.confirm'),
       cancelText: t('admin.cancel'),
-      onOk: () => {
-        // TODO: 调用后端API执行重置
-        message.success(t('admin.resetPasswordSuccess').replace('{name}', record.name))
+      onOk: async () => {
+        try {
+          const result = await apiService.resetDistributorPassword(record.id)
+          console.log('密码重置成功:', result)
+          
+          // 显示成功消息，包含新密码信息
+          Modal.success({
+            title: t('admin.resetPasswordSuccess'),
+            content: (
+              <div>
+                <p>{t('admin.resetPasswordSuccessMessage').replace('{name}', result.distributorName)}</p>
+                <p><strong>{t('admin.newPassword')}: {result.newPassword}</strong></p>
+                <p style={{ color: '#ff4d4f', fontSize: '12px' }}>{t('admin.passwordSecurityTip')}</p>
+              </div>
+            ),
+            width: 400
+          })
+        } catch (error: unknown) {
+          console.error('重置密码失败:', error)
+          let errorMessage = '重置密码失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
       }
     })
   }
@@ -236,14 +320,42 @@ const AdminSites: React.FC = () => {
       content: (
         <div>
           <p>{statusAction.replace('{name}', record.name)}</p>
+          {newStatus === 'disabled' && (
+            <p style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '8px' }}>
+              {t('admin.disableAccountWarning')}
+            </p>
+          )}
         </div>
       ),
-      okText: t('admin.confirm'),
-      cancelText: t('admin.cancel'),
-      onOk: () => {
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okType: newStatus === 'disabled' ? 'danger' : 'primary',
+      onOk: async () => {
+        try {
+          // 调用后端API更新用户状态
+          await apiService.updateUserStatus(record.userId!, newStatus.toUpperCase())
+          
+          // 更新前端状态
         setDistributors(prev => prev.map(d => d.id === record.id ? { ...d, accountStatus: newStatus } : d))
+          
         const successMessage = newStatus === 'active' ? t('admin.enableDistributorSuccess') : t('admin.disableDistributorSuccess')
         message.success(successMessage.replace('{name}', record.name))
+        } catch (error: unknown) {
+          console.error('切换分判商状态失败:', error)
+          let errorMessage = '切换状态失败'
+          
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          
+          message.error(errorMessage)
+        }
       }
     })
   }
@@ -256,8 +368,12 @@ const AdminSites: React.FC = () => {
     { title: t('admin.siteManager'), dataIndex: 'manager', key: 'manager', width: 120 },
     { title: t('admin.sitePhone'), dataIndex: 'phone', key: 'phone', width: 140 },
     { title: t('admin.siteStatus'), dataIndex: 'status', key: 'status', width: 100, render: (s?: string) => {
-      const map: any = { active: { color: 'green', text: t('admin.siteActive') }, inactive: { color: 'red', text: t('admin.siteInactive') }, suspended: { color: 'orange', text: t('admin.siteSuspended') } }
-      const cfg = map[s || 'active']
+      const map: Record<string, { color: string; text: string }> = { 
+        active: { color: 'green', text: t('admin.siteActive') }, 
+        inactive: { color: 'red', text: t('admin.siteInactive') }, 
+        suspended: { color: 'orange', text: t('admin.siteSuspended') } 
+      }
+      const cfg = map[s || 'active'] || map['active']
       return <Tag color={cfg.color}>{cfg.text}</Tag>
     } },
     // 隐藏关联分判商列
@@ -276,7 +392,7 @@ const AdminSites: React.FC = () => {
     //     </div>
     //   )
     // } },
-    { title: t('common.actions'), key: 'actions', width: 180, render: (_: any, record: Site) => (
+    { title: t('common.actions'), key: 'actions', width: 180, render: (_: unknown, record: Site) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -295,7 +411,10 @@ const AdminSites: React.FC = () => {
           danger 
           size="small" 
           icon={<DeleteOutlined />} 
-          onClick={() => setSites(prev => prev.filter(s => s.id !== record.id))}
+          onClick={async () => {
+            setSites(prev => prev.filter(s => s.id !== record.id))
+            await refreshSites()
+          }}
           title={t('admin.deleteTooltip')}
         />
       </Space>
@@ -304,11 +423,12 @@ const AdminSites: React.FC = () => {
 
   // 分判商表格列定义
   const distributorColumns = [
-    { title: t('admin.distributorId'), dataIndex: 'id', key: 'id', width: 100 },
+    { title: t('admin.distributorId'), dataIndex: 'distributorId', key: 'distributorId', width: 100 },
     { title: t('admin.distributorName'), dataIndex: 'name', key: 'name', width: 160 },
     { title: t('admin.distributorContact'), dataIndex: 'contactName', key: 'contactName', width: 120 },
     { title: t('admin.distributorPhone'), dataIndex: 'phone', key: 'phone', width: 140 },
     { title: t('admin.distributorEmail'), dataIndex: 'email', key: 'email', width: 200 },
+    { title: t('admin.distributorWhatsapp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 160 },
     { title: t('admin.distributorSite'), dataIndex: 'siteIds', key: 'siteIds', width: 200, render: (siteIds?: string[]) => {
       if (!siteIds || siteIds.length === 0) return '-'
       return (
@@ -326,11 +446,14 @@ const AdminSites: React.FC = () => {
     } },
     { title: t('admin.distributorAccount'), dataIndex: 'accountUsername', key: 'accountUsername', width: 140 },
     { title: t('admin.distributorAccountStatus'), dataIndex: 'accountStatus', key: 'accountStatus', width: 100, render: (s?: string) => {
-      const map: any = { active: { color: 'green', text: t('admin.distributorActive') }, disabled: { color: 'red', text: t('admin.distributorDisabled') } }
-      const cfg = map[s || 'active']
+      const map: Record<string, { color: string; text: string }> = { 
+        active: { color: 'green', text: t('admin.distributorActive') }, 
+        disabled: { color: 'red', text: t('admin.distributorDisabled') } 
+      }
+      const cfg = map[s || 'active'] || map['active']
       return <Tag color={cfg.color}>{cfg.text}</Tag>
     } },
-         { title: t('common.actions'), key: 'actions', width: 280, render: (_: any, record: Distributor) => (
+         { title: t('common.actions'), key: 'actions', width: 280, render: (_: unknown, record: Distributor) => (
        <Space style={{ justifyContent: 'flex-end' }}>
          <Button 
            size="small" 
@@ -355,7 +478,7 @@ const AdminSites: React.FC = () => {
            danger 
            size="small" 
            icon={<DeleteOutlined />} 
-           onClick={() => setDistributors(prev => prev.filter(d => d.id !== record.id))}
+           onClick={() => handleDeleteDistributor(record)}
            title={t('admin.deleteTooltip')}
          />
        </Space>
@@ -386,8 +509,10 @@ const AdminSites: React.FC = () => {
   // 分判商筛选后的数据
   const filteredDistributors = useMemo(() => {
     return distributors.filter(d => {
+      // 全局工地筛选：如果选择了特定工地，只显示与该工地关联的分判商
+      if (selectedSiteId && (!d.siteIds || !d.siteIds.includes(selectedSiteId))) return false
+      
       if (distributorStatusFilters.length > 0 && !distributorStatusFilters.includes(d.accountStatus || 'active')) return false
-      if (distributorSiteFilters.length > 0 && (!d.siteIds || !d.siteIds.some(siteId => distributorSiteFilters.includes(siteId)))) return false
       if (distributorKeyword.trim()) {
         const k = distributorKeyword.trim().toLowerCase()
         const text = `${d.name || ''} ${d.contactName || ''}`.toLowerCase()
@@ -395,7 +520,8 @@ const AdminSites: React.FC = () => {
       }
       return true
     })
-  }, [distributors, distributorStatusFilters, distributorSiteFilters, distributorKeyword])
+  }, [distributors, distributorStatusFilters, distributorKeyword, selectedSiteId])
+
 
   // 批量发送账号密码到Email
   const handleBatchSendEmail = () => {
@@ -487,18 +613,60 @@ const AdminSites: React.FC = () => {
 
   // 工地表单提交
   const onSiteSubmit = async () => {
+    try {
     const v = await siteForm.validateFields()
+      
     if (editingSite) {
+        // 编辑工地 - 暂时使用本地更新，后续可以添加编辑API
       setSites(prev => prev.map(s => s.id === editingSite.id ? { ...editingSite, ...v } : s))
+        
+        // 刷新全局工地筛选器
+        await refreshSites()
+        
       message.success(t('admin.siteUpdated'))
     } else {
-      const newItem: Site = { id: (Date.now()).toString(), code: v.code || '', name: v.name, address: v.address, manager: v.manager, phone: v.phone, status: v.status, distributorIds: v.distributorIds }
-      setSites(prev => [newItem, ...prev])
+        // 新增工地 - 调用后端API
+        const siteData = {
+          name: v.name,
+          address: v.address,
+          code: v.code,
+          manager: v.manager,
+          phone: v.phone,
+          status: v.status || 'active',
+          distributorIds: v.distributorIds || []
+        }
+        
+        const newSite = await apiService.createSite(siteData)
+        // 确保返回的site数据包含必需的字段
+        const siteWithDefaults = {
+          ...newSite,
+          code: newSite.code || `SITE_${Date.now()}` // 如果没有code，生成一个默认值
+        }
+        setSites(prev => [siteWithDefaults, ...prev])
+        
+        // 刷新全局工地筛选器
+        await refreshSites()
+        
       message.success(t('admin.siteAdded'))
     }
+      
     setSiteModalOpen(false)
     setEditingSite(null)
     siteForm.resetFields()
+    } catch (error: unknown) {
+      console.error('Failed to submit site:', error)
+      
+      const err = error as { statusCode?: number; message?: string }
+      if (err.statusCode === 400) {
+        message.error('输入数据有误，请检查表单')
+      } else if (err.statusCode === 409) {
+        message.error('工地名称或代码已存在，请使用其他名称或代码')
+      } else if (err.statusCode === 403) {
+        message.error('权限不足，无法创建工地')
+      } else {
+        message.error('创建工地失败，请重试')
+      }
+    }
   }
 
   // 分判商表单提交
@@ -507,8 +675,38 @@ const AdminSites: React.FC = () => {
       const v = await distributorForm.validateFields()
       
       if (editingDistributor) {
-        // 编辑分判商 - 暂时使用本地更新，后续可以添加编辑API
-        setDistributors(prev => prev.map(d => d.id === editingDistributor.id ? { ...editingDistributor, ...v } : d))
+        // 编辑分判商 - 调用后端API
+        const updateData = {
+          name: v.name,
+          contactName: v.contactName,
+          phone: v.phone,
+          email: v.email,
+          whatsapp: v.whatsapp,
+          siteIds: v.siteIds || [],
+          username: v.accountUsername // 添加用户名更新
+        }
+        
+        console.log('准备更新分判商，数据:', updateData)
+        
+        const updatedDistributor = await apiService.updateDistributor(editingDistributor.id, updateData)
+        console.log('分判商更新成功:', updatedDistributor)
+        
+        // 转换数据格式以匹配前端期望
+        const transformedDistributor = {
+          id: updatedDistributor.id,
+          distributorId: updatedDistributor.distributorId,
+          name: updatedDistributor.name,
+          contactName: updatedDistributor.contactName,
+          phone: updatedDistributor.phone,
+          email: updatedDistributor.email,
+          whatsapp: updatedDistributor.whatsapp,
+          accountUsername: updatedDistributor.user?.username || updatedDistributor.name,
+          accountStatus: (updatedDistributor.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+          siteIds: updatedDistributor.siteIds || [],
+          userId: updatedDistributor.userId
+        }
+        
+        setDistributors(prev => prev.map(d => d.id === editingDistributor.id ? transformedDistributor : d))
         message.success(t('admin.distributorUpdated'))
       } else {
         // 新增分判商 - 调用后端API
@@ -522,32 +720,60 @@ const AdminSites: React.FC = () => {
           whatsapp: v.whatsapp,
           username: v.accountUsername || v.name.toLowerCase().replace(/\s+/g, ''),
           password: defaultPwd,
-          siteIds: v.siteIds
+          siteIds: v.siteIds || []
         }
         
+        console.log('准备创建分判商，数据:', distributorData)
+        
         const newDistributor = await apiService.createDistributor(distributorData)
-        setDistributors(prev => [newDistributor, ...prev])
+        console.log('分判商创建成功:', newDistributor)
+        
+        // 转换数据格式以匹配前端期望
+        const transformedDistributor = {
+          id: newDistributor.id,
+          distributorId: newDistributor.distributorId,
+          name: newDistributor.name,
+          contactName: newDistributor.contactName,
+          phone: newDistributor.phone,
+          email: newDistributor.email,
+          whatsapp: newDistributor.whatsapp,
+          accountUsername: newDistributor.user?.username || newDistributor.name,
+          accountStatus: (newDistributor.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+          siteIds: newDistributor.siteIds || []
+        }
+        
+        setDistributors(prev => [transformedDistributor, ...prev])
         
         // 显示发送方式选择对话框
-        showSendMethodModal(newDistributor, defaultPwd)
+        showSendMethodModal(transformedDistributor, defaultPwd)
         message.success(t('admin.distributorAdded'))
       }
       
       setDistributorModalOpen(false)
       setEditingDistributor(null)
       distributorForm.resetFields()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to submit distributor:', error)
       
-      if (error.statusCode === 400) {
-        message.error('输入数据有误，请检查表单')
-      } else if (error.statusCode === 409) {
-        message.error('用户名已存在，请使用其他用户名')
-      } else if (error.statusCode === 403) {
-        message.error('权限不足，无法创建分判商')
-      } else {
-        message.error('创建分判商失败，请重试')
+      // 更详细的错误处理
+      const err = error as { statusCode?: number; message?: string }
+      let errorMessage = '创建分判商失败，请重试'
+      
+      if (err.statusCode === 400) {
+        errorMessage = err.message || '输入数据有误，请检查表单'
+      } else if (err.statusCode === 409) {
+        errorMessage = '用户名已存在，请使用其他用户名'
+      } else if (err.statusCode === 403) {
+        errorMessage = '权限不足，无法创建分判商'
+      } else if (err.statusCode === 422) {
+        errorMessage = '数据验证失败，请检查输入信息'
+      } else if (err.statusCode === 500) {
+        errorMessage = '服务器内部错误，请稍后重试'
+      } else if (err.message) {
+        errorMessage = err.message
       }
+      
+      message.error(errorMessage)
     }
   }
 
@@ -557,44 +783,93 @@ const AdminSites: React.FC = () => {
       const v = await guardForm.validateFields()
       
       if (editingGuard) {
-        // 编辑门卫 - 暂时使用本地更新，后续可以添加编辑API
-        setGuards(prev => prev.map(g => g.id === editingGuard.id ? { ...editingGuard, ...v } : g))
+        // 编辑门卫 - 调用后端API
+        const updateData = {
+          name: v.name,
+          phone: v.phone,
+          email: v.email,
+          whatsapp: v.whatsapp,
+          siteId: v.siteId,
+          username: v.accountUsername // 添加用户名更新
+        }
+        
+        console.log('准备更新门卫，数据:', updateData)
+        
+        const updatedGuard = await apiService.updateGuard(editingGuard.id, updateData)
+        console.log('门卫更新成功:', updatedGuard)
+        
+        // 转换数据格式以匹配前端期望
+        const transformedGuard = {
+          id: updatedGuard.id,
+          guardId: updatedGuard.guardId,
+          name: updatedGuard.name,
+          phone: updatedGuard.phone,
+          email: updatedGuard.email,
+          whatsapp: updatedGuard.whatsapp,
+          siteId: updatedGuard.siteId,
+          accountUsername: updatedGuard.user?.username || updatedGuard.guardId,
+          accountStatus: (updatedGuard.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+          createdAt: updatedGuard.createdAt,
+          updatedAt: updatedGuard.updatedAt,
+          userId: editingGuard?.userId
+        }
+        
+        setGuards(prev => prev.map(g => g.id === editingGuard.id ? transformedGuard : g))
         message.success(t('admin.guardUpdated'))
       } else {
         // 新增门卫 - 调用后端API
         const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
         
         const guardData = {
-          guardId: v.guardId,
           name: v.name,
           siteId: v.siteId,
           phone: v.phone,
           email: v.email,
           whatsapp: v.whatsapp,
-          username: v.accountUsername || v.guardId,
+          username: v.accountUsername || v.name.toLowerCase().replace(/\s+/g, ''),
           password: defaultPwd
         }
         
         const newGuard = await apiService.createGuard(guardData)
-        setGuards(prev => [newGuard, ...prev])
         
-        message.success(t('admin.guardAddedSuccess').replace('{username}', v.accountUsername || v.guardId).replace('{password}', defaultPwd))
+        // 转换数据格式以匹配前端期望
+        const transformedGuard = {
+          id: newGuard.id,
+          guardId: newGuard.guardId,
+          name: newGuard.name,
+          siteId: newGuard.siteId,
+          phone: newGuard.phone,
+          email: newGuard.email,
+          whatsapp: newGuard.whatsapp,
+          accountUsername: newGuard.user?.username || newGuard.guardId,
+          accountStatus: (newGuard.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+          createdAt: newGuard.createdAt,
+          updatedAt: newGuard.updatedAt
+        }
+        
+        setGuards(prev => [transformedGuard, ...prev])
+        
+        message.success(t('admin.guardAddedSuccess').replace('{username}', v.accountUsername || newGuard.guardId).replace('{password}', defaultPwd))
       }
       
       setGuardModalOpen(false)
       setEditingGuard(null)
       guardForm.resetFields()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to submit guard:', error)
       
-      if (error.statusCode === 400) {
+      const err = error as { statusCode?: number; message?: string }
+      if (err.statusCode === 400) {
         message.error('输入数据有误，请检查表单')
-      } else if (error.statusCode === 409) {
+      } else if (err.statusCode === 409) {
         message.error('门卫ID或用户名已存在，请使用其他ID或用户名')
-      } else if (error.statusCode === 403) {
-        message.error('权限不足，无法创建门卫')
+      } else if (err.statusCode === 403) {
+        message.error('权限不足，无法操作门卫')
+      } else if (err.statusCode === 404) {
+        message.error('门卫不存在')
       } else {
-        message.error('创建门卫失败，请重试')
+        const errorMessage = editingGuard ? '更新门卫失败，请重试' : '创建门卫失败，请重试'
+        message.error(errorMessage)
       }
     }
   }
@@ -659,10 +934,147 @@ const AdminSites: React.FC = () => {
         return
       }
       
-      setDistributors(prev => [...importedDistributors, ...prev])
-      message.success(t('admin.distributorImportSuccess').replace('{count}', importedDistributors.length.toString()))
+      // 显示导入确认对话框
+      // 调试翻译键
+      console.log('🔍 翻译键调试信息:');
+      console.log('当前语言:', locale);
+      console.log('翻译对象类型:', typeof messages);
+      console.log('翻译对象键:', Object.keys(messages || {}));
+      console.log('admin对象存在:', !!messages?.admin);
+      console.log('admin对象键:', messages?.admin ? Object.keys(messages.admin) : '无');
+      console.log('admin对象键数量:', messages?.admin ? Object.keys(messages.admin).length : 0);
+      console.log('查找导入相关键:');
+      const adminKeys = messages?.admin ? Object.keys(messages.admin) : [];
+      const importKeys = adminKeys.filter(key => key.includes('import') || key.includes('Import'));
+      console.log('包含import的键:', importKeys);
+      console.log('admin.distributorImportConfirm:', t('admin.distributorImportConfirm'));
+      console.log('admin.importConfirmMessage:', t('admin.importConfirmMessage'));
+      console.log('admin.importDefaultSiteMessage:', t('admin.importDefaultSiteMessage'));
+      console.log('admin.importRulesMessage:', t('admin.importRulesMessage'));
+      console.log('admin.noSiteSelected:', t('admin.noSiteSelected'));
+      
+      // 检查其他翻译键是否工作
+      console.log('其他翻译键测试:');
+      console.log('common.save:', t('common.save'));
+      console.log('common.cancel:', t('common.cancel'));
+      
+      Modal.confirm({
+        title: t('admin.distributorImportConfirm'),
+        content: (
+          <div>
+            <p>{t('admin.importConfirmMessage').replace('{count}', importedDistributors.length.toString())}</p>
+            <p style={{ color: '#1890ff', marginTop: '8px' }}>
+              {t('admin.importDefaultSiteMessage').replace('{siteName}', selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.name || '' : t('admin.noSiteSelected'))}
+            </p>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
+              {t('admin.importRulesMessage')}
+            </p>
+            {errors.length > 0 && (
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '8px', 
+                background: '#fff7e6', 
+                border: '1px solid #ffd591', 
+                borderRadius: '4px',
+                fontSize: '12px'
+              }}>
+                <div style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: '4px' }}>
+                  ⚠️ {t('admin.importWarnings')}:
+                </div>
+                {errors.slice(0, 3).map((error, index) => (
+                  <div key={index} style={{ color: '#666', marginBottom: '2px' }}>
+                    {error}
+                  </div>
+                ))}
+                {errors.length > 3 && (
+                  <div style={{ color: '#999', fontStyle: 'italic' }}>
+                    ... 还有 {errors.length - 3} 个警告
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ),
+        onOk: async () => {
+          await processDistributorImport(importedDistributors)
+        }
+      })
     } catch (error) {
       message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
+    }
+  }
+
+  // 处理分判商导入
+  const processDistributorImport = async (importedDistributors: Record<string, unknown>[]) => {
+    try {
+      setLoading(true)
+      
+      let successCount = 0
+      let skipCount = 0
+      const errors: string[] = []
+
+      for (const distributorData of importedDistributors) {
+        try {
+          // 准备导入数据
+          const importData = {
+            name: String(distributorData.name || ''),
+            contactName: String(distributorData.contactName || ''),
+            phone: String(distributorData.phone || ''),
+            email: String(distributorData.email || ''),
+            whatsapp: String(distributorData.whatsapp || ''),
+            username: String(distributorData.accountUsername || String(distributorData.name || '').toLowerCase().replace(/\s+/g, '')),
+            password: 'Pass@123', // 默认密码
+            siteIds: selectedSiteId ? [selectedSiteId] : (Array.isArray(distributorData.siteIds) ? distributorData.siteIds : [])
+          }
+
+          // 检查用户名是否已存在（通过API调用）
+          try {
+            // 先尝试创建，如果用户名已存在会返回409错误
+            const newDistributor = await apiService.createDistributor(importData)
+            
+            // 转换数据格式以匹配前端期望
+            const transformedDistributor = {
+              id: newDistributor.id,
+              distributorId: newDistributor.distributorId,
+              name: newDistributor.name,
+              contactName: newDistributor.contactName,
+              phone: newDistributor.phone,
+              email: newDistributor.email,
+              whatsapp: newDistributor.whatsapp,
+              accountUsername: newDistributor.user?.username || newDistributor.name,
+              accountStatus: (newDistributor.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+              siteIds: newDistributor.siteIds || []
+            }
+            
+            setDistributors(prev => [transformedDistributor, ...prev])
+            successCount++
+          } catch (createError: unknown) {
+            const error = createError as { statusCode?: number; message?: string }
+            if (error.statusCode === 409) {
+              // 用户名已存在，跳过
+              skipCount++
+              console.log(`跳过重复的分判商: ${distributorData.name} (用户名: ${importData.username})`)
+            } else {
+              // 其他错误
+              errors.push(`${distributorData.name}: ${error.message || '创建失败'}`)
+            }
+          }
+        } catch (error: unknown) {
+          const err = error as { message?: string }
+          errors.push(`${distributorData.name}: ${err.message || '处理失败'}`)
+        }
+      }
+
+      // 刷新全局工地筛选器
+      await refreshSites()
+
+      // 显示导入结果弹窗
+      showImportResultModal(successCount, skipCount, errors)
+    } catch (error) {
+      console.error('Import processing failed:', error)
+      message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -674,6 +1086,161 @@ const AdminSites: React.FC = () => {
   const handleDownloadDistributorTemplate = () => {
     generateDistributorImportTemplate()
     message.success(t('admin.distributorTemplateDownloaded'))
+  }
+
+  // 显示导入结果弹窗
+  const showImportResultModal = (successCount: number, skipCount: number, errors: string[]) => {
+    const totalCount = successCount + skipCount + errors.length
+    
+    Modal.info({
+      title: t('admin.importResultTitle'),
+      width: 600,
+      content: (
+        <div style={{ marginTop: '16px' }}>
+          {/* 总体统计 */}
+          <div style={{ 
+            background: '#f6ffed', 
+            border: '1px solid #b7eb8f', 
+            borderRadius: '6px', 
+            padding: '16px', 
+            marginBottom: '16px' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '8px' }} />
+              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                {t('admin.importCompleted')}
+              </span>
+            </div>
+            <div style={{ color: '#666', fontSize: '14px' }}>
+              {t('admin.importTotalProcessed').replace('{total}', totalCount.toString())}
+            </div>
+          </div>
+
+          {/* 详细统计 */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: successCount > 0 ? '#f6ffed' : '#f5f5f5',
+              border: `1px solid ${successCount > 0 ? '#b7eb8f' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: successCount > 0 ? '#52c41a' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {successCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('admin.importSuccessCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: skipCount > 0 ? '#fff7e6' : '#f5f5f5',
+              border: `1px solid ${skipCount > 0 ? '#ffd591' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: skipCount > 0 ? '#fa8c16' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {skipCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('admin.importSkipCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: errors.length > 0 ? '#fff2f0' : '#f5f5f5',
+              border: `1px solid ${errors.length > 0 ? '#ffccc7' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: errors.length > 0 ? '#ff4d4f' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {errors.length}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('admin.importErrorCount')}
+              </div>
+            </div>
+          </div>
+
+          {/* 错误详情 */}
+          {errors.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '8px', 
+                color: '#ff4d4f',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <ExclamationCircleOutlined style={{ marginRight: '6px' }} />
+                {t('admin.importErrorDetails')}
+              </div>
+              <div style={{ 
+                background: '#fff2f0', 
+                border: '1px solid #ffccc7', 
+                borderRadius: '6px', 
+                padding: '12px',
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                {errors.map((error, index) => (
+                  <div key={index} style={{ 
+                    marginBottom: '4px', 
+                    fontSize: '12px',
+                    color: '#666',
+                    fontFamily: 'monospace'
+                  }}>
+                    {index + 1}. {error}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 提示信息 */}
+          <div style={{ 
+            marginTop: '16px', 
+            padding: '12px', 
+            background: '#e6f7ff', 
+            border: '1px solid #91d5ff', 
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            <div style={{ marginBottom: '4px' }}>
+              💡 {t('admin.importTips')}
+            </div>
+            <div>• {t('admin.importTip1')}</div>
+            <div>• {t('admin.importTip2')}</div>
+            <div>• {t('admin.importTip3')}</div>
+          </div>
+        </div>
+      ),
+      okText: t('admin.confirm'),
+      onOk: () => {
+        // 可以在这里添加额外的处理逻辑
+      }
+    })
   }
 
   const handleGuardExport = (exportAll: boolean = true) => {
@@ -696,14 +1263,111 @@ const AdminSites: React.FC = () => {
     
     Modal.confirm({
       title: statusTitle,
-      content: statusConfirm.replace('{name}', record.name),
+      content: (
+        <div>
+          <p>{statusConfirm.replace('{name}', record.name)}</p>
+          {newStatus === 'disabled' && (
+            <p style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '8px' }}>
+              {t('admin.disableAccountWarning')}
+            </p>
+          )}
+        </div>
+      ),
       okText: t('admin.confirm'),
       cancelText: t('admin.cancel'),
-      onOk: () => {
+      onOk: async () => {
+        try {
+          const result = await apiService.toggleGuardStatus(record.id)
+          console.log('门卫状态切换成功:', result)
+          
+          // 更新本地状态
         setGuards(prev => prev.map(g => 
           g.id === record.id ? { ...g, accountStatus: newStatus } : g
         ))
+          
         message.success(statusSuccess.replace('{name}', record.name))
+        } catch (error: unknown) {
+          console.error('切换门卫状态失败:', error)
+          let errorMessage = '切换状态失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
+      }
+    })
+  }
+
+  // 删除分判商
+  const handleDeleteDistributor = (record: Distributor) => {
+    Modal.confirm({
+      title: t('admin.deleteDistributorTitle'),
+      content: t('admin.deleteDistributorConfirm').replace('{name}', record.name),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const result = await apiService.deleteDistributor(record.id)
+          console.log('分判商删除成功:', result)
+          
+          // 从本地状态中移除
+          setDistributors(prev => prev.filter(d => d.id !== record.id))
+          message.success(t('admin.distributorDeleted').replace('{name}', record.name))
+        } catch (error: unknown) {
+          console.error('删除分判商失败:', error)
+          let errorMessage = '删除分判商失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
+      }
+    })
+  }
+
+  // 删除门卫
+  const handleDeleteGuard = (record: Guard) => {
+    Modal.confirm({
+      title: t('admin.deleteGuardTitle'),
+      content: t('admin.deleteGuardConfirm').replace('{name}', record.name),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const result = await apiService.deleteGuard(record.id)
+          console.log('门卫删除成功:', result)
+          
+          // 从本地状态中移除
+          setGuards(prev => prev.filter(g => g.id !== record.id))
+          message.success(t('admin.guardDeleted').replace('{name}', record.name))
+        } catch (error: unknown) {
+          console.error('删除门卫失败:', error)
+          let errorMessage = '删除门卫失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
       }
     })
   }
@@ -715,9 +1379,37 @@ const AdminSites: React.FC = () => {
       content: t('admin.resetGuardPasswordConfirm').replace('{name}', record.name),
       okText: t('admin.confirm'),
       cancelText: t('admin.cancel'),
-      onOk: () => {
-        // 这里应该调用后端API重置密码
-        message.success(t('admin.resetGuardPasswordSuccess').replace('{name}', record.name))
+      onOk: async () => {
+        try {
+          const result = await apiService.resetGuardPassword(record.id)
+          console.log('门卫密码重置成功:', result)
+          
+          // 显示成功消息，包含新密码信息
+          Modal.success({
+            title: t('admin.resetGuardPasswordSuccess'),
+            content: (
+              <div>
+                <p>{t('admin.resetGuardPasswordSuccessMessage').replace('{name}', result.guardName)}</p>
+                <p><strong>{t('admin.newPassword')}: {result.newPassword}</strong></p>
+                <p style={{ color: '#ff4d4f', fontSize: '12px' }}>{t('admin.passwordSecurityTip')}</p>
+              </div>
+            ),
+            width: 400
+          })
+        } catch (error: unknown) {
+          console.error('重置门卫密码失败:', error)
+          let errorMessage = '重置密码失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
       }
     })
   }
@@ -749,7 +1441,7 @@ const AdminSites: React.FC = () => {
       ),
       sorter: (a: Guard, b: Guard) => (a.accountStatus || '').localeCompare(b.accountStatus || '')
     },
-    { title: t('common.actions'), key: 'actions', width: 200, render: (_: any, record: Guard) => (
+    { title: t('common.actions'), key: 'actions', width: 200, render: (_: unknown, record: Guard) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -774,7 +1466,7 @@ const AdminSites: React.FC = () => {
           danger 
           size="small" 
           icon={<DeleteOutlined />} 
-          onClick={() => setGuards(prev => prev.filter(g => g.id !== record.id))}
+          onClick={() => handleDeleteGuard(record)}
           title={t('admin.deleteTooltip')}
         />
       </Space>
@@ -784,16 +1476,30 @@ const AdminSites: React.FC = () => {
   // 门卫筛选逻辑
   const filteredGuards = useMemo(() => {
     return guards.filter(guard => {
+      // 全局工地筛选：如果选择了特定工地，只显示该工地的门卫
+      if (selectedSiteId && guard.siteId !== selectedSiteId) return false
+      
       const matchesKeyword = !guardKeyword.trim() || 
         guard.guardId.toLowerCase().includes(guardKeyword.toLowerCase()) ||
         guard.name.toLowerCase().includes(guardKeyword.toLowerCase()) ||
         guard.phone.includes(guardKeyword)
       
-      const matchesSite = guardSiteFilters.length === 0 || guardSiteFilters.includes(guard.siteId)
-      
-      return matchesKeyword && matchesSite
+      return matchesKeyword
     })
-  }, [guards, guardKeyword, guardSiteFilters])
+  }, [guards, guardKeyword, selectedSiteId])
+
+  // 监听筛选数据变化，更新分页总数
+  useEffect(() => {
+    setSitePagination(prev => ({ ...prev, total: filteredSites.length, current: 1 }))
+  }, [filteredSites])
+
+  useEffect(() => {
+    setDistributorPagination(prev => ({ ...prev, total: filteredDistributors.length, current: 1 }))
+  }, [filteredDistributors])
+
+  useEffect(() => {
+    setGuardPagination(prev => ({ ...prev, total: filteredGuards.length, current: 1 }))
+  }, [filteredGuards])
 
   // 工地管理标签页内容
   const siteManagementTab = (
@@ -887,7 +1593,17 @@ const AdminSites: React.FC = () => {
          columns={siteColumns} 
          dataSource={filteredSites} 
          loading={loading}
-         pagination={{ pageSize: 10, showSizeChanger: true }}
+         pagination={{
+           current: sitePagination.current,
+           pageSize: sitePagination.pageSize,
+           total: sitePagination.total,
+           showSizeChanger: true,
+           showQuickJumper: true,
+           showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+           pageSizeOptions: ['10', '20', '50', '100'],
+           onChange: handleSitePaginationChange,
+           onShowSizeChange: handleSitePaginationChange
+         }}
          rowSelection={{
            selectedRowKeys: selectedSiteIds,
            onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
@@ -903,10 +1619,10 @@ const AdminSites: React.FC = () => {
   const distributorManagementTab = (
     <Card>
       <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={5}>
+        <Col span={8}>
           <Input placeholder={t('admin.distributorKeywordPlaceholder')} value={distributorKeyword} onChange={e => setDistributorKeyword(e.target.value)} allowClear />
         </Col>
-        <Col span={5}>
+        <Col span={8}>
           <Select
             mode="multiple"
             style={{ width: '100%' }}
@@ -917,18 +1633,7 @@ const AdminSites: React.FC = () => {
             allowClear
           />
         </Col>
-        <Col span={5}>
-          <Select
-            mode="multiple"
-            style={{ width: '100%' }}
-            placeholder={t('admin.siteFilterPlaceholder')}
-            value={distributorSiteFilters}
-            onChange={setDistributorSiteFilters}
-            options={sites.map(s => ({ value: s.id, label: s.name }))}
-            allowClear
-          />
-        </Col>
-        <Col span={9}>
+        <Col span={8}>
            <Space wrap>
              <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadDistributorTemplate}>{t('admin.downloadTemplate')}</Button>
              <Upload
@@ -990,12 +1695,11 @@ const AdminSites: React.FC = () => {
         </div>
         
         <Space>
-          {(distributorStatusFilters.length > 0 || distributorSiteFilters.length > 0 || distributorKeyword.trim()) && (
+          {(distributorStatusFilters.length > 0 || distributorKeyword.trim()) && (
             <Button 
               size="small" 
               onClick={() => {
                 setDistributorStatusFilters([])
-                setDistributorSiteFilters([])
                 setDistributorKeyword('')
               }}
             >
@@ -1018,7 +1722,17 @@ const AdminSites: React.FC = () => {
          columns={distributorColumns} 
          dataSource={filteredDistributors} 
          loading={loading}
-         pagination={{ pageSize: 10, showSizeChanger: true }}
+         pagination={{
+           current: distributorPagination.current,
+           pageSize: distributorPagination.pageSize,
+           total: distributorPagination.total,
+           showSizeChanger: true,
+           showQuickJumper: true,
+           showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+           pageSizeOptions: ['10', '20', '50', '100'],
+           onChange: handleDistributorPaginationChange,
+           onShowSizeChange: handleDistributorPaginationChange
+         }}
          rowSelection={{
            selectedRowKeys: selectedDistributorIds,
            onChange: (selectedRowKeys) => setSelectedDistributorIds(selectedRowKeys as string[]),
@@ -1034,22 +1748,8 @@ const AdminSites: React.FC = () => {
   const guardManagementTab = (
     <Card>
       <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={6}>
+        <Col span={12}>
           <Input placeholder={t('admin.guardKeywordPlaceholder')} value={guardKeyword} onChange={e => setGuardKeyword(e.target.value)} allowClear />
-        </Col>
-        <Col span={6}>
-          <Select
-            mode="multiple"
-            style={{ width: '100%' }}
-            placeholder={t('admin.guardSiteFilterPlaceholder')}
-            value={guardSiteFilters}
-            onChange={setGuardSiteFilters}
-            allowClear
-          >
-            {sites.map(site => (
-              <Select.Option key={site.id} value={site.id}>{site.name}</Select.Option>
-            ))}
-          </Select>
         </Col>
         <Col span={12}>
           <Space>
@@ -1078,11 +1778,10 @@ const AdminSites: React.FC = () => {
         </div>
         
         <Space>
-          {(guardSiteFilters.length > 0 || guardKeyword.trim()) && (
+          {guardKeyword.trim() && (
             <Button 
               size="small" 
               onClick={() => {
-                setGuardSiteFilters([])
                 setGuardKeyword('')
               }}
             >
@@ -1105,7 +1804,17 @@ const AdminSites: React.FC = () => {
         columns={guardColumns} 
         dataSource={filteredGuards} 
         loading={loading}
-        pagination={{ pageSize: 10, showSizeChanger: true }}
+        pagination={{
+          current: guardPagination.current,
+          pageSize: guardPagination.pageSize,
+          total: guardPagination.total,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          onChange: handleGuardPaginationChange,
+          onShowSizeChange: handleGuardPaginationChange
+        }}
         rowSelection={{
           selectedRowKeys: selectedGuardIds,
           onChange: (selectedRowKeys) => setSelectedGuardIds(selectedRowKeys as string[]),
@@ -1128,7 +1837,7 @@ const AdminSites: React.FC = () => {
             label: (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
                 <TeamOutlined style={{ color: '#52c41a', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.distributorManagement')}（{distributors.length}）</span>
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.distributorManagement')}（{filteredDistributors.length}）</span>
               </div>
             ),
             children: distributorManagementTab
@@ -1138,7 +1847,7 @@ const AdminSites: React.FC = () => {
             label: (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
                 <KeyOutlined style={{ color: '#fa8c16', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.guardManagement')}（{guards.length}）</span>
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.guardManagement')}（{filteredGuards.length}）</span>
               </div>
             ),
             children: guardManagementTab
@@ -1148,7 +1857,7 @@ const AdminSites: React.FC = () => {
             label: (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
                 <HomeOutlined style={{ color: '#1890ff', fontSize: '16px' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.siteManagement')}（{sites.length}）</span>
+                <span style={{ fontSize: '15px', fontWeight: 500 }}>{t('admin.siteManagement')}（{filteredSites.length}）</span>
               </div>
             ),
             children: siteManagementTab
@@ -1173,7 +1882,15 @@ const AdminSites: React.FC = () => {
                 {t('admin.addGuard')}
               </Button>
             ) : (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDistributor(null); distributorForm.resetFields(); setDistributorModalOpen(true) }}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { 
+                setEditingDistributor(null); 
+                distributorForm.resetFields(); 
+                // 设置默认工地为当前全局筛选选择的工地
+                if (selectedSiteId) {
+                  distributorForm.setFieldsValue({ siteIds: [selectedSiteId] });
+                }
+                setDistributorModalOpen(true) 
+              }}>
                 {t('admin.addDistributor')}
               </Button>
             )}
@@ -1231,7 +1948,7 @@ const AdminSites: React.FC = () => {
           <Form.Item name="contactName" label={t('admin.contactLabel')}>
             <Input placeholder={t('admin.contactPlaceholder')} />
           </Form.Item>
-          <Form.Item name="siteIds" label={t('admin.siteIdsLabel')}>
+          <Form.Item name="siteIds" label={t('admin.siteIdsLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Select 
               mode="multiple" 
               placeholder={t('admin.siteMultiSelectPlaceholder')} 
@@ -1264,9 +1981,6 @@ const AdminSites: React.FC = () => {
       {/* 门卫管理模态框 */}
       <Modal title={editingGuard ? t('admin.editGuard') : t('admin.addGuard')} open={guardModalOpen} onCancel={() => { setGuardModalOpen(false); setEditingGuard(null) }} onOk={onGuardSubmit} destroyOnClose>
         <Form form={guardForm} layout="vertical">
-          <Form.Item name="guardId" label={t('admin.guardIdLabel')} rules={[{ required: true, message: t('form.required') }]}>
-            <Input placeholder={t('admin.guardIdPlaceholder')} />
-          </Form.Item>
           <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Input placeholder={t('admin.guardNamePlaceholder')} />
           </Form.Item>

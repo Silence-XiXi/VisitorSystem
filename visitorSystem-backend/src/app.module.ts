@@ -8,6 +8,7 @@ import { CacheExampleModule } from './cache/cache-example.module';
 import { DistributorsModule } from './distributors/distributors.module';
 import { GuardsModule } from './guards/guards.module';
 import { AdminModule } from './admin/admin.module';
+import { ItemCategoriesModule } from './item-categories/item-categories.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AdminModule } from './admin/admin.module';
     DistributorsModule,
     GuardsModule,
     AdminModule,
+    ItemCategoriesModule,
   ],
 })
 export class AppModule {}

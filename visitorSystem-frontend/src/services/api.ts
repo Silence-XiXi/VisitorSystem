@@ -7,6 +7,7 @@ export interface LoginRequest {
 
 interface Distributor {
   id: string;
+  distributorId: string; // 分判商编号
   name: string;
   contactName?: string;
   phone?: string;
@@ -16,6 +17,7 @@ interface Distributor {
   accountStatus?: 'active' | 'disabled';
   siteIds?: string[];
   sites?: Array<{ id: string; name: string }>;
+  userId?: string;
   user?: {
     username: string;
     status: string;
@@ -310,8 +312,90 @@ class ApiService {
     });
   }
 
-  async createGuard(guardData: {
+  async updateDistributor(distributorId: string, distributorData: {
+    name: string;
+    contactName?: string;
+    phone?: string;
+    email?: string;
+    whatsapp?: string;
+    siteIds?: string[];
+    username?: string;
+  }): Promise<Distributor> {
+    return this.requestWithRetry(`/admin/distributors/${distributorId}`, {
+      method: 'PUT',
+      body: JSON.stringify(distributorData),
+    });
+  }
+
+  async resetDistributorPassword(distributorId: string): Promise<{
+    distributorId: string;
+    distributorName: string;
+    username: string;
+    newPassword: string;
+  }> {
+    return this.requestWithRetry(`/admin/distributors/${distributorId}/reset-password`, {
+      method: 'POST',
+    });
+  }
+
+  async resetGuardPassword(guardId: string): Promise<{
     guardId: string;
+    guardName: string;
+    username: string;
+    newPassword: string;
+  }> {
+    return this.requestWithRetry(`/admin/guards/${guardId}/reset-password`, {
+      method: 'POST',
+    });
+  }
+
+  async updateGuard(guardId: string, guardData: {
+    name: string;
+    phone?: string;
+    email?: string;
+    whatsapp?: string;
+    siteId?: string;
+    username?: string;
+  }): Promise<Guard> {
+    return this.requestWithRetry(`/admin/guards/${guardId}`, {
+      method: 'PUT',
+      body: JSON.stringify(guardData),
+    });
+  }
+
+  async deleteGuard(guardId: string): Promise<{
+    guardId: string;
+    guardName: string;
+    username: string;
+  }> {
+    return this.requestWithRetry(`/admin/guards/${guardId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteDistributor(distributorId: string): Promise<{
+    distributorId: string;
+    distributorName: string;
+    username: string;
+  }> {
+    return this.requestWithRetry(`/admin/distributors/${distributorId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async toggleGuardStatus(guardId: string): Promise<{
+    guardId: string;
+    guardName: string;
+    username: string;
+    oldStatus: string;
+    newStatus: string;
+  }> {
+    return this.requestWithRetry(`/admin/guards/${guardId}/toggle-status`, {
+      method: 'PATCH',
+    });
+  }
+
+  async createGuard(guardData: {
     name: string;
     siteId: string;
     phone: string;
@@ -326,6 +410,21 @@ class ApiService {
     });
   }
 
+  async createSite(siteData: {
+    name: string;
+    address: string;
+    code?: string;
+    manager?: string;
+    phone?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    distributorIds?: string[];
+  }): Promise<Site> {
+    return this.requestWithRetry('/admin/sites', {
+      method: 'POST',
+      body: JSON.stringify(siteData),
+    });
+  }
+
   async updateUserStatus(userId: string, status: string): Promise<{
     id: string;
     username: string;
@@ -336,6 +435,74 @@ class ApiService {
       body: JSON.stringify({ status }),
     });
   }
+
+  // 物品分类管理 API
+  async getAllItemCategories(): Promise<Array<{
+    id: string;
+    name: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }>> {
+    return this.request('/item-categories');
+  }
+
+  async createItemCategory(categoryData: {
+    name: string;
+    description?: string;
+    status?: string;
+  }): Promise<{
+    id: string;
+    name: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    return this.request('/item-categories', {
+      method: 'POST',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async updateItemCategory(id: string, categoryData: {
+    name?: string;
+    description?: string;
+    status?: string;
+  }): Promise<{
+    id: string;
+    name: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    return this.request(`/item-categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async deleteItemCategory(id: string): Promise<void> {
+    await this.request(`/item-categories/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async toggleItemCategoryStatus(id: string): Promise<{
+    id: string;
+    name: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    return this.request(`/item-categories/${id}/toggle-status`, {
+      method: 'PATCH',
+    });
+  }
+
 }
 
 export const apiService = new ApiService();

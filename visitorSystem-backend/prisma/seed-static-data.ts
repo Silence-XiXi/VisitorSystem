@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 const mockDistributors = [
   {
     id: '1',
+    distributorId: 'D1234567',
     name: '北京建筑公司',
     contactName: '刘强',
     phone: '010-88888888',
@@ -97,6 +98,7 @@ const mockDistributors = [
   },
   {
     id: '10',
+    distributorId: 'D71RYP4P',
     name: '重庆建设有限公司',
     contactName: '王刚',
     phone: '023-11111111',
@@ -107,6 +109,7 @@ const mockDistributors = [
   },
   {
     id: '11',
+    distributorId: 'DVV65BJ9',
     name: '天津建筑集团',
     contactName: '赵敏',
     phone: '022-00000000',
@@ -117,6 +120,7 @@ const mockDistributors = [
   },
   {
     id: '12',
+    distributorId: 'DG23T8QG',
     name: '青岛建设公司',
     contactName: '刘芳',
     phone: '0532-99999999',
@@ -127,6 +131,7 @@ const mockDistributors = [
   },
   {
     id: '13',
+    distributorId: 'DX016G0A',
     name: '大连工程集团',
     contactName: '孙华',
     phone: '0411-88888888',
@@ -137,6 +142,7 @@ const mockDistributors = [
   },
   {
     id: '14',
+    distributorId: 'DK7AQFBD',
     name: '厦门建筑有限公司',
     contactName: '陈伟',
     phone: '0592-77777777',
@@ -147,6 +153,7 @@ const mockDistributors = [
   },
   {
     id: '15',
+    distributorId: 'D6UN6X6N',
     name: '苏州建设集团',
     contactName: '李强',
     phone: '0512-66666666',
@@ -157,6 +164,7 @@ const mockDistributors = [
   },
   {
     id: '16',
+    distributorId: 'DQZEMAKR',
     name: '无锡工程公司',
     contactName: '王敏',
     phone: '0510-55555555',
@@ -270,7 +278,8 @@ const mockSites = [
   },
   {
     id: '11',
-    name: '天津滨海项目',
+    distributorId: 'DM8593Z9',
+    name: '
     address: '天津市滨海新区滨海大道',
     code: 'TJ-BH-001',
     manager: '赵敏',
@@ -280,7 +289,8 @@ const mockSites = [
   },
   {
     id: '12',
-    name: '青岛崂山项目',
+    distributorId: 'DU28D7GU',
+    name: '
     address: '青岛市崂山区崂山路',
     code: 'QD-LS-001',
     manager: '刘芳',
@@ -290,7 +300,8 @@ const mockSites = [
   },
   {
     id: '13',
-    name: '大连星海项目',
+    distributorId: 'DKXYQHO8',
+    name: '
     address: '大连市沙河口区星海广场',
     code: 'DL-XH-001',
     manager: '孙华',
@@ -300,7 +311,8 @@ const mockSites = [
   },
   {
     id: '14',
-    name: '厦门集美项目',
+    distributorId: 'DGJB5AQV',
+    name: '
     address: '厦门市集美区集美大道',
     code: 'XM-JM-001',
     manager: '陈伟',
@@ -310,7 +322,8 @@ const mockSites = [
   },
   {
     id: '15',
-    name: '苏州工业园区项目',
+    distributorId: 'D1DGHAQI',
+    name: '
     address: '苏州市工业园区星湖街',
     code: 'SZ-GY-001',
     manager: '李强',
@@ -320,7 +333,8 @@ const mockSites = [
   },
   {
     id: '16',
-    name: '无锡太湖项目',
+    distributorId: 'DUV17TTQ',
+    name: '
     address: '无锡市滨湖区太湖大道',
     code: 'WX-TH-001',
     manager: '王敏',
@@ -333,7 +347,8 @@ const mockSites = [
 const mockItemCategories = [
   {
     id: '1',
-    name: '门禁卡',
+    distributorId: 'DBABSEFN',
+    name: '
     description: '用于进出工地、办公室等场所的门禁卡',
     status: 'active',
     createTime: '2024-01-01T00:00:00Z',
@@ -419,6 +434,7 @@ async function main() {
       await prisma.distributor.create({
         data: {
           id: distributorData.id,
+          distributorId: distributorData.distributorId,
           name: distributorData.name,
           contactName: distributorData.contactName,
           phone: distributorData.phone,

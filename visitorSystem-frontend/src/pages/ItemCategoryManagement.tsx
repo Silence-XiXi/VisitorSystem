@@ -1,26 +1,45 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Row, Col, Upload } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
-import { mockItemCategories } from '../data/mockData'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
+import { apiService } from '../services/api'
 
 // 借用物品分类接口
 interface ItemCategory {
   id: string
   name: string
   description: string
-  status: 'active' | 'inactive'
-  createTime: string
-  updateTime: string
+  status: 'ACTIVE' | 'INACTIVE'
+  createdAt: string
+  updatedAt: string
 }
 
 const ItemCategoryManagement: React.FC = () => {
   const { t } = useLocale()
-  const [categories, setCategories] = useState<ItemCategory[]>(mockItemCategories as ItemCategory[])
+  const [categories, setCategories] = useState<ItemCategory[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(null)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
+
+  // 加载分类数据
+  const loadCategories = async () => {
+    try {
+      setLoading(true)
+      const data = await apiService.getAllItemCategories()
+      setCategories(data)
+    } catch (error) {
+      console.error('加载分类数据失败:', error)
+      message.error('加载分类数据失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadCategories()
+  }, [])
 
   // 显示确认删除对话框
   const showDeleteConfirm = (record: ItemCategory) => {
@@ -38,19 +57,26 @@ const ItemCategoryManagement: React.FC = () => {
       okText: t('itemCategory.deleteConfirm'),
       cancelText: t('common.cancel'),
       okType: 'danger',
-      onOk: () => {
-        setCategories(prev => prev.filter(c => c.id !== record.id))
-        message.success(t('itemCategory.deleteSuccess').replace('{name}', record.name))
+      onOk: async () => {
+        try {
+          await apiService.deleteItemCategory(record.id)
+          setCategories(prev => prev.filter(c => c.id !== record.id))
+          message.success(t('itemCategory.deleteSuccess').replace('{name}', record.name))
+        } catch (error: any) {
+          console.error('删除分类失败:', error)
+          const errorMessage = error?.response?.data?.message || '删除分类失败'
+          message.error(errorMessage)
+        }
       }
     })
   }
 
   // 切换分类状态
   const handleToggleStatus = (record: ItemCategory) => {
-    const newStatus = record.status === 'active' ? 'inactive' : 'active'
-    const statusTitle = newStatus === 'active' ? t('itemCategory.enableTitle') : t('itemCategory.disableTitle')
-    const statusContent = newStatus === 'active' ? t('itemCategory.enableContent') : t('itemCategory.disableContent')
-    const statusSuccess = newStatus === 'active' ? t('itemCategory.enableSuccess') : t('itemCategory.disableSuccess')
+    const newStatus = record.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+    const statusTitle = newStatus === 'ACTIVE' ? t('itemCategory.enableTitle') : t('itemCategory.disableTitle')
+    const statusContent = newStatus === 'ACTIVE' ? t('itemCategory.enableContent') : t('itemCategory.disableContent')
+    const statusSuccess = newStatus === 'ACTIVE' ? t('itemCategory.enableSuccess') : t('itemCategory.disableSuccess')
     
     Modal.confirm({
       title: statusTitle,
@@ -58,13 +84,36 @@ const ItemCategoryManagement: React.FC = () => {
       content: (
         <div>
           <p>{statusContent.replace('{name}', record.name)}</p>
+          {newStatus === 'INACTIVE' && (
+            <p style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '8px' }}>
+              {t('itemCategory.disableWarning')}
+            </p>
+          )}
         </div>
       ),
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
-      onOk: () => {
-        setCategories(prev => prev.map(c => c.id === record.id ? { ...c, status: newStatus, updateTime: new Date().toISOString() } : c))
-        message.success(statusSuccess.replace('{name}', record.name))
+      okType: newStatus === 'INACTIVE' ? 'danger' : 'primary',
+      onOk: async () => {
+        try {
+          setLoading(true)
+          const updatedCategory = await apiService.toggleItemCategoryStatus(record.id)
+          setCategories(prev => prev.map(c => c.id === record.id ? updatedCategory : c))
+          message.success(statusSuccess.replace('{name}', record.name))
+        } catch (error: any) {
+          console.error('切换状态失败:', error)
+          let errorMessage = '切换状态失败'
+          
+          if (error?.response?.data?.message) {
+            errorMessage = error.response.data.message
+          } else if (error?.message) {
+            errorMessage = error.message
+          }
+          
+          message.error(errorMessage)
+        } finally {
+          setLoading(false)
+        }
       }
     })
   }
@@ -80,16 +129,16 @@ const ItemCategoryManagement: React.FC = () => {
       key: 'status', 
       width: 100, 
       render: (status: string) => {
-        const map: any = { 
-          active: { color: 'green', text: t('itemCategory.active') }, 
-          inactive: { color: 'red', text: t('itemCategory.inactive') } 
+        const map: Record<string, { color: string; text: string }> = { 
+          ACTIVE: { color: 'green', text: t('itemCategory.active') }, 
+          INACTIVE: { color: 'red', text: t('itemCategory.inactive') } 
         }
-        const cfg = map[status]
+        const cfg = map[status] || map['ACTIVE']
         return <Tag color={cfg.color}>{cfg.text}</Tag>
       } 
     },
-    { title: t('itemCategory.createTime'), dataIndex: 'createTime', key: 'createTime', width: 180, render: (time: string) => new Date(time).toLocaleString() },
-    { title: t('itemCategory.updateTime'), dataIndex: 'updateTime', key: 'updateTime', width: 180, render: (time: string) => new Date(time).toLocaleString() },
+    { title: t('itemCategory.createTime'), dataIndex: 'createdAt', key: 'createdAt', width: 180, render: (time: string) => new Date(time).toLocaleString() },
+    { title: t('itemCategory.updateTime'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (time: string) => new Date(time).toLocaleString() },
     { 
       title: t('common.actions'), 
       key: 'actions', 
@@ -108,10 +157,10 @@ const ItemCategoryManagement: React.FC = () => {
           />
           <Button 
             size="small" 
-            icon={record.status === 'active' ? <DeleteOutlined /> : <EditOutlined />}
-            type={record.status === 'active' ? 'default' : 'primary'}
+            icon={record.status === 'ACTIVE' ? <StopOutlined /> : <PlayCircleOutlined />}
+            type={record.status === 'ACTIVE' ? 'default' : 'primary'}
             onClick={() => handleToggleStatus(record)}
-            title={record.status === 'active' ? t('itemCategory.disable') : t('itemCategory.enable')}
+            title={record.status === 'ACTIVE' ? t('itemCategory.disable') : t('itemCategory.enable')}
           />
           <Button 
             danger 
@@ -127,31 +176,37 @@ const ItemCategoryManagement: React.FC = () => {
 
   // 表单提交
   const onFormSubmit = async () => {
-    const values = await form.validateFields()
-    if (editingCategory) {
-      // 编辑现有分类
-      setCategories(prev => prev.map(c => c.id === editingCategory.id ? { 
-        ...editingCategory, 
-        ...values, 
-        updateTime: new Date().toISOString() 
-      } : c))
-      message.success(t('itemCategory.updateSuccess'))
-    } else {
-      // 新增分类
-      const newCategory: ItemCategory = {
-        id: Date.now().toString(),
-        name: values.name,
-        description: values.description || '',
-        status: values.status || 'active',
-        createTime: new Date().toISOString(),
-        updateTime: new Date().toISOString()
+    try {
+      const values = await form.validateFields()
+      
+      if (editingCategory) {
+        // 编辑现有分类
+        const updatedCategory = await apiService.updateItemCategory(editingCategory.id, {
+          name: values.name,
+          description: values.description,
+          status: values.status || 'ACTIVE'
+        })
+        setCategories(prev => prev.map(c => c.id === editingCategory.id ? updatedCategory : c))
+        message.success(t('itemCategory.updateSuccess'))
+      } else {
+        // 新增分类
+        const newCategory = await apiService.createItemCategory({
+          name: values.name,
+          description: values.description,
+          status: values.status || 'ACTIVE'
+        })
+        setCategories(prev => [newCategory, ...prev])
+        message.success(t('itemCategory.addSuccess'))
       }
-      setCategories(prev => [newCategory, ...prev])
-      message.success(t('itemCategory.addSuccess'))
+      
+      setModalOpen(false)
+      setEditingCategory(null)
+      form.resetFields()
+    } catch (error: any) {
+      console.error('提交失败:', error)
+      const errorMessage = error?.response?.data?.message || '操作失败'
+      message.error(errorMessage)
     }
-    setModalOpen(false)
-    setEditingCategory(null)
-    form.resetFields()
   }
 
   // 导出分类数据
@@ -245,6 +300,7 @@ const ItemCategoryManagement: React.FC = () => {
           rowKey="id" 
           columns={columns} 
           dataSource={categories} 
+          loading={loading}
           pagination={{ pageSize: 10, showSizeChanger: true }}
           rowSelection={{
             selectedRowKeys: selectedCategoryIds,
@@ -285,20 +341,20 @@ const ItemCategoryManagement: React.FC = () => {
           <Form.Item 
             name="status" 
             label={t('itemCategory.status')} 
-            initialValue={'active'}
+            initialValue={'ACTIVE'}
           >
             <Input.Group compact>
               <Button 
                 style={{ width: '50%' }}
-                onClick={() => form.setFieldValue('status', 'active')}
-                type={form.getFieldValue('status') === 'active' ? 'primary' : 'default'}
+                onClick={() => form.setFieldValue('status', 'ACTIVE')}
+                type={form.getFieldValue('status') === 'ACTIVE' ? 'primary' : 'default'}
               >
                 {t('itemCategory.active')}
               </Button>
               <Button 
                 style={{ width: '50%' }}
-                onClick={() => form.setFieldValue('status', 'inactive')}
-                type={form.getFieldValue('status') === 'inactive' ? 'primary' : 'default'}
+                onClick={() => form.setFieldValue('status', 'INACTIVE')}
+                type={form.getFieldValue('status') === 'INACTIVE' ? 'primary' : 'default'}
               >
                 {t('itemCategory.inactive')}
               </Button>
