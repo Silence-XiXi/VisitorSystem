@@ -31,6 +31,7 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isInitialized, setIsInitialized] = useState(false)
   
   // 安全地获取翻译函数，如果不在LocaleProvider中则使用默认值
   let t: (key: string) => string
@@ -58,6 +59,11 @@ export const useAuth = () => {
   }
 
   useEffect(() => {
+    // 防止重复初始化
+    if (isInitialized) {
+      return
+    }
+
     const validateAuth = async () => {
       console.log('useAuth: Starting authentication validation')
       
@@ -73,23 +79,6 @@ export const useAuth = () => {
           console.log('useAuth: Parsed user data:', userData)
           setUser(userData)
           setIsAuthenticated(true)
-          
-          // 验证token是否仍然有效
-          try {
-            console.log('useAuth: Validating token with server...')
-            const profile = await apiService.getProfile()
-            console.log('useAuth: Token validation successful, profile:', profile)
-            // Token有效，更新用户信息
-            setUser(profile)
-            localStorage.setItem('user', JSON.stringify(profile))
-          } catch (error) {
-            console.log('useAuth: Token validation failed:', error)
-            // Token无效，清除本地存储
-            localStorage.removeItem('user')
-            localStorage.removeItem('access_token')
-            setUser(null)
-            setIsAuthenticated(false)
-          }
         } catch (error) {
           console.error('useAuth: Error parsing stored user data:', error)
           localStorage.removeItem('user')
@@ -106,10 +95,11 @@ export const useAuth = () => {
       
       console.log('useAuth: Authentication validation complete, isLoading set to false')
       setIsLoading(false)
+      setIsInitialized(true)
     }
 
     validateAuth()
-  }, [])
+  }, [isInitialized])
 
   const login = async (username: string, password: string): Promise<{ success: boolean; role?: string; error?: string; errorCode?: number }> => {
     try {
@@ -208,6 +198,7 @@ export const useAuth = () => {
       localStorage.removeItem('access_token')
       setUser(null)
       setIsAuthenticated(false)
+      setIsInitialized(false)
     }
   }
 

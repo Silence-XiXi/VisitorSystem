@@ -18,6 +18,7 @@ const mockDistributors = [
   },
   {
     id: '2',
+    distributorId: 'D2A8B9C1',
     name: '上海工程集团',
     contactName: '王芳',
     phone: '021-66666666',
@@ -28,6 +29,7 @@ const mockDistributors = [
   },
   {
     id: '3',
+    distributorId: 'D3E4F5G6',
     name: '广州建设有限公司',
     contactName: '李明',
     phone: '020-77777777',
@@ -38,6 +40,7 @@ const mockDistributors = [
   },
   {
     id: '4',
+    distributorId: 'D4H7I8J9',
     name: '深圳建筑集团',
     contactName: '周婷',
     phone: '0755-12345678',
@@ -48,6 +51,7 @@ const mockDistributors = [
   },
   {
     id: '5',
+    distributorId: 'D5K0L1M2',
     name: '杭州城建集团',
     contactName: '钱勇',
     phone: '0571-99999999',
@@ -58,6 +62,7 @@ const mockDistributors = [
   },
   {
     id: '6',
+    distributorId: 'D6N3O4P5',
     name: '成都建工集团',
     contactName: '孙伟',
     phone: '028-55555555',
@@ -68,6 +73,7 @@ const mockDistributors = [
   },
   {
     id: '7',
+    distributorId: 'D7Q6R7S8',
     name: '武汉建设集团',
     contactName: '陈华',
     phone: '027-44444444',
@@ -78,6 +84,7 @@ const mockDistributors = [
   },
   {
     id: '8',
+    distributorId: 'D8T9U0V1',
     name: '西安建筑公司',
     contactName: '张伟',
     phone: '029-33333333',
@@ -88,6 +95,7 @@ const mockDistributors = [
   },
   {
     id: '9',
+    distributorId: 'D9W2X3Y4',
     name: '南京工程集团',
     contactName: '李敏',
     phone: '025-22222222',
@@ -279,7 +287,7 @@ const mockSites = [
   {
     id: '11',
     distributorId: 'DM8593Z9',
-    name: '
+    name: '天津滨海工地',
     address: '天津市滨海新区滨海大道',
     code: 'TJ-BH-001',
     manager: '赵敏',
@@ -290,7 +298,7 @@ const mockSites = [
   {
     id: '12',
     distributorId: 'DU28D7GU',
-    name: '
+    name: '青岛崂山工地',
     address: '青岛市崂山区崂山路',
     code: 'QD-LS-001',
     manager: '刘芳',
@@ -301,7 +309,7 @@ const mockSites = [
   {
     id: '13',
     distributorId: 'DKXYQHO8',
-    name: '
+    name: '大连星海工地',
     address: '大连市沙河口区星海广场',
     code: 'DL-XH-001',
     manager: '孙华',
@@ -312,7 +320,7 @@ const mockSites = [
   {
     id: '14',
     distributorId: 'DGJB5AQV',
-    name: '
+    name: '厦门集美工地',
     address: '厦门市集美区集美大道',
     code: 'XM-JM-001',
     manager: '陈伟',
@@ -323,7 +331,7 @@ const mockSites = [
   {
     id: '15',
     distributorId: 'D1DGHAQI',
-    name: '
+    name: '苏州工业园区工地',
     address: '苏州市工业园区星湖街',
     code: 'SZ-GY-001',
     manager: '李强',
@@ -334,7 +342,7 @@ const mockSites = [
   {
     id: '16',
     distributorId: 'DUV17TTQ',
-    name: '
+    name: '无锡太湖工地',
     address: '无锡市滨湖区太湖大道',
     code: 'WX-TH-001',
     manager: '王敏',
@@ -348,7 +356,7 @@ const mockItemCategories = [
   {
     id: '1',
     distributorId: 'DBABSEFN',
-    name: '
+    name: '门禁卡',
     description: '用于进出工地、办公室等场所的门禁卡',
     status: 'active',
     createTime: '2024-01-01T00:00:00Z',
@@ -356,6 +364,7 @@ const mockItemCategories = [
   },
   {
     id: '2',
+    distributorId: 'D2Z5A6B7',
     name: '钥匙',
     description: '各种门锁、柜子、工具箱等的钥匙',
     status: 'active',
@@ -364,6 +373,7 @@ const mockItemCategories = [
   },
   {
     id: '3',
+    distributorId: 'D3C8D9E0',
     name: '梯子',
     description: '各种高度和类型的梯子，用于高空作业',
     status: 'active',
@@ -372,6 +382,7 @@ const mockItemCategories = [
   },
   {
     id: '4',
+    distributorId: 'D4F1G2H3',
     name: '安全帽',
     description: '工地安全防护用品，各种颜色和尺寸',
     status: 'active',
@@ -380,6 +391,7 @@ const mockItemCategories = [
   },
   {
     id: '5',
+    distributorId: 'D5I4J5K6',
     name: '工具',
     description: '各种手动和电动工具，如扳手、电钻等',
     status: 'active',
@@ -388,6 +400,7 @@ const mockItemCategories = [
   },
   {
     id: '6',
+    distributorId: 'D6L7M8N9',
     name: '防护用品',
     description: '安全眼镜、手套、口罩等个人防护用品',
     status: 'active',
@@ -396,6 +409,7 @@ const mockItemCategories = [
   },
   {
     id: '7',
+    distributorId: 'D7O0P1Q2',
     name: '测量设备',
     description: '卷尺、水平仪、激光测距仪等测量工具',
     status: 'active',
@@ -404,6 +418,7 @@ const mockItemCategories = [
   },
   {
     id: '8',
+    distributorId: 'D8R3S4T5',
     name: '通信设备',
     description: '对讲机、电话、平板电脑等通信工具',
     status: 'inactive',
@@ -579,6 +594,7 @@ async function main() {
           name: categoryData.name,
           description: categoryData.description,
           status: categoryData.status.toUpperCase() as any,
+          code: `C${Math.random().toString(36).substr(2, 7).toUpperCase()}`,
         },
       });
     }

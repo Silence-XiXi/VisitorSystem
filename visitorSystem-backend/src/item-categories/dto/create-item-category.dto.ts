@@ -3,6 +3,11 @@ import { ItemCategoryStatus } from '@prisma/client';
 
 export class CreateItemCategoryDto {
   @IsString()
+  @IsOptional()
+  @MaxLength(8)
+  code?: string;
+
+  @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   name: string;

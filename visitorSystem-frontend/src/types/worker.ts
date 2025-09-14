@@ -2,7 +2,7 @@ export interface Worker {
   id: string;
   workerId: string; // 工人唯一编号
   name: string; // 姓名
-  gender: 'male' | 'female'; // 性别
+  gender: 'MALE' | 'FEMALE'; // 性别
   idCard: string; // 身份证号
   region: string; // 地区
   photo: string; // 照片URL
@@ -14,27 +14,26 @@ export interface Worker {
   birthDate?: string; // 出生日期 ISO 字符串 YYYY-MM-DD
   age?: number; // 年龄（根据出生日期计算）
   physicalCardId?: string; // 实体卡编号（每日发放，非固定）
-  status: 'active' | 'inactive' | 'suspended'; // 状态
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'; // 状态
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateWorkerRequest {
-  workerId: string;
   name: string;
-  gender: 'male' | 'female';
+  gender: 'MALE' | 'FEMALE';
   idCard: string;
   region: string;
   photo?: string;
   distributorId: string;
   siteId: string;
   phone: string;
-  email: string;
-  whatsapp: string;
-  birthDate: string;
-  age: number;
+  email?: string;
+  whatsapp?: string;
+  birthDate?: string;
+  age?: number;
   physicalCardId?: string;
-  status: 'active' | 'inactive' | 'suspended';
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 }
 
 export interface UpdateWorkerRequest extends Partial<CreateWorkerRequest> {

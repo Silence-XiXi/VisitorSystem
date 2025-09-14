@@ -6,10 +6,13 @@ import { mockSites, mockDistributors, mockGuards } from '../data/mockData'
 import { 
   exportSitesToExcel, 
   exportDistributorsToExcel, 
-  readSiteExcelFile, 
+  exportGuardsToExcel,
+  readSiteExcelFile,
   readDistributorExcelFile,
+  readGuardExcelFile,
   generateSiteImportTemplate,
-  generateDistributorImportTemplate
+  generateDistributorImportTemplate,
+  generateGuardImportTemplate
 } from '../utils/excelUtils'
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
@@ -50,6 +53,7 @@ const AdminSites: React.FC = () => {
 
   // 门卫筛选状态
   const [guardKeyword, setGuardKeyword] = useState<string>('')
+  const [guardStatusFilters, setGuardStatusFilters] = useState<string[]>([])
   
   // 标签页状态
   const [activeTab, setActiveTab] = useState<string>('distributors')
@@ -111,6 +115,11 @@ const AdminSites: React.FC = () => {
     }))
   }
 
+  // 状态转换辅助函数
+  const transformSiteStatus = (status: string) => {
+    return status === 'ACTIVE' ? 'active' : status === 'INACTIVE' ? 'inactive' : status === 'SUSPENDED' ? 'suspended' : 'active'
+  }
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -128,7 +137,7 @@ const AdminSites: React.FC = () => {
         code: site.code || '',
         manager: site.manager,
         phone: site.phone,
-        status: site.status || 'active',
+        status: transformSiteStatus(site.status),
         distributorIds: site.distributorIds || []
       }))
       
@@ -287,7 +296,7 @@ const AdminSites: React.FC = () => {
   }
 
   // 切换工地状态
-  const handleToggleSiteStatus = (record: Site) => {
+  const handleToggleSiteStatus = async (record: Site) => {
     const newStatus = record.status === 'active' ? 'inactive' : 'active'
     const statusText = newStatus === 'active' ? t('admin.enableSiteTitle') : t('admin.disableSiteTitle')
     const statusAction = newStatus === 'active' ? t('admin.enableSiteConfirm') : t('admin.disableSiteConfirm')
@@ -301,10 +310,39 @@ const AdminSites: React.FC = () => {
       ),
       okText: t('admin.confirm'),
       cancelText: t('admin.cancel'),
-      onOk: () => {
-        setSites(prev => prev.map(s => s.id === record.id ? { ...s, status: newStatus } : s))
-        const successMessage = newStatus === 'active' ? t('admin.enableSiteSuccess') : t('admin.disableSiteSuccess')
-        message.success(successMessage.replace('{name}', record.name))
+      onOk: async () => {
+        try {
+          // 调用后端API更新工地状态
+          const siteData = {
+            name: record.name,
+            address: record.address,
+            code: record.code,
+            manager: record.manager,
+            phone: record.phone,
+            status: newStatus === 'active' ? 'active' : 'inactive', // 转换为后端期望的格式
+            distributorIds: record.distributorIds || []
+          }
+          
+          const updatedSite = await apiService.updateSite(record.id, siteData)
+          
+          // 转换后端返回的状态格式
+          const transformedUpdatedSite = {
+            ...updatedSite,
+            status: transformSiteStatus(updatedSite.status)
+          }
+          
+          // 更新本地状态
+          setSites(prev => prev.map(s => s.id === record.id ? transformedUpdatedSite : s))
+          
+          // 刷新全局工地筛选器
+          await refreshSites()
+          
+          const successMessage = newStatus === 'active' ? t('admin.enableSiteSuccess') : t('admin.disableSiteSuccess')
+          message.success(successMessage.replace('{name}', record.name))
+        } catch (error) {
+          console.error('更新工地状态失败:', error)
+          message.error(t('admin.updateSiteStatusFailed'))
+        }
       }
     })
   }
@@ -362,7 +400,7 @@ const AdminSites: React.FC = () => {
 
   // 工地表格列定义
   const siteColumns = [
-    { title: t('admin.siteId'), dataIndex: 'id', key: 'id', width: 100 },
+    { title: t('admin.siteCode'), dataIndex: 'code', key: 'code', width: 120 },
     { title: t('admin.siteName'), dataIndex: 'name', key: 'name', width: 160 },
     { title: t('admin.siteAddress'), dataIndex: 'address', key: 'address' },
     { title: t('admin.siteManager'), dataIndex: 'manager', key: 'manager', width: 120 },
@@ -506,12 +544,18 @@ const AdminSites: React.FC = () => {
     })
   }, [sites, siteStatusFilters, siteManagerFilters, siteKeyword])
 
-  // 分判商筛选后的数据
-  const filteredDistributors = useMemo(() => {
+  // 分判商全局筛选后的数据（仅按工地筛选）
+  const globallyFilteredDistributors = useMemo(() => {
     return distributors.filter(d => {
       // 全局工地筛选：如果选择了特定工地，只显示与该工地关联的分判商
       if (selectedSiteId && (!d.siteIds || !d.siteIds.includes(selectedSiteId))) return false
-      
+      return true
+    })
+  }, [distributors, selectedSiteId])
+
+  // 分判商筛选后的数据
+  const filteredDistributors = useMemo(() => {
+    return globallyFilteredDistributors.filter(d => {
       if (distributorStatusFilters.length > 0 && !distributorStatusFilters.includes(d.accountStatus || 'active')) return false
       if (distributorKeyword.trim()) {
         const k = distributorKeyword.trim().toLowerCase()
@@ -520,7 +564,7 @@ const AdminSites: React.FC = () => {
       }
       return true
     })
-  }, [distributors, distributorStatusFilters, distributorKeyword, selectedSiteId])
+  }, [globallyFilteredDistributors, distributorStatusFilters, distributorKeyword])
 
 
   // 批量发送账号密码到Email
@@ -617,8 +661,27 @@ const AdminSites: React.FC = () => {
     const v = await siteForm.validateFields()
       
     if (editingSite) {
-        // 编辑工地 - 暂时使用本地更新，后续可以添加编辑API
-      setSites(prev => prev.map(s => s.id === editingSite.id ? { ...editingSite, ...v } : s))
+        // 编辑工地 - 调用后端API
+        const siteData = {
+          name: v.name,
+          address: v.address,
+          code: editingSite?.code, // 编辑时保持原有编号
+          manager: v.manager,
+          phone: v.phone,
+          status: v.status || 'active',
+          distributorIds: v.distributorIds || []
+        }
+        
+        const updatedSite = await apiService.updateSite(editingSite.id, siteData)
+        
+        // 转换后端返回的状态格式
+        const transformedUpdatedSite = {
+          ...updatedSite,
+          status: transformSiteStatus(updatedSite.status)
+        }
+        
+        // 更新本地状态
+        setSites(prev => prev.map(s => s.id === editingSite.id ? transformedUpdatedSite : s))
         
         // 刷新全局工地筛选器
         await refreshSites()
@@ -629,7 +692,7 @@ const AdminSites: React.FC = () => {
         const siteData = {
           name: v.name,
           address: v.address,
-          code: v.code,
+          // 不传递code字段，让后端自动生成
           manager: v.manager,
           phone: v.phone,
           status: v.status || 'active',
@@ -637,12 +700,19 @@ const AdminSites: React.FC = () => {
         }
         
         const newSite = await apiService.createSite(siteData)
-        // 确保返回的site数据包含必需的字段
+        // 确保返回的site数据包含必需的字段，并转换状态格式
         const siteWithDefaults = {
           ...newSite,
           code: newSite.code || `SITE_${Date.now()}` // 如果没有code，生成一个默认值
         }
-        setSites(prev => [siteWithDefaults, ...prev])
+        
+        // 转换后端返回的状态格式
+        const transformedNewSite = {
+          ...siteWithDefaults,
+          status: transformSiteStatus(siteWithDefaults.status)
+        }
+        
+        setSites(prev => [transformedNewSite, ...prev])
         
         // 刷新全局工地筛选器
         await refreshSites()
@@ -887,6 +957,7 @@ const AdminSites: React.FC = () => {
     message.success(t('admin.sitesExported').replace('{count}', dataToExport.length.toString()))
   }
 
+
   const handleDistributorExport = (exportAll: boolean = true) => {
     const dataToExport = exportAll ? distributors : distributors.filter(distributor => selectedDistributorIds.includes(distributor.id))
     
@@ -897,6 +968,163 @@ const AdminSites: React.FC = () => {
     
     exportDistributorsToExcel(dataToExport, sites)
     message.success(t('admin.distributorsExported').replace('{count}', dataToExport.length.toString()))
+  }
+
+  // 显示分判商导出选择对话框
+  const showDistributorExportOptions = () => {
+    const currentSiteName = selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.name : null
+    const currentSiteDistributors = selectedSiteId ? distributors.filter(d => d.siteIds && d.siteIds.includes(selectedSiteId)) : []
+    const currentSiteCount = currentSiteDistributors.length
+    const allDistributorsCount = distributors.length
+
+    Modal.confirm({
+      title: (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{t('admin.exportDistributorsTitle')}</span>
+          <Button 
+            type="text" 
+            size="small" 
+            icon={<CloseOutlined />} 
+            onClick={() => Modal.destroyAll()}
+            style={{ marginRight: -8 }}
+          />
+        </div>
+      ),
+      icon: <DownloadOutlined style={{ color: '#1890ff' }} />,
+      content: (
+        <div>
+          <p style={{ marginBottom: '16px', fontSize: '14px' }}>
+            {t('admin.exportDistributorsDescription')}
+          </p>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '12px',
+            marginBottom: '16px'
+          }}>
+            {/* 导出当前全局工地选择的分判商数据 */}
+            <div 
+              style={{ 
+                padding: '12px 16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px',
+                cursor: 'pointer',
+                background: '#fafafa',
+                transition: 'all 0.2s'
+              }}
+              onClick={() => {
+                Modal.destroyAll()
+                handleExportCurrentSiteDistributors()
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '4px'
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                  {t('admin.exportCurrentSiteDistributors')}
+                </span>
+                <span style={{ 
+                  background: '#1890ff', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px',
+                  fontSize: '12px'
+                }}>
+                  {currentSiteCount}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {currentSiteName ? 
+                  t('admin.exportCurrentSiteDistributorsDescription').replace('{siteName}', currentSiteName) :
+                  t('admin.noSiteSelected')
+                }
+              </div>
+            </div>
+
+            {/* 导出所有分判商的数据 */}
+            <div 
+              style={{ 
+                padding: '12px 16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px',
+                cursor: 'pointer',
+                background: '#fafafa',
+                transition: 'all 0.2s'
+              }}
+              onClick={() => {
+                Modal.destroyAll()
+                handleExportAllDistributors()
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '4px'
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#52c41a' }}>
+                  {t('admin.exportAllDistributors')}
+                </span>
+                <span style={{ 
+                  background: '#52c41a', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px',
+                  fontSize: '12px'
+                }}>
+                  {allDistributorsCount}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {t('admin.exportAllDistributorsDescription')}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ 
+            padding: '8px 12px', 
+            background: '#e6f7ff', 
+            border: '1px solid #91d5ff', 
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            💡 {t('admin.exportDistributorsTip')}
+          </div>
+        </div>
+      ),
+      okText: t('admin.exportCurrentSiteDistributors'),
+      cancelText: t('admin.exportAllDistributors'),
+      onOk: () => {
+        handleExportCurrentSiteDistributors()
+      },
+      onCancel: () => {
+        handleExportAllDistributors()
+      },
+      width: 500
+    })
+  }
+
+  // 导出当前全局工地选择的分判商数据
+  const handleExportCurrentSiteDistributors = () => {
+    if (!selectedSiteId) {
+      message.warning(t('admin.noSiteSelectedForExport'))
+      return
+    }
+
+    const currentSiteDistributors = distributors.filter(d => d.siteIds && d.siteIds.includes(selectedSiteId))
+    exportDistributorsToExcel(currentSiteDistributors, sites)
+    message.success(t('admin.currentSiteDistributorsExported').replace('{count}', currentSiteDistributors.length.toString()))
+  }
+
+  // 导出所有分判商的数据
+  const handleExportAllDistributors = () => {
+    exportDistributorsToExcel(distributors, sites)
+    message.success(t('admin.allDistributorsExported').replace('{count}', distributors.length.toString()))
   }
 
   const handleSiteImport = async (file: File) => {
@@ -913,16 +1141,130 @@ const AdminSites: React.FC = () => {
         return
       }
       
-      setSites(prev => [...importedSites, ...prev])
-      message.success(t('admin.importSuccess').replace('{count}', importedSites.length.toString()))
+      // 显示导入确认对话框
+      Modal.confirm({
+        title: t('admin.siteImportConfirm'),
+        content: (
+          <div>
+            <p>{t('admin.importConfirmMessage').replace('{count}', importedSites.length.toString())}</p>
+            <p style={{ color: '#1890ff', marginTop: '8px' }}>
+              {t('admin.siteImportRulesMessage')}
+            </p>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
+              {t('admin.importRulesMessage')}
+            </p>
+            {errors.length > 0 && (
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '8px', 
+                background: '#fff7e6', 
+                border: '1px solid #ffd591', 
+                borderRadius: '4px',
+                fontSize: '12px'
+              }}>
+                <div style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: '4px' }}>
+                  ⚠️ {t('admin.importWarnings')}:
+                </div>
+                {errors.slice(0, 3).map((error, index) => (
+                  <div key={index} style={{ color: '#666', marginBottom: '2px' }}>
+                    {error}
+                  </div>
+                ))}
+                {errors.length > 3 && (
+                  <div style={{ color: '#999', fontStyle: 'italic' }}>
+                    ... 还有 {errors.length - 3} 个警告
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ),
+        onOk: async () => {
+          await processSiteImport(importedSites)
+        }
+      })
     } catch (error) {
       message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
     }
   }
 
+  // 处理工地导入
+  const processSiteImport = async (importedSites: Record<string, unknown>[]) => {
+    try {
+      setLoading(true)
+      
+      let successCount = 0
+      let skipCount = 0
+      const errors: string[] = []
+
+      for (const siteData of importedSites) {
+        try {
+          // 准备导入数据
+          const importData = {
+            name: String(siteData.name || ''),
+            address: String(siteData.address || ''),
+            code: String(siteData.code || '').trim(),
+            manager: String(siteData.manager || ''),
+            phone: String(siteData.phone || ''),
+            status: (siteData.status as 'active' | 'inactive' | 'suspended') || 'active'
+          }
+
+          // 如果没有编号，不发送code字段，让后端自动生成
+          if (!importData.code) {
+            delete importData.code
+          }
+
+          try {
+            // 先尝试创建，如果编号已存在会返回409错误
+            const newSite = await apiService.createSite(importData)
+            
+            // 转换数据格式以匹配前端期望
+            const transformedSite = {
+              id: newSite.id,
+              code: newSite.code,
+              name: newSite.name,
+              address: newSite.address,
+              manager: newSite.manager,
+              phone: newSite.phone,
+              status: transformSiteStatus(newSite.status),
+              distributorIds: newSite.distributorIds || []
+            }
+            
+            setSites(prev => [transformedSite, ...prev])
+            successCount++
+          } catch (createError: unknown) {
+            const error = createError as { statusCode?: number; message?: string }
+            if (error.statusCode === 409) {
+              // 编号已存在，跳过
+              skipCount++
+              console.log(`跳过重复的工地: ${siteData.name} (编号: ${importData.code || '自动生成'})`)
+            } else {
+              // 其他错误
+              errors.push(`${siteData.name}: ${error.message || '创建失败'}`)
+            }
+          }
+        } catch (error: unknown) {
+          const err = error as { message?: string }
+          errors.push(`${siteData.name}: ${err.message || '处理失败'}`)
+        }
+      }
+
+      // 刷新全局工地筛选器
+      await refreshSites()
+
+      // 显示导入结果弹窗
+      showImportResultModal(successCount, skipCount, errors, 'site')
+    } catch (error) {
+      console.error('Site import processing failed:', error)
+      message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleDistributorImport = async (file: File) => {
     try {
-      const { distributors: importedDistributors, errors } = await readDistributorExcelFile(file)
+      const { distributors: importedDistributors, errors } = await readDistributorExcelFile(file, sites)
       
       if (errors.length > 0) {
         message.error(t('admin.importFailed').replace('{errors}', errors.join('; ')))
@@ -1024,7 +1366,9 @@ const AdminSites: React.FC = () => {
             whatsapp: String(distributorData.whatsapp || ''),
             username: String(distributorData.accountUsername || String(distributorData.name || '').toLowerCase().replace(/\s+/g, '')),
             password: 'Pass@123', // 默认密码
-            siteIds: selectedSiteId ? [selectedSiteId] : (Array.isArray(distributorData.siteIds) ? distributorData.siteIds : [])
+            siteIds: Array.isArray(distributorData.siteIds) && distributorData.siteIds.length > 0 
+              ? distributorData.siteIds 
+              : (selectedSiteId ? [selectedSiteId] : [])
           }
 
           // 检查用户名是否已存在（通过API调用）
@@ -1069,7 +1413,7 @@ const AdminSites: React.FC = () => {
       await refreshSites()
 
       // 显示导入结果弹窗
-      showImportResultModal(successCount, skipCount, errors)
+      showImportResultModal(successCount, skipCount, errors, 'distributor')
     } catch (error) {
       console.error('Import processing failed:', error)
       message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
@@ -1088,12 +1432,187 @@ const AdminSites: React.FC = () => {
     message.success(t('admin.distributorTemplateDownloaded'))
   }
 
+  // 门卫导入导出相关函数
+  const handleGuardImport = async (file: File) => {
+    try {
+      // 使用当前全局选择的工地作为默认工地
+      const { guards: importedGuards, errors } = await readGuardExcelFile(file, selectedSiteId)
+      
+      if (errors.length > 0) {
+        message.error(t('admin.importFailed').replace('{errors}', errors.join('; ')))
+        return
+      }
+      
+      if (importedGuards.length === 0) {
+        message.warning(t('admin.noValidData'))
+        return
+      }
+
+      // 显示导入确认对话框
+      Modal.confirm({
+        title: t('admin.guardImportConfirm'),
+        content: (
+          <div>
+            <p>{t('admin.guardImportConfirmMessage').replace('{count}', importedGuards.length.toString())}</p>
+            <p style={{ color: '#1890ff', marginTop: '8px' }}>
+              {t('admin.guardImportDefaultSiteMessage').replace('{siteName}', selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.code || '' : t('admin.noSiteSelected'))}
+            </p>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
+              {t('admin.guardImportRulesMessage')}
+            </p>
+            {errors.length > 0 && (
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '8px', 
+                background: '#fff7e6', 
+                border: '1px solid #ffd591', 
+                borderRadius: '4px',
+                fontSize: '12px'
+              }}>
+                <div style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: '4px' }}>
+                  ⚠️ {t('admin.importWarnings')}:
+                </div>
+                {errors.slice(0, 3).map((error, index) => (
+                  <div key={index} style={{ color: '#666', marginBottom: '2px' }}>
+                    {error}
+                  </div>
+                ))}
+                {errors.length > 3 && (
+                  <div style={{ color: '#999', fontStyle: 'italic' }}>
+                    ... 还有 {errors.length - 3} 个警告
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ),
+        onOk: async () => {
+          await processGuardImport(importedGuards)
+        }
+      })
+    } catch (error) {
+      message.error(t('admin.importFailed').replace('{errors}', '文件读取失败'))
+    }
+  }
+
+  // 处理门卫导入
+  const processGuardImport = async (importedGuards: Record<string, unknown>[]) => {
+    try {
+      setLoading(true)
+      
+      let successCount = 0
+      let skipCount = 0
+      const errors: string[] = []
+      
+      // 获取现有的门卫数据，用于检查唯一性
+      const existingGuards = await apiService.getAllGuards()
+      const existingGuardIds = new Set(existingGuards.map(g => g.guardId))
+      const existingUsernames = new Set(existingGuards.map(g => g.user?.username).filter(Boolean))
+
+      for (const guardData of importedGuards) {
+        try {
+          // 生成门卫编号（如果没有提供）
+          let guardId = String(guardData.guardId || '').trim()
+          if (!guardId) {
+            let counter = 1
+            do {
+              guardId = `G${String(successCount + skipCount + errors.length + counter).padStart(3, '0')}`
+              counter++
+            } while (existingGuardIds.has(guardId))
+            existingGuardIds.add(guardId) // 添加到已使用列表
+          }
+          
+          // 生成账号（如果没有提供）
+          let username = String(guardData.accountUsername || '').trim()
+          if (!username) {
+            let counter = 1
+            do {
+              username = `guard${String(successCount + skipCount + errors.length + counter).padStart(3, '0')}`
+              counter++
+            } while (existingUsernames.has(username))
+            existingUsernames.add(username) // 添加到已使用列表
+          }
+          
+          // 准备导入数据
+          const importData = {
+            name: String(guardData.name || ''),
+            siteId: guardData.siteId || (selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.code : '') || '',
+            phone: String(guardData.phone || ''),
+            email: String(guardData.email || ''),
+            whatsapp: String(guardData.whatsapp || ''),
+            guardId: guardId,
+            username: username,
+            password: '123456' // 默认密码
+          }
+
+          // 检查用户名是否已存在（通过API调用）
+          try {
+            // 先尝试创建，如果用户名已存在会返回409错误
+            const newGuard = await apiService.createGuard(importData)
+            
+            // 转换数据格式以匹配前端期望
+            const transformedGuard = {
+              id: newGuard.id,
+              guardId: newGuard.guardId,
+              name: newGuard.name,
+              siteId: newGuard.siteId,
+              phone: newGuard.phone,
+              email: newGuard.email,
+              whatsapp: newGuard.whatsapp,
+              accountUsername: newGuard.user?.username || newGuard.name,
+              accountStatus: (newGuard.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+              status: newGuard.status,
+              createdAt: newGuard.createdAt,
+              updatedAt: newGuard.updatedAt,
+              site: newGuard.site
+            }
+            
+            setGuards(prev => [transformedGuard, ...prev])
+            successCount++
+          } catch (createError: unknown) {
+            const error = createError as { statusCode?: number; message?: string }
+            if (error.statusCode === 409) {
+              // 用户名已存在，跳过
+              skipCount++
+              console.log(`跳过重复的门卫: ${guardData.name} (用户名: ${importData.username})`)
+            } else {
+              // 其他错误
+              errors.push(`${guardData.name}: ${error.message || '创建失败'}`)
+            }
+          }
+        } catch (error: unknown) {
+          const err = error as { message?: string }
+          errors.push(`${guardData.name}: ${err.message || '处理失败'}`)
+        }
+      }
+
+      // 刷新全局工地筛选器
+      await refreshSites()
+
+      // 显示导入结果弹窗
+      showImportResultModal(successCount, skipCount, errors, 'guard')
+    } catch (error) {
+      console.error('Import processing failed:', error)
+      message.error(t('admin.importFailed').replace('{errors}', (error as Error).message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDownloadGuardTemplate = () => {
+    generateGuardImportTemplate()
+    message.success(t('admin.guardTemplateDownloaded'))
+  }
+
   // 显示导入结果弹窗
-  const showImportResultModal = (successCount: number, skipCount: number, errors: string[]) => {
+  const showImportResultModal = (successCount: number, skipCount: number, errors: string[], type: 'distributor' | 'guard' | 'site' = 'distributor') => {
     const totalCount = successCount + skipCount + errors.length
+    const title = type === 'guard' ? t('admin.guardImportResultTitle') : 
+                  type === 'site' ? t('admin.siteImportResultTitle') : 
+                  t('admin.importResultTitle')
     
     Modal.info({
-      title: t('admin.importResultTitle'),
+      title: title,
       width: 600,
       content: (
         <div style={{ marginTop: '16px' }}>
@@ -1244,13 +1763,181 @@ const AdminSites: React.FC = () => {
   }
 
   const handleGuardExport = (exportAll: boolean = true) => {
+    const dataToExport = exportAll ? guards : guards.filter(guard => selectedGuardIds.includes(guard.id))
+    
     if (!exportAll && selectedGuardIds.length === 0) {
       message.warning(t('admin.pleaseSelectGuardsToExport'))
       return
     }
     
-    // 这里应该调用实际的Excel导出API
-    message.success(t('admin.guardsExported'))
+    exportGuardsToExcel(dataToExport, sites)
+    message.success(t('admin.guardsExported').replace('{count}', dataToExport.length.toString()))
+  }
+
+  // 显示门卫导出选择对话框
+  const showGuardExportOptions = () => {
+    const currentSiteName = selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.name : null
+    const currentSiteGuards = selectedSiteId ? guards.filter(g => g.siteId === selectedSiteId) : []
+    const currentSiteCount = currentSiteGuards.length
+    const allGuardsCount = guards.length
+
+    Modal.confirm({
+      title: (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{t('admin.exportGuardsTitle')}</span>
+          <Button 
+            type="text" 
+            size="small" 
+            icon={<CloseOutlined />} 
+            onClick={() => Modal.destroyAll()}
+            style={{ marginRight: -8 }}
+          />
+        </div>
+      ),
+      icon: <DownloadOutlined style={{ color: '#1890ff' }} />,
+      content: (
+        <div>
+          <p style={{ marginBottom: '16px', fontSize: '14px' }}>
+            {t('admin.exportGuardsDescription')}
+          </p>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '12px',
+            marginBottom: '16px'
+          }}>
+            {/* 导出当前全局工地选择的门卫数据 */}
+            <div 
+              style={{ 
+                padding: '12px 16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px',
+                cursor: 'pointer',
+                background: '#fafafa',
+                transition: 'all 0.2s'
+              }}
+              onClick={async () => {
+                Modal.destroyAll()
+                await handleExportCurrentSiteGuards()
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '4px'
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                  {t('admin.exportCurrentSiteGuards')}
+                </span>
+                <span style={{ 
+                  background: '#1890ff', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px',
+                  fontSize: '12px'
+                }}>
+                  {currentSiteCount}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {currentSiteName ? 
+                  t('admin.exportCurrentSiteGuardsDescription').replace('{siteName}', currentSiteName) :
+                  t('admin.noSiteSelected')
+                }
+              </div>
+            </div>
+
+            {/* 导出所有门卫的数据 */}
+            <div 
+              style={{ 
+                padding: '12px 16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px',
+                cursor: 'pointer',
+                background: '#fafafa',
+                transition: 'all 0.2s'
+              }}
+              onClick={async () => {
+                Modal.destroyAll()
+                await handleExportAllGuards()
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '4px'
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#52c41a' }}>
+                  {t('admin.exportAllGuards')}
+                </span>
+                <span style={{ 
+                  background: '#52c41a', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px',
+                  fontSize: '12px'
+                }}>
+                  {allGuardsCount}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {t('admin.exportAllGuardsDescription')}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ 
+            padding: '8px 12px', 
+            background: '#e6f7ff', 
+            border: '1px solid #91d5ff', 
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            💡 {t('admin.exportGuardsTip')}
+          </div>
+        </div>
+      ),
+      okText: t('admin.exportCurrentSiteGuards'),
+      cancelText: t('admin.exportAllGuards'),
+      onOk: async () => {
+        await handleExportCurrentSiteGuards()
+      },
+      onCancel: async () => {
+        await handleExportAllGuards()
+      },
+      width: 500
+    })
+  }
+
+  // 导出当前全局工地选择的门卫数据
+  const handleExportCurrentSiteGuards = async () => {
+    if (!selectedSiteId) {
+      message.warning(t('admin.noSiteSelectedForExport'))
+      return
+    }
+
+    try {
+      const currentSiteGuards = await apiService.getGuardsBySite(selectedSiteId)
+      exportGuardsToExcel(currentSiteGuards, sites)
+      message.success(t('admin.currentSiteGuardsExported').replace('{count}', currentSiteGuards.length.toString()))
+    } catch (error) {
+      message.error(t('admin.exportFailed'))
+    }
+  }
+
+  // 导出所有门卫的数据
+  const handleExportAllGuards = async () => {
+    try {
+      const allGuards = await apiService.getAllGuards()
+      exportGuardsToExcel(allGuards, sites)
+      message.success(t('admin.allGuardsExported').replace('{count}', allGuards.length.toString()))
+    } catch (error) {
+      message.error(t('admin.exportFailed'))
+    }
   }
 
   // 门卫管理相关函数
@@ -1473,12 +2160,22 @@ const AdminSites: React.FC = () => {
     )}
   ]
 
-  // 门卫筛选逻辑
-  const filteredGuards = useMemo(() => {
+  // 门卫全局筛选后的数据（仅按工地筛选）
+  const globallyFilteredGuards = useMemo(() => {
     return guards.filter(guard => {
       // 全局工地筛选：如果选择了特定工地，只显示该工地的门卫
       if (selectedSiteId && guard.siteId !== selectedSiteId) return false
+      return true
+    })
+  }, [guards, selectedSiteId])
+
+  // 门卫筛选逻辑
+  const filteredGuards = useMemo(() => {
+    return globallyFilteredGuards.filter(guard => {
+      // 状态筛选
+      if (guardStatusFilters.length > 0 && !guardStatusFilters.includes(guard.accountStatus || 'active')) return false
       
+      // 关键词筛选
       const matchesKeyword = !guardKeyword.trim() || 
         guard.guardId.toLowerCase().includes(guardKeyword.toLowerCase()) ||
         guard.name.toLowerCase().includes(guardKeyword.toLowerCase()) ||
@@ -1486,7 +2183,7 @@ const AdminSites: React.FC = () => {
       
       return matchesKeyword
     })
-  }, [guards, guardKeyword, selectedSiteId])
+  }, [globallyFilteredGuards, guardStatusFilters, guardKeyword])
 
   // 监听筛选数据变化，更新分页总数
   useEffect(() => {
@@ -1546,7 +2243,7 @@ const AdminSites: React.FC = () => {
              <Button 
                size="small"
                icon={<DownloadOutlined />} 
-               onClick={() => handleSiteExport(selectedSiteIds.length === 0)}
+               onClick={selectedSiteIds.length === 0 ? () => handleSiteExport(true) : () => handleSiteExport(false)}
              >
                {selectedSiteIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedSiteIds.length})`}
              </Button>
@@ -1555,15 +2252,16 @@ const AdminSites: React.FC = () => {
       </Row>
       
       {/* 筛选结果统计 */}
-      <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: '#666', fontSize: '14px' }}>
-          {t('admin.filterResults').replace('{count}', filteredSites.length.toString())}
-          {sites.length !== filteredSites.length && (
-            <span style={{ marginLeft: 8, color: '#999' }}>
-              {t('admin.fromTotalRecords').replace('{total}', sites.length.toString())}
-            </span>
-          )}
-        </span>
+      {!loading && (siteStatusFilters.length > 0 || siteManagerFilters.length > 0 || siteKeyword.trim() || selectedSiteIds.length > 0) && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: '#666', fontSize: '14px' }}>
+            {t('admin.filterResults').replace('{count}', filteredSites.length.toString())}
+            {sites.length !== filteredSites.length && (
+              <span style={{ marginLeft: 8, color: '#999' }}>
+                {t('admin.fromTotalRecords').replace('{total}', sites.length.toString())}
+              </span>
+            )}
+          </span>
                  <Space>
            {(siteStatusFilters.length > 0 || siteManagerFilters.length > 0 || siteKeyword.trim()) && (
              <Button 
@@ -1586,7 +2284,8 @@ const AdminSites: React.FC = () => {
              </Button>
            )}
          </Space>
-      </div>
+        </div>
+      )}
       
              <Table 
          rowKey="id" 
@@ -1649,7 +2348,7 @@ const AdminSites: React.FC = () => {
              <Button 
                size="small"
                icon={<DownloadOutlined />} 
-               onClick={() => handleDistributorExport(selectedDistributorIds.length === 0)}
+               onClick={selectedDistributorIds.length === 0 ? showDistributorExportOptions : () => handleDistributorExport(false)}
              >
                {selectedDistributorIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedDistributorIds.length})`}
              </Button>
@@ -1658,16 +2357,17 @@ const AdminSites: React.FC = () => {
       </Row>
       
       {/* 筛选结果统计 */}
-      <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ color: '#666', fontSize: '14px' }}>
-            {t('admin.filterResults').replace('{count}', filteredDistributors.length.toString())}
-            {distributors.length !== filteredDistributors.length && (
-              <span style={{ marginLeft: 8, color: '#999' }}>
-                {t('admin.fromTotalRecords').replace('{total}', distributors.length.toString())}
-              </span>
-            )}
-          </span>
+      {!loading && (distributorStatusFilters.length > 0 || distributorKeyword.trim() || selectedDistributorIds.length > 0) && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ color: '#666', fontSize: '14px' }}>
+              {t('admin.filterResults').replace('{count}', filteredDistributors.length.toString())}
+              {globallyFilteredDistributors.length !== filteredDistributors.length && (
+                <span style={{ marginLeft: 8, color: '#999' }}>
+                  {t('admin.fromTotalRecords').replace('{total}', globallyFilteredDistributors.length.toString())}
+                </span>
+              )}
+            </span>
           
           {/* 批量发送按钮 */}
           {selectedDistributorIds.length > 0 && (
@@ -1715,7 +2415,8 @@ const AdminSites: React.FC = () => {
             </Button>
           )}
         </Space>
-      </div>
+        </div>
+      )}
       
              <Table 
          rowKey="id" 
@@ -1748,15 +2449,39 @@ const AdminSites: React.FC = () => {
   const guardManagementTab = (
     <Card>
       <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={12}>
+        <Col span={8}>
           <Input placeholder={t('admin.guardKeywordPlaceholder')} value={guardKeyword} onChange={e => setGuardKeyword(e.target.value)} allowClear />
         </Col>
-        <Col span={12}>
-          <Space>
+        <Col span={8}>
+          <Select
+            mode="multiple"
+            placeholder={t('admin.guardStatusFilter')}
+            value={guardStatusFilters}
+            onChange={setGuardStatusFilters}
+            style={{ width: '100%' }}
+            allowClear
+          >
+            <Select.Option value="active">{t('admin.distributorActive')}</Select.Option>
+            <Select.Option value="disabled">{t('admin.distributorDisabled')}</Select.Option>
+          </Select>
+        </Col>
+        <Col span={8}>
+          <Space wrap>
+            <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadGuardTemplate}>{t('admin.downloadTemplate')}</Button>
+            <Upload
+              accept=".xlsx,.xls"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                handleGuardImport(file)
+                return false
+              }}
+            >
+              <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
+            </Upload>
             <Button 
               size="small" 
               icon={<DownloadOutlined />} 
-              onClick={() => handleGuardExport(selectedGuardIds.length === 0)}
+              onClick={selectedGuardIds.length === 0 ? showGuardExportOptions : () => handleGuardExport(false)}
             >
               {selectedGuardIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedGuardIds.length})`}
             </Button>
@@ -1765,23 +2490,25 @@ const AdminSites: React.FC = () => {
       </Row>
       
       {/* 筛选结果统计 */}
-      <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ color: '#666', fontSize: '14px' }}>
-            {t('admin.filterResults').replace('{count}', filteredGuards.length.toString())}
-            {guards.length !== filteredGuards.length && (
-              <span style={{ marginLeft: 8, color: '#999' }}>
-                {t('admin.fromTotalRecords').replace('{total}', guards.length.toString())}
-              </span>
-            )}
-          </span>
-        </div>
+      {!loading && (guardStatusFilters.length > 0 || guardKeyword.trim() || selectedGuardIds.length > 0) && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ color: '#666', fontSize: '14px' }}>
+              {t('admin.filterResults').replace('{count}', filteredGuards.length.toString())}
+              {globallyFilteredGuards.length !== filteredGuards.length && (
+                <span style={{ marginLeft: 8, color: '#999' }}>
+                  {t('admin.fromTotalRecords').replace('{total}', globallyFilteredGuards.length.toString())}
+                </span>
+              )}
+            </span>
+          </div>
         
         <Space>
-          {guardKeyword.trim() && (
+          {(guardStatusFilters.length > 0 || guardKeyword.trim()) && (
             <Button 
               size="small" 
               onClick={() => {
+                setGuardStatusFilters([])
                 setGuardKeyword('')
               }}
             >
@@ -1797,7 +2524,8 @@ const AdminSites: React.FC = () => {
             </Button>
           )}
         </Space>
-      </div>
+        </div>
+      )}
       
       <Table 
         rowKey="id" 
@@ -1913,9 +2641,6 @@ const AdminSites: React.FC = () => {
         <Form form={siteForm} layout="vertical">
           <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Input placeholder={t('admin.siteNamePlaceholder')} />
-          </Form.Item>
-          <Form.Item name="code" label={t('admin.codeLabel')}>
-            <Input placeholder={t('admin.codePlaceholder')} />
           </Form.Item>
           <Form.Item name="address" label={t('admin.addressLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Input placeholder={t('admin.addressPlaceholder')} />

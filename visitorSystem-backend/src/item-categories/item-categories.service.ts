@@ -8,6 +8,32 @@ import { ItemCategory, ItemCategoryStatus } from '@prisma/client';
 export class ItemCategoriesService {
   constructor(private prisma: PrismaService) {}
 
+  // 生成分类编号
+  private generateCategoryCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = 'C';
+    for (let i = 0; i < 7; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  // 生成唯一的分类编号
+  private async generateUniqueCode(): Promise<string> {
+    let code: string;
+    let isUnique = false;
+    
+    while (!isUnique) {
+      code = this.generateCategoryCode();
+      const existing = await this.prisma.itemCategory.findUnique({
+        where: { code }
+      });
+      isUnique = !existing;
+    }
+    
+    return code!;
+  }
+
   async create(createItemCategoryDto: CreateItemCategoryDto): Promise<ItemCategory> {
     try {
       // 检查分类名称是否已存在
@@ -19,8 +45,23 @@ export class ItemCategoriesService {
         throw new ConflictException('分类名称已存在');
       }
 
+      // 检查code是否已存在（如果提供）
+      let code = createItemCategoryDto.code;
+      if (code && code.trim() !== '') {
+        const existingCode = await this.prisma.itemCategory.findUnique({
+          where: { code }
+        });
+        if (existingCode) {
+          throw new ConflictException('分类编号已存在');
+        }
+      } else {
+        // 如果没有提供code或code为空，自动生成
+        code = await this.generateUniqueCode();
+      }
+
       const itemCategory = await this.prisma.itemCategory.create({
         data: {
+          code,
           name: createItemCategoryDto.name,
           description: createItemCategoryDto.description,
           status: createItemCategoryDto.status || ItemCategoryStatus.ACTIVE,
@@ -67,6 +108,17 @@ export class ItemCategoriesService {
 
         if (nameExists) {
           throw new ConflictException('分类名称已存在');
+        }
+      }
+
+      // 如果要更新code，检查新code是否已存在
+      if (updateItemCategoryDto.code && updateItemCategoryDto.code !== existingCategory.code) {
+        const codeExists = await this.prisma.itemCategory.findUnique({
+          where: { code: updateItemCategoryDto.code }
+        });
+
+        if (codeExists) {
+          throw new ConflictException('分类编号已存在');
         }
       }
 

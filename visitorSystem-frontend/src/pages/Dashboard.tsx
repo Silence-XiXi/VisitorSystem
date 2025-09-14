@@ -310,7 +310,6 @@ const Dashboard: React.FC = () => {
             <LocaleSwitcher />
             <Dropdown menu={{ items: dropdownItems }} placement="bottomRight">
               <Space style={{ cursor: 'pointer' }}>
-                <Avatar icon={<UserOutlined />} />
                 <span style={{ 
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',

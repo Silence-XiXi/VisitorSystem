@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as bcrypt from 'bcryptjs';
@@ -113,13 +113,16 @@ export class AdminService {
     });
   }
 
-  // 获取所有门卫列表
-  async getAllGuards(user: CurrentUser) {
+  // 获取门卫列表
+  async getAllGuards(user: CurrentUser, siteId?: string) {
     if (user.role !== 'ADMIN') {
-      throw new ForbiddenException('只有管理员可以访问所有门卫');
+      throw new ForbiddenException('只有管理员可以访问门卫列表');
     }
 
+    const whereClause = siteId ? { siteId } : {};
+
     return this.prisma.guard.findMany({
+      where: whereClause,
       include: {
         user: {
           select: {
@@ -165,6 +168,171 @@ export class AdminService {
       orderBy: {
         createdAt: 'desc'
       }
+    });
+  }
+
+  // 生成工人编号
+  private async generateWorkerId(): Promise<string> {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let workerId: string;
+    let exists: boolean;
+
+    do {
+      // 生成WK开头的10位编号
+      workerId = 'WK' + Array.from({ length: 8 }, () => 
+        characters.charAt(Math.floor(Math.random() * characters.length))
+      ).join('');
+      
+      // 检查是否已存在
+      const existingWorker = await this.prisma.worker.findUnique({
+        where: { workerId }
+      });
+      exists = !!existingWorker;
+    } while (exists);
+    
+    return workerId;
+  }
+
+  // 创建工人
+  async createWorker(user: CurrentUser, workerData: any) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以创建工人');
+    }
+
+    // 验证分判商是否存在
+    if (workerData.distributorId) {
+      const distributor = await this.prisma.distributor.findUnique({
+        where: { id: workerData.distributorId }
+      });
+      if (!distributor) {
+        throw new NotFoundException('分判商不存在');
+      }
+    }
+
+    // 验证工地是否存在
+    if (workerData.siteId) {
+      const site = await this.prisma.site.findUnique({
+        where: { id: workerData.siteId }
+      });
+      if (!site) {
+        throw new NotFoundException('工地不存在');
+      }
+    }
+
+    // 检查身份证号是否已存在
+    if (workerData.idCard) {
+      const existingWorker = await this.prisma.worker.findUnique({
+        where: { idCard: workerData.idCard }
+      });
+      if (existingWorker) {
+        throw new ConflictException('身份证号已存在');
+      }
+    }
+
+    // 生成工人编号
+    const workerId = await this.generateWorkerId();
+
+    // 处理可选字段，确保空字符串转换为null
+    const processedData = {
+      ...workerData,
+      workerId,
+      email: workerData.email || null,
+      whatsapp: workerData.whatsapp || null,
+      birthDate: workerData.birthDate ? new Date(workerData.birthDate) : null,
+      physicalCardId: workerData.physicalCardId || null,
+      photo: workerData.photo || null
+    };
+
+    try {
+      return await this.prisma.worker.create({
+        data: processedData,
+        include: {
+          distributor: true,
+          site: true
+        }
+      });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        if (error.meta?.target?.includes('idCard')) {
+          throw new ConflictException('身份证号已存在');
+        } else if (error.meta?.target?.includes('workerId')) {
+          throw new ConflictException('工人编号已存在');
+        }
+      }
+      throw error;
+    }
+  }
+
+  // 更新工人信息
+  async updateWorker(user: CurrentUser, workerId: string, updateData: any) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以更新工人信息');
+    }
+
+    const worker = await this.prisma.worker.findUnique({
+      where: { id: workerId }
+    });
+
+    if (!worker) {
+      throw new NotFoundException('工人不存在');
+    }
+
+    // 验证分判商是否存在
+    if (updateData.distributorId) {
+      const distributor = await this.prisma.distributor.findUnique({
+        where: { id: updateData.distributorId }
+      });
+      if (!distributor) {
+        throw new NotFoundException('分判商不存在');
+      }
+    }
+
+    // 验证工地是否存在
+    if (updateData.siteId) {
+      const site = await this.prisma.site.findUnique({
+        where: { id: updateData.siteId }
+      });
+      if (!site) {
+        throw new NotFoundException('工地不存在');
+      }
+    }
+
+    // 处理可选字段，确保空字符串转换为null
+    const processedData = {
+      ...updateData,
+      email: updateData.email || null,
+      whatsapp: updateData.whatsapp || null,
+      birthDate: updateData.birthDate ? new Date(updateData.birthDate) : null,
+      physicalCardId: updateData.physicalCardId || null,
+      photo: updateData.photo || null
+    };
+
+    return this.prisma.worker.update({
+      where: { id: workerId },
+      data: processedData,
+      include: {
+        distributor: true,
+        site: true
+      }
+    });
+  }
+
+  // 删除工人
+  async deleteWorker(user: CurrentUser, workerId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以删除工人');
+    }
+
+    const worker = await this.prisma.worker.findUnique({
+      where: { id: workerId }
+    });
+
+    if (!worker) {
+      throw new NotFoundException('工人不存在');
+    }
+
+    return this.prisma.worker.delete({
+      where: { id: workerId }
     });
   }
 
@@ -476,8 +644,50 @@ export class AdminService {
       throw new ForbiddenException('只有管理员可以创建门卫');
     }
 
-    // 自动生成门卫编号
-    const guardId = await this.generateGuardId();
+    // 使用提供的门卫编号或自动生成
+    let guardId = guardData.guardId;
+    if (!guardId) {
+      guardId = await this.generateGuardId();
+    } else {
+      // 检查门卫编号是否已存在
+      const existingGuard = await this.prisma.guard.findUnique({
+        where: { guardId: guardId }
+      });
+      if (existingGuard) {
+        throw new ConflictException('门卫编号已存在');
+      }
+    }
+
+    // 检查用户名是否已存在
+    const existingUser = await this.prisma.user.findUnique({
+      where: { username: guardData.username }
+    });
+    if (existingUser) {
+      throw new ConflictException('用户名已存在');
+    }
+
+    // 检查工地是否存在（支持通过ID或编号查找）
+    let siteId = guardData.siteId;
+    if (guardData.siteId) {
+      // 先尝试通过ID查找
+      let existingSite = await this.prisma.site.findUnique({
+        where: { id: guardData.siteId }
+      });
+      
+      // 如果通过ID找不到，尝试通过编号查找
+      if (!existingSite) {
+        existingSite = await this.prisma.site.findUnique({
+          where: { code: guardData.siteId }
+        });
+        if (existingSite) {
+          siteId = existingSite.id; // 使用找到的工地的ID
+        }
+      }
+      
+      if (!existingSite) {
+        throw new BadRequestException('指定的工地不存在');
+      }
+    }
 
     // 加密密码
     const hashedPassword = await bcrypt.hash(guardData.password, 10);
@@ -497,7 +707,7 @@ export class AdminService {
       data: {
         guardId: guardId,
         name: guardData.name,
-        siteId: guardData.siteId,
+        siteId: siteId,
         phone: guardData.phone,
         email: guardData.email,
         whatsapp: guardData.whatsapp,
@@ -560,6 +770,27 @@ export class AdminService {
     };
   }
 
+  // 生成工地编号
+  private async generateSiteCode(): Promise<string> {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let siteCode: string;
+    let exists = true;
+    
+    while (exists) {
+      siteCode = 'S';
+      for (let i = 0; i < 8; i++) {
+        siteCode += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      
+      const existingSite = await this.prisma.site.findUnique({
+        where: { code: siteCode }
+      });
+      exists = !!existingSite;
+    }
+    
+    return siteCode;
+  }
+
   // 创建工地
   async createSite(user: CurrentUser, siteData: any) {
     if (user.role !== 'ADMIN') {
@@ -573,10 +804,14 @@ export class AdminService {
       throw new BadRequestException('工地名称和地址为必填项');
     }
 
-    // 检查工地代码是否已存在（如果提供了代码）
-    if (code) {
+    // 生成或验证工地代码
+    let siteCode = code;
+    if (!siteCode) {
+      siteCode = await this.generateSiteCode();
+    } else {
+      // 检查工地代码是否已存在
       const existingSite = await this.prisma.site.findUnique({
-        where: { code }
+        where: { code: siteCode }
       });
       if (existingSite) {
         throw new ConflictException('工地代码已存在');
@@ -588,7 +823,7 @@ export class AdminService {
       data: {
         name,
         address,
-        code,
+        code: siteCode,
         manager,
         phone,
         status: status.toUpperCase() as any, // 转换为大写以匹配枚举
@@ -641,6 +876,107 @@ export class AdminService {
     }
 
     return site;
+  }
+
+  // 更新工地
+  async updateSite(user: CurrentUser, siteId: string, siteData: any) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以更新工地');
+    }
+
+    const { name, address, code, manager, phone, status = 'ACTIVE', distributorIds = [] } = siteData;
+
+    // 验证必填字段
+    if (!name || !address) {
+      throw new BadRequestException('工地名称和地址为必填项');
+    }
+
+    // 检查工地是否存在
+    const existingSite = await this.prisma.site.findUnique({
+      where: { id: siteId }
+    });
+
+    if (!existingSite) {
+      throw new NotFoundException('工地不存在');
+    }
+
+    // 如果提供了新的工地代码，检查是否与其他工地冲突
+    if (code && code !== existingSite.code) {
+      const codeExists = await this.prisma.site.findUnique({
+        where: { code: code }
+      });
+      if (codeExists) {
+        throw new ConflictException('工地代码已存在');
+      }
+    }
+
+    // 更新工地
+    const updatedSite = await this.prisma.site.update({
+      where: { id: siteId },
+      data: {
+        name,
+        address,
+        code: code || existingSite.code, // 如果没有提供新代码，保持原代码
+        manager,
+        phone,
+        status: status.toUpperCase() as any,
+      },
+      include: {
+        distributors: {
+          include: {
+            distributor: true
+          }
+        },
+        guards: true,
+        workers: {
+          select: {
+            id: true,
+            status: true
+          }
+        }
+      }
+    });
+
+    // 更新关联的分判商
+    if (distributorIds && distributorIds.length >= 0) {
+      // 删除现有的关联关系
+      await this.prisma.siteDistributor.deleteMany({
+        where: { siteId: siteId }
+      });
+
+      // 创建新的关联关系
+      if (distributorIds.length > 0) {
+        const siteDistributorData = distributorIds.map((distributorId: string) => ({
+          siteId: siteId,
+          distributorId
+        }));
+
+        await this.prisma.siteDistributor.createMany({
+          data: siteDistributorData
+        });
+      }
+
+      // 重新查询以包含关联的分判商
+      return this.prisma.site.findUnique({
+        where: { id: siteId },
+        include: {
+          distributors: {
+            include: {
+              distributor: true
+            }
+          },
+          guards: true,
+          workers: {
+            select: {
+              id: true,
+              status: true
+            }
+          }
+        }
+      });
+    }
+
+    return updatedSite;
   }
 
   // 重置分判商密码
@@ -909,5 +1245,220 @@ export class AdminService {
       oldStatus: guard.user.status,
       newStatus: newStatus
     };
+  }
+
+  // 导出工人数据
+  async exportWorkers(user: CurrentUser, filters: { siteId?: string; distributorId?: string; status?: string }) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以导出工人数据');
+    }
+
+    const where: any = {};
+    if (filters.siteId) where.siteId = filters.siteId;
+    if (filters.distributorId) where.distributorId = filters.distributorId;
+    if (filters.status) where.status = filters.status;
+
+    const workers = await this.prisma.worker.findMany({
+      where,
+      include: {
+        distributor: true,
+        site: true
+      }
+    });
+
+    return {
+      workers: workers.map(worker => ({
+        workerId: worker.workerId,
+        name: worker.name,
+        gender: worker.gender,
+        idCard: worker.idCard,
+        region: worker.region,
+        distributorName: worker.distributor?.name || '',
+        siteName: worker.site?.name || '',
+        phone: worker.phone,
+        email: worker.email,
+        whatsapp: worker.whatsapp,
+        status: worker.status,
+        birthDate: worker.birthDate,
+        photo: worker.photo,
+        createdAt: worker.createdAt,
+        updatedAt: worker.updatedAt
+      }))
+    };
+  }
+
+  // 导入工人数据
+  async importWorkers(user: CurrentUser, workersData: any[]) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以导入工人数据');
+    }
+
+    const results = {
+      success: 0,
+      skipped: 0,
+      errors: 0,
+      errorDetails: [] as string[]
+    };
+
+    for (let i = 0; i < workersData.length; i++) {
+      const workerData = workersData[i];
+      
+      try {
+        // 检查必填字段
+        if (!workerData.name || !workerData.gender || !workerData.idCard || !workerData.phone) {
+          results.errors++;
+          results.errorDetails.push(`第${i + 1}行：缺少必填字段`);
+          continue;
+        }
+
+        // 检查身份证号是否已存在
+        const existingWorker = await this.prisma.worker.findUnique({
+          where: { idCard: workerData.idCard }
+        });
+
+        if (existingWorker) {
+          results.skipped++;
+          continue;
+        }
+
+        // 生成工人编号
+        const workerId = await this.generateWorkerId();
+
+        // 处理可选字段
+        const processedData = {
+          ...workerData,
+          workerId,
+          email: workerData.email || null,
+          whatsapp: workerData.whatsapp || null,
+          birthDate: workerData.birthDate ? new Date(workerData.birthDate) : null,
+          physicalCardId: workerData.physicalCardId || null,
+          photo: workerData.photo || null
+        };
+
+        await this.prisma.worker.create({
+          data: processedData
+        });
+
+        results.success++;
+      } catch (error) {
+        results.errors++;
+        results.errorDetails.push(`第${i + 1}行：${error instanceof Error ? error.message : '未知错误'}`);
+      }
+    }
+
+    return results;
+  }
+
+  // 下载工人导入模板
+  async downloadWorkerTemplate(user: CurrentUser) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以下载工人模板');
+    }
+
+    // 获取分判商和工地列表用于模板
+    const [distributors, sites] = await Promise.all([
+      this.prisma.distributor.findMany({ select: { id: true, name: true } }),
+      this.prisma.site.findMany({ select: { id: true, name: true } })
+    ]);
+
+    return {
+      template: {
+        headers: [
+          '工人编号',
+          '姓名',
+          '性别',
+          '身份证号',
+          '地区',
+          '分判商',
+          '所属工地',
+          '联系电话',
+          '邮箱',
+          'WhatsApp',
+          '状态',
+          '出生日期'
+        ],
+        sampleData: [
+          {
+            '工人编号': 'WK1234567890',
+            '姓名': '张三',
+            '性别': '男',
+            '身份证号': '123456789012345678',
+            '地区': '中国大陆',
+            '分判商': distributors[0]?.name || '示例分判商',
+            '所属工地': sites[0]?.name || '示例工地',
+            '联系电话': '13800138000',
+            '邮箱': 'zhangsan@example.com',
+            'WhatsApp': '13800138000',
+            '状态': '在职',
+            '出生日期': '1990-01-01'
+          }
+        ],
+        distributors,
+        sites
+      }
+    };
+  }
+
+  // 获取所有借用物品记录（管理员用）
+  async getAllBorrowRecords(user: CurrentUser, filters?: {
+    siteId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以访问所有借用记录');
+    }
+
+    const whereClause: any = {};
+
+    if (filters?.siteId) {
+      whereClause.siteId = filters.siteId;
+    }
+
+    if (filters?.status) {
+      whereClause.status = filters.status.toUpperCase();
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      whereClause.borrowDate = {};
+      if (filters.startDate) {
+        // 创建本地时间的开始日期（00:00:00）
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        whereClause.borrowDate.gte = startDate;
+      }
+      if (filters.endDate) {
+        // 创建本地时间的结束日期（23:59:59）
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        whereClause.borrowDate.lte = endDate;
+      }
+    }
+
+    const records = await this.prisma.itemBorrowRecord.findMany({
+      where: whereClause,
+      include: {
+        worker: {
+          include: {
+            distributor: true,
+            site: true
+          }
+        },
+        item: {
+          include: {
+            category: true
+          }
+        },
+        site: true,
+        borrowHandler: true,
+        returnHandler: true
+      },
+      orderBy: {
+        borrowDate: 'desc'
+      }
+    });
+
+    return records;
   }
 }

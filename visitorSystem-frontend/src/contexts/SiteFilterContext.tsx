@@ -54,16 +54,18 @@ export const SiteFilterProvider: React.FC<SiteFilterProviderProps> = ({ children
       setLoading(true)
       const sitesData = await apiService.getAllSites()
       
-      // 转换数据格式以匹配前端期望的格式
-      const transformedSites = sitesData.map(site => ({
-        id: site.id,
-        name: site.name,
-        address: site.address,
-        code: site.code || '',
-        manager: site.manager,
-        phone: site.phone,
-        status: site.status || 'active'
-      }))
+      // 转换数据格式以匹配前端期望的格式，并过滤掉禁用的工地
+      const transformedSites = sitesData
+        .filter(site => site.status === 'ACTIVE') // 只显示启用的工地
+        .map(site => ({
+          id: site.id,
+          name: site.name,
+          address: site.address,
+          code: site.code || '',
+          manager: site.manager,
+          phone: site.phone,
+          status: 'active' // 统一转换为小写
+        }))
       
       setSites(transformedSites)
       

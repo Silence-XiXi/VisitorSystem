@@ -1108,7 +1108,6 @@ const Guard: React.FC = () => {
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <Avatar icon={<UserOutlined />} size={window.innerWidth < 768 ? 'small' : 'default'} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)' }}>
               <Text 
                 strong 

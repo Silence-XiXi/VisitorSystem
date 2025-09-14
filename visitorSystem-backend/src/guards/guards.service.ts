@@ -63,7 +63,7 @@ export class GuardsService {
   }
 
   // 获取门卫所在工地的物品借用记录
-  async getSiteBorrowRecords(user: CurrentUser, status?: string) {
+  async getSiteBorrowRecords(user: CurrentUser, status?: string, workerId?: string) {
     if (user.role !== 'GUARD') {
       throw new ForbiddenException('只有门卫可以访问此接口');
     }
@@ -82,6 +82,10 @@ export class GuardsService {
 
     if (status) {
       whereClause.status = status.toUpperCase();
+    }
+
+    if (workerId) {
+      whereClause.workerId = workerId;
     }
 
     const records = await this.prisma.itemBorrowRecord.findMany({

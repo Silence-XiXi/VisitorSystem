@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Form, Input, Button, Upload, Avatar, Row, Col, Select, message, Tabs } from 'antd'
-import { UploadOutlined, UserOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Button, Row, Col, Select, message, Tabs } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
@@ -10,14 +10,12 @@ const DistributorAccountSettings: React.FC = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [form] = Form.useForm()
-  const [avatarUrl, setAvatarUrl] = useState<string>('')
 
   useEffect(() => {
     const raw = localStorage.getItem('distributor_account_settings')
     if (raw) {
       const data = JSON.parse(raw)
       form.setFieldsValue(data)
-      if (data.avatarUrl) setAvatarUrl(data.avatarUrl)
     } else {
       // 设置默认值
       form.setFieldsValue({
@@ -31,7 +29,7 @@ const DistributorAccountSettings: React.FC = () => {
   const onSave = async () => {
     try {
       const values = await form.validateFields()
-      localStorage.setItem('distributor_account_settings', JSON.stringify({ ...values, avatarUrl }))
+      localStorage.setItem('distributor_account_settings', JSON.stringify(values))
       if (values.language && values.language !== locale) {
         setLocale(values.language)
       }
@@ -56,21 +54,6 @@ const DistributorAccountSettings: React.FC = () => {
     }
   }
 
-  const uploadProps = {
-    name: 'file',
-    showUploadList: false,
-    accept: 'image/*',
-    customRequest: (options: any) => {
-      const file = options.file as File
-      const reader = new FileReader()
-      reader.onload = () => {
-        const url = reader.result as string
-        setAvatarUrl(url)
-        options.onSuccess({}, file)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
 
   const handleGoBack = () => {
     navigate('/distributor/workers')
@@ -96,22 +79,7 @@ const DistributorAccountSettings: React.FC = () => {
         <Tabs defaultActiveKey="basic">
           <Tabs.TabPane tab={t('distributor.basicInfoSettings')} key="basic">
             <Row gutter={16}>
-              <Col xs={24} lg={8}>
-                <Card title={t('distributor.avatarSettings')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <Avatar size={80} src={avatarUrl} icon={<UserOutlined />} />
-                    <div>
-                      <Upload {...uploadProps}>
-                        <Button icon={<UploadOutlined />}>{t('distributor.uploadAvatar')}</Button>
-                      </Upload>
-                      <div style={{ marginTop: 8, fontSize: '12px', color: '#999' }}>
-                        {t('distributor.avatarFormatTip')}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </Col>
-              <Col xs={24} lg={16}>
+              <Col xs={24}>
                 <Card title={t('distributor.basicInfo')} extra={<Button type="primary" onClick={onSave}>{t('distributor.save')}</Button>}>
                   <Form form={form} layout="vertical">
                     <Row gutter={16}>
@@ -157,16 +125,6 @@ const DistributorAccountSettings: React.FC = () => {
                       </Col>
                     </Row>
                     <Row gutter={16}>
-                      <Col span={12}>
-                        <Form.Item name="theme" label={t('distributor.themeStyle')} initialValue={'light'}>
-                          <Select
-                            options={[
-                              { value: 'light', label: t('distributor.lightTheme') },
-                              { value: 'dark', label: t('distributor.darkTheme') }
-                            ]}
-                          />
-                        </Form.Item>
-                      </Col>
                       <Col span={12}>
                         <Form.Item name="timezone" label={t('distributor.timezoneSettings')} initialValue={'Asia/Shanghai'}>
                           <Select

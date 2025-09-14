@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
-import { Form, Input, Select, Upload, Button, message, Row, Col, DatePicker, Tooltip } from 'antd';
-import type { UploadProps } from 'antd';
-import { UploadOutlined, UserOutlined, PhoneOutlined, MailOutlined, WhatsAppOutlined, IdcardOutlined, CalendarOutlined, CreditCardOutlined } from '@ant-design/icons';
+import React, { useEffect, forwardRef, useImperativeHandle } from 'react';
+import { Form, Input, Select, Button, message, Row, Col, DatePicker, Tooltip } from 'antd';
+import { UserOutlined, PhoneOutlined, MailOutlined, WhatsAppOutlined, IdcardOutlined, CalendarOutlined, CreditCardOutlined } from '@ant-design/icons';
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Distributor, Site } from '../types/worker';
 import { useLocale } from '../contexts/LocaleContext';
 import dayjs, { Dayjs } from 'dayjs';
@@ -16,6 +15,11 @@ interface WorkerFormProps {
   onCancel: () => void;
   loading?: boolean;
   showButtons?: boolean;
+  selectedSiteId?: string;
+}
+
+export interface WorkerFormRef {
+  submit: () => void;
 }
 
 const calcAgeFromBirth = (birthDate: string): number => {
@@ -29,99 +33,92 @@ const calcAgeFromBirth = (birthDate: string): number => {
   return Math.max(age, 0);
 };
 
-const WorkerForm: React.FC<WorkerFormProps> = ({
+const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
   worker,
   distributors,
   sites,
   onSubmit,
   onCancel,
   loading = false,
-  showButtons = true
-}) => {
+  showButtons = true,
+  selectedSiteId
+}, ref) => {
   const { t } = useLocale();
   const [form] = Form.useForm();
   const isEdit = !!worker;
 
+  useImperativeHandle(ref, () => ({
+    submit: () => {
+      form.submit();
+    }
+  }));
+
   useEffect(() => {
     if (worker) {
+      const { workerId, ...workerData } = worker;
       form.setFieldsValue({
-        ...worker,
-        birthDate: worker.birthDate ? dayjs(worker.birthDate) : undefined,
-        photo: worker.photo ? [{ url: worker.photo, uid: '-1', name: 'photo.jpg' }] : []
+        ...workerData,
+        birthDate: worker.birthDate ? dayjs(worker.birthDate) : undefined
+      });
+    } else if (selectedSiteId) {
+      // 新增工人时，默认选择当前全局筛选的工地
+      form.setFieldsValue({
+        siteId: selectedSiteId
       });
     }
-  }, [worker, form]);
+  }, [worker, form, selectedSiteId]);
 
   const handleSubmit = async (values: any) => {
+    console.log('WorkerForm handleSubmit called with values:', values);
     try {
       const birthDateStr: string | undefined = values.birthDate ? (values.birthDate as Dayjs).format('YYYY-MM-DD') : undefined;
-      const computedAge = birthDateStr ? calcAgeFromBirth(birthDateStr) : undefined;
 
       const formData = {
         ...values,
-        birthDate: birthDateStr,
-        age: computedAge,
-        photo: values.photo?.[0]?.url || values.photo?.[0]?.response?.url || ''
+        birthDate: birthDateStr
       };
       
+      // 移除workerId字段，因为现在由后端自动生成
+      delete formData.workerId;
+      
+      console.log('Processed formData:', formData);
+      console.log('isEdit:', isEdit);
+      
       if (isEdit) {
+        console.log('Calling onSubmit for edit with id:', worker!.id);
         await onSubmit({ ...formData, id: worker!.id });
       } else {
+        console.log('Calling onSubmit for create');
         await onSubmit(formData);
       }
       
+      // 只有在没有错误的情况下才显示成功消息和重置表单
       message.success(t(isEdit ? 'worker.updateSuccess' : 'worker.createSuccess'));
       form.resetFields();
-    } catch (error) {
-      message.error(t(isEdit ? 'worker.updateFailed' : 'worker.createFailed'));
+    } catch (error: any) {
+      console.error('WorkerForm handleSubmit error:', error);
+      
+      // 检查是否是身份证号重复错误
+      if (error?.message?.includes('身份证号已存在')) {
+        message.error('身份证号已存在');
+      } else if (error?.message?.includes('工人编号已存在')) {
+        message.error('工人编号已存在');
+      } else {
+        message.error(t(isEdit ? 'worker.updateFailed' : 'worker.createFailed'));
+      }
     }
   };
 
-  const uploadProps: UploadProps = {
-    name: 'file',
-    action: '/api/upload',
-    listType: 'picture-card',
-    maxCount: 1,
-    beforeUpload: (file: File) => {
-      const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
-      if (!isJpgOrPng) {
-        message.error(t('worker.photoFormatLimit'));
-        return false;
-      }
-      const isLt2M = file.size / 1024 / 1024 < 2;
-      if (!isLt2M) {
-        message.error(t('worker.photoSizeLimit'));
-        return false;
-      }
-      return true;
-    },
-    onChange: (info: any) => {
-      if (info.file.status === 'done') {
-        message.success(t('worker.photoUploadSuccess'));
-      } else if (info.file.status === 'error') {
-        message.error(t('worker.photoUploadFailed'));
-      }
-    }
-  };
 
   return (
     <Form
       form={form}
       layout="vertical"
       onFinish={handleSubmit}
-      initialValues={{ status: 'active', gender: 'male' }}
+      initialValues={{ status: 'ACTIVE', gender: 'MALE' }}
       className="worker-form"
     >
       <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            name="workerId"
-            label={t('worker.workerId')}
-            rules={[{ required: true, message: t('form.required') }]}
-          >
-            <Input placeholder={t('form.inputPlaceholder') + t('worker.workerId')} prefix={<UserOutlined />} />
-          </Form.Item>
-        </Col>
         <Col span={12}>
           <Form.Item
             name="name"
@@ -141,8 +138,8 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
             rules={[{ required: true, message: t('form.required') }]}
           >
             <Select placeholder={t('form.selectPlaceholder') + t('worker.gender')}>
-              <Option value="male">{t('worker.male')}</Option>
-              <Option value="female">{t('worker.female')}</Option>
+              <Option value="MALE">{t('worker.male')}</Option>
+              <Option value="FEMALE">{t('worker.female')}</Option>
             </Select>
           </Form.Item>
         </Col>
@@ -151,8 +148,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
             name="idCard"
             label={t('worker.idCard')}
             rules={[
-              { required: true, message: t('form.required') },
-              { pattern: /(^\d{15}$)|(^\d{18}$)|(^\d{17}(\d|X|x)$)/, message: t('form.invalidIdCard') }
+              { required: true, message: t('form.required') }
             ]}
           >
             <Input placeholder={t('form.inputPlaceholder') + t('worker.idCard')} prefix={<IdcardOutlined />} />
@@ -186,7 +182,6 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
           <Form.Item
             name="region"
             label={t('worker.region')}
-            rules={[{ required: true, message: t('form.required') }]}
           >
             <Select placeholder={t('form.selectPlaceholder') + t('worker.region')}>
               <Option value="中国大陆">{t('regions.mainland')}</Option>
@@ -231,8 +226,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
             name="phone"
             label={t('worker.phone')}
             rules={[
-              { required: true, message: t('form.required') },
-              { pattern: /^1[3-9]\d{9}$/, message: t('form.invalidPhone') }
+              { required: true, message: t('form.required') }
             ]}
           >
             <Input placeholder={t('form.inputPlaceholder') + t('worker.phone')} prefix={<PhoneOutlined />} />
@@ -245,7 +239,6 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
           <Form.Item
             name="whatsapp"
             label={t('worker.whatsapp')}
-            rules={[{ required: true, message: t('form.required') }]}
           >
             <Input placeholder={t('form.inputPlaceholder') + t('worker.whatsapp')} prefix={<WhatsAppOutlined />} />
           </Form.Item>
@@ -255,7 +248,6 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
             name="email"
             label={t('worker.email')}
             rules={[
-              { required: true, message: t('form.required') },
               { type: 'email', message: t('form.invalidEmail') }
             ]}
           >
@@ -272,25 +264,14 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
             rules={[{ required: true, message: t('form.required') }]}
           >
             <Select placeholder={t('form.selectPlaceholder') + t('worker.status')}>
-              <Option value="active">{t('worker.active')}</Option>
-              <Option value="suspended">{t('worker.suspended')}</Option>
-              <Option value="inactive">{t('worker.inactive')}</Option>
+              <Option value="ACTIVE">{t('worker.active')}</Option>
+              <Option value="SUSPENDED">{t('worker.suspended')}</Option>
+              <Option value="INACTIVE">{t('worker.inactive')}</Option>
             </Select>
           </Form.Item>
         </Col>
       </Row>
 
-      <Form.Item
-        name="photo"
-        label={t('worker.photo')}
-      >
-        <Upload {...uploadProps}>
-          <div>
-            <UploadOutlined />
-            <div style={{ marginTop: 8 }}>{t('worker.uploadPhoto')}</div>
-          </div>
-        </Upload>
-      </Form.Item>
 
       {showButtons && (
         <Form.Item>
@@ -302,6 +283,8 @@ const WorkerForm: React.FC<WorkerFormProps> = ({
       )}
     </Form>
   );
-};
+});
+
+WorkerForm.displayName = 'WorkerForm';
 
 export default WorkerForm;

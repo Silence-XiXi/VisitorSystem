@@ -101,10 +101,10 @@ const Login: React.FC = () => {
     message.success(t('login.languageChanged'))
   }
 
-  // 如果用户已经登录，自动跳转到相应页面
+  // 如果用户已经登录，自动跳转到相应页面（仅在页面加载时检查）
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      console.log('Auto redirecting user:', user)
+      console.log('Auto redirecting user on page load:', user)
       const userRole = user.role.toLowerCase()
       if (userRole === 'distributor') {
         navigate('/distributor/workers', { replace: true })
@@ -114,7 +114,7 @@ const Login: React.FC = () => {
         navigate('/dashboard', { replace: true })
       }
     }
-  }, [isAuthenticated, user, isLoading, navigate])
+  }, [isLoading]) // 只在isLoading变化时触发，避免重复跳转
 
   const onFinish = async (values: { username: string; password: string; captcha: string }) => {
     // 检查网络状态
@@ -140,8 +140,18 @@ const Login: React.FC = () => {
       if (result.success) {
         message.success(t('login.loginSuccess'))
         setRetryCount(0) // 登录成功，重置重试计数
-        // 不在这里手动跳转，让useEffect处理跳转
-        // 这样可以避免双重跳转逻辑冲突
+        
+        // 登录成功后，等待状态稳定再跳转
+        setTimeout(() => {
+          const userRole = result.role?.toLowerCase()
+          if (userRole === 'distributor') {
+            navigate('/distributor/workers', { replace: true })
+          } else if (userRole === 'guard') {
+            navigate('/guard', { replace: true })
+          } else {
+            navigate('/dashboard', { replace: true })
+          }
+        }, 200) // 200ms延迟确保状态稳定
       } else {
         console.log('Login failed:', result)
         

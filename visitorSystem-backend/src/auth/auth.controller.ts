@@ -35,4 +35,14 @@ export class AuthController {
   async logout(@Request() req) {
     return this.authService.logout(req.user.id);
   }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '修改密码' })
+  @ApiResponse({ status: 200, description: '修改成功' })
+  @ApiResponse({ status: 401, description: '当前密码错误或用户不存在' })
+  async changePassword(@Request() req, @Body() body: { oldPassword: string; newPassword: string }) {
+    return this.authService.changePassword(req.user.id, body.oldPassword, body.newPassword);
+  }
 }

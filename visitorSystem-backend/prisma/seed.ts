@@ -131,6 +131,7 @@ async function main() {
         name: category.name,
         description: category.description,
         status: 'ACTIVE',
+        code: `C${Math.random().toString(36).substr(2, 7).toUpperCase()}`,
       },
     });
   }

@@ -186,7 +186,6 @@ const DistributorLayout: React.FC = () => {
                 height: 'auto'
               }}
             >
-              <Avatar size="small" icon={<UserOutlined />} />
               <Text style={{ color: '#666', fontSize: '14px' }}>
                 {user?.username || distributorInfo.username}（{t('common.subcontractor')}）
               </Text>

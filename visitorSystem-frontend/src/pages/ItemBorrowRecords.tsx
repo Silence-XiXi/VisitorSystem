@@ -5,6 +5,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
 import { mockWorkers, mockSites, mockDistributors, mockGuards } from '../data/mockData'
+import * as XLSX from 'xlsx'
 
 interface ItemBorrowRecord {
   key: string
@@ -84,6 +85,7 @@ const ItemBorrowRecords: React.FC = () => {
   const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false)
   const [selectedRecord, setSelectedRecord] = useState<ItemBorrowRecord | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [exportModalVisible, setExportModalVisible] = useState(false)
 
   // 筛选后的数据
   const filteredData = useMemo(() => {
@@ -154,9 +156,59 @@ const ItemBorrowRecords: React.FC = () => {
       return
     }
     
-    const exportType = selectedRowKeys.length > 0 ? t('itemBorrowRecords.exportSelected').replace('({count})', '') : t('itemBorrowRecords.exportAll')
-    message.success(t('itemBorrowRecords.exportSuccess').replace('{type}', exportType))
-    // 这里应该调用实际的Excel导出API，传入dataToExport
+    try {
+      // 准备导出数据
+      const exportData = dataToExport.map(record => ({
+        [t('itemBorrowRecords.borrowDate')]: record.borrowDate,
+        [t('itemBorrowRecords.workerName')]: record.workerName,
+        [t('itemBorrowRecords.physicalCardId')]: record.physicalCardId || '-',
+        [t('itemBorrowRecords.distributor')]: record.distributorName,
+        [t('itemBorrowRecords.siteName')]: record.siteName,
+        [t('itemBorrowRecords.itemType')]: record.itemType,
+        [t('itemBorrowRecords.itemCode')]: record.itemCode,
+        [t('itemBorrowRecords.borrowTime')]: record.borrowTime,
+        [t('itemBorrowRecords.returnDate')]: record.returnDate || '-',
+        [t('itemBorrowRecords.returnTime')]: record.returnTime || '-',
+        [t('itemBorrowRecords.status')]: record.status === 'borrowed' ? t('itemBorrowRecords.borrowed') : t('itemBorrowRecords.returned'),
+        [t('itemBorrowRecords.borrowDuration')]: record.borrowDuration ? `${record.borrowDuration}小时` : '-',
+        [t('itemBorrowRecords.borrowHandler')]: record.borrowHandlerName || '-'
+      }))
+      
+      // 创建工作簿
+      const workbook = XLSX.utils.book_new()
+      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 12 }, // 借用日期
+        { wch: 15 }, // 工人姓名
+        { wch: 15 }, // 实体卡ID
+        { wch: 20 }, // 分判商
+        { wch: 20 }, // 工地名称
+        { wch: 15 }, // 物品类型
+        { wch: 15 }, // 物品编号
+        { wch: 10 }, // 借用时间
+        { wch: 12 }, // 归还日期
+        { wch: 10 }, // 归还时间
+        { wch: 10 }, // 状态
+        { wch: 12 }, // 借用时长
+        { wch: 15 }  // 借用经办人
+      ]
+      worksheet['!cols'] = colWidths
+      
+      // 添加工作表
+      XLSX.utils.book_append_sheet(workbook, worksheet, t('itemBorrowRecords.title'))
+      
+      // 生成文件名并下载
+      const fileName = `物品借用记录_${new Date().toISOString().split('T')[0]}.xlsx`
+      XLSX.writeFile(workbook, fileName)
+      
+      const exportType = selectedRowKeys.length > 0 ? t('itemBorrowRecords.exportSelected').replace('({count})', '') : t('itemBorrowRecords.exportAll')
+      message.success(t('itemBorrowRecords.exportSuccess').replace('{type}', exportType).replace('{count}', dataToExport.length.toString()))
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error(t('itemBorrowRecords.exportFailed'))
+    }
   }
 
   // 表格列定义
@@ -353,7 +405,7 @@ const ItemBorrowRecords: React.FC = () => {
               <Button 
                 type="primary" 
                 icon={<DownloadOutlined />} 
-                onClick={exportToExcel}
+                onClick={() => setExportModalVisible(true)}
               >
                 {selectedRowKeys.length > 0 ? t('itemBorrowRecords.exportSelected').replace('{count}', selectedRowKeys.length.toString()) : t('itemBorrowRecords.exportAll')}
               </Button>
@@ -458,6 +510,94 @@ const ItemBorrowRecords: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 导出选项模态框 */}
+      <Modal
+        title={t('itemBorrowRecords.exportOptionsTitle')}
+        open={exportModalVisible}
+        onCancel={() => setExportModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setExportModalVisible(false)}>
+            {t('common.cancel')}
+          </Button>,
+          <Button 
+            key="exportAll" 
+            type="primary" 
+            onClick={() => {
+              setExportModalVisible(false)
+              exportToExcel()
+            }}
+          >
+            {t('itemBorrowRecords.exportAll')}
+          </Button>,
+          selectedRowKeys.length > 0 && (
+            <Button 
+              key="exportSelected" 
+              type="primary" 
+              onClick={() => {
+                setExportModalVisible(false)
+                exportToExcel()
+              }}
+            >
+              {t('itemBorrowRecords.exportSelected').replace('{count}', selectedRowKeys.length.toString())}
+            </Button>
+          )
+        ].filter(Boolean)}
+        width={500}
+      >
+        <div style={{ marginTop: 16 }}>
+          <p style={{ marginBottom: 16, color: '#666' }}>
+            {t('itemBorrowRecords.exportOptionsDescription')}
+          </p>
+          
+          <div style={{ 
+            background: '#f5f5f5', 
+            padding: '12px 16px', 
+            borderRadius: '6px', 
+            marginBottom: 16 
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+              {t('itemBorrowRecords.exportAll')}
+            </div>
+            <div style={{ color: '#666', fontSize: '14px' }}>
+              {t('itemBorrowRecords.exportAllDescription').replace('{count}', filteredData.length.toString())}
+            </div>
+          </div>
+          
+          {selectedRowKeys.length > 0 && (
+            <div style={{ 
+              background: '#e6f7ff', 
+              padding: '12px 16px', 
+              borderRadius: '6px', 
+              border: '1px solid #91d5ff' 
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#1890ff' }}>
+                {t('itemBorrowRecords.exportSelected').replace('{count}', selectedRowKeys.length.toString())}
+              </div>
+              <div style={{ color: '#666', fontSize: '14px' }}>
+                {t('itemBorrowRecords.exportSelectedDescription')}
+              </div>
+            </div>
+          )}
+          
+          <div style={{ 
+            marginTop: 16, 
+            padding: '12px', 
+            background: '#fff7e6', 
+            border: '1px solid #ffd591', 
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 4, color: '#fa8c16' }}>
+              💡 {t('itemBorrowRecords.exportTips')}:
+            </div>
+            <div>• {t('itemBorrowRecords.exportTip1')}</div>
+            <div>• {t('itemBorrowRecords.exportTip2')}</div>
+            <div>• {t('itemBorrowRecords.exportTip3')}</div>
+          </div>
+        </div>
       </Modal>
     </div>
   )

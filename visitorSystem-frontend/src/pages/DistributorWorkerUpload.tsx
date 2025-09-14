@@ -487,13 +487,15 @@ const DistributorWorkerUpload: React.FC = () => {
           margin: 0,
           borderRadius: 0
         }}
-        bodyStyle={{ 
-          flex: 1, 
-          display: 'flex', 
-          flexDirection: 'column', 
-          padding: 0, 
-          overflow: 'hidden',
-          margin: 0
+        styles={{
+          body: {
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            padding: 0, 
+            overflow: 'hidden',
+            margin: 0
+          }
         }}
         headStyle={{
           padding: '12px 16px',

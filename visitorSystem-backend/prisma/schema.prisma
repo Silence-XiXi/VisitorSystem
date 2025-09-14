@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,246 +7,250 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 用户表 - 支持多种角色（管理员、分判商、门卫）
 model User {
-  id          String   @id @default(cuid()) // 用户唯一标识
-  username    String   @unique // 用户名，用于登录
-  password    String // 密码（加密存储）
-  role        UserRole // 用户角色：ADMIN-管理员, DISTRIBUTOR-分判商, GUARD-门卫
-  status      UserStatus @default(ACTIVE) // 账户状态：ACTIVE-激活, DISABLED-禁用
-  createdAt   DateTime @default(now()) // 创建时间
-  updatedAt   DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  distributor Distributor? // 关联的分判商信息（仅分判商角色有）
-  guard       Guard? // 关联的门卫信息（仅门卫角色有）
+  id          String       @id @default(cuid())
+  username    String       @unique
+  password    String
+  role        UserRole
+  status      UserStatus   @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  distributor Distributor?
+  guard       Guard?
 
   @@map("users")
 }
 
-// 分判商表
 model Distributor {
-  id            String   @id @default(cuid()) // 分判商唯一标识
-  distributorId String   @unique // 分判商编号（业务唯一）
-  name          String // 分判商公司名称
-  contactName   String? // 联系人姓名
-  phone         String? // 联系电话
-  email         String? // 邮箱地址
-  whatsapp      String? // WhatsApp号码
-  status        DistributorStatus @default(ACTIVE) // 状态：ACTIVE-活跃, INACTIVE-不活跃, SUSPENDED-暂停
-  createdAt     DateTime @default(now()) // 创建时间
-  updatedAt     DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  userId        String   @unique // 关联的用户ID
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联的用户
-  sites         SiteDistributor[] // 关联的工地（多对多）
-  workers       Worker[] // 管理的工人
+  id            String            @id @default(cuid())
+  name          String
+  contactName   String?
+  phone         String?
+  email         String?
+  whatsapp      String?
+  status        DistributorStatus @default(ACTIVE)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  userId        String            @unique
+  distributorId String            @unique
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sites         SiteDistributor[]
+  workers       Worker[]
 
   @@map("distributors")
 }
 
-// 工地表
 model Site {
-  id          String   @id @default(cuid()) // 工地唯一标识
-  name        String // 工地名称
-  address     String // 工地地址
-  code        String?  @unique // 工地编码（唯一）
-  manager     String? // 工地负责人
-  phone       String? // 联系电话
-  status      SiteStatus @default(ACTIVE) // 状态：ACTIVE-活跃, INACTIVE-不活跃, SUSPENDED-暂停
-  createdAt   DateTime @default(now()) // 创建时间
-  updatedAt   DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  distributors SiteDistributor[] // 关联的分判商（多对多）
-  guards       Guard[] // 工地门卫
-  workers      Worker[] // 工地工人
-  itemBorrowRecords ItemBorrowRecord[] // 物品借用记录
+  id                String             @id @default(cuid())
+  name              String
+  address           String
+  code              String?            @unique
+  manager           String?
+  phone             String?
+  status            SiteStatus         @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  guards            Guard[]
+  itemBorrowRecords ItemBorrowRecord[]
+  visitorRecords    VisitorRecord[]
+  distributors      SiteDistributor[]
+  workers           Worker[]
 
   @@map("sites")
 }
 
-// 工地-分判商关联表（多对多）
 model SiteDistributor {
-  id            String     @id @default(cuid()) // 关联记录唯一标识
-  siteId        String // 工地ID
-  distributorId String // 分判商ID
-  createdAt     DateTime   @default(now()) // 关联创建时间
+  id            String      @id @default(cuid())
+  siteId        String
+  distributorId String
+  createdAt     DateTime    @default(now())
+  distributor   Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  site          Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
-  site          Site       @relation(fields: [siteId], references: [id], onDelete: Cascade) // 关联的工地
-  distributor   Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade) // 关联的分判商
-
-  @@unique([siteId, distributorId]) // 确保同一工地和分判商只能关联一次
+  @@unique([siteId, distributorId])
   @@map("site_distributors")
 }
 
-// 门卫表
 model Guard {
-  id            String   @id @default(cuid()) // 门卫唯一标识
-  guardId       String   @unique // 门卫编号（业务唯一）
-  name          String // 门卫姓名
-  phone         String // 联系电话
-  email         String? // 邮箱地址
-  whatsapp      String? // WhatsApp号码
-  status        GuardStatus @default(ACTIVE) // 状态：ACTIVE-活跃, DISABLED-禁用
-  createdAt     DateTime @default(now()) // 创建时间
-  updatedAt     DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  siteId        String // 所属工地ID
-  site          Site     @relation(fields: [siteId], references: [id], onDelete: Cascade) // 关联的工地
-  userId        String   @unique // 关联的用户ID
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联的用户
-  itemBorrowRecords ItemBorrowRecord[] // 经办的物品借用记录
-  returnRecords ItemBorrowRecord[] @relation("ReturnHandler") // 经办的物品归还记录
+  id                String             @id @default(cuid())
+  guardId           String             @unique
+  name              String
+  phone             String
+  email             String?
+  whatsapp          String?
+  status            GuardStatus        @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  siteId            String
+  userId            String             @unique
+  site              Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemBorrowRecords ItemBorrowRecord[]
+  returnRecords     ItemBorrowRecord[] @relation("ReturnHandler")
+  visitorRecords    VisitorRecord[]
 
   @@map("guards")
 }
 
-// 工人表
 model Worker {
-  id              String   @id @default(cuid()) // 工人唯一标识
-  workerId        String   @unique // 工人编号（业务唯一）
-  name            String // 工人姓名
-  gender          Gender // 性别：MALE-男, FEMALE-女
-  idCard          String   @unique // 身份证号（唯一）
-  region          String // 地区/国籍
-  photo           String? // 照片URL
-  phone           String // 联系电话
-  email           String? // 邮箱地址
-  whatsapp        String? // WhatsApp号码
-  birthDate       DateTime? // 出生日期
-  age             Int? // 年龄（根据出生日期计算）
-  physicalCardId  String? // 实体卡编号（每日发放，非固定）
-  status          WorkerStatus @default(ACTIVE) // 状态：ACTIVE-活跃, INACTIVE-不活跃, SUSPENDED-暂停
-  createdAt       DateTime @default(now()) // 创建时间
-  updatedAt       DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  distributorId   String // 所属分判商ID
-  distributor     Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade) // 关联的分判商
-  siteId          String // 所属工地ID
-  site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade) // 关联的工地
-  itemBorrowRecords ItemBorrowRecord[] // 物品借用记录
+  id                String             @id @default(cuid())
+  workerId          String             @unique
+  name              String
+  gender            Gender
+  idCard            String             @unique
+  region            String?
+  photo             String?
+  phone             String
+  email             String?
+  whatsapp          String?
+  birthDate         DateTime?
+  age               Int?
+  physicalCardId    String?
+  status            WorkerStatus       @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  distributorId     String
+  siteId            String
+  itemBorrowRecords ItemBorrowRecord[]
+  visitorRecords    VisitorRecord[]
+  distributor       Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  site              Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   @@map("workers")
 }
 
-// 物品分类表
 model ItemCategory {
-  id          String   @id @default(cuid()) // 分类唯一标识
-  name        String   @unique // 分类名称（唯一）
-  description String? // 分类描述
-  status      ItemCategoryStatus @default(ACTIVE) // 状态：ACTIVE-活跃, INACTIVE-不活跃
-  createdAt   DateTime @default(now()) // 创建时间
-  updatedAt   DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  items       Item[] // 该分类下的物品
+  id          String             @id @default(cuid())
+  name        String             @unique
+  description String?
+  status      ItemCategoryStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  code        String             @unique
+  items       Item[]
 
   @@map("item_categories")
 }
 
-// 物品表
 model Item {
-  id          String   @id @default(cuid()) // 物品唯一标识
-  itemCode    String   @unique // 物品编码（业务唯一）
-  name        String // 物品名称
-  description String? // 物品描述
-  status      ItemStatus @default(AVAILABLE) // 状态：AVAILABLE-可用, BORROWED-已借出, MAINTENANCE-维护中, LOST-丢失
-  createdAt   DateTime @default(now()) // 创建时间
-  updatedAt   DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  categoryId  String // 物品分类ID
-  category    ItemCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade) // 关联的分类
-  itemBorrowRecords ItemBorrowRecord[] // 借用记录
+  id                String             @id @default(cuid())
+  itemCode          String             @unique
+  name              String
+  description       String?
+  status            ItemStatus         @default(AVAILABLE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  categoryId        String
+  itemBorrowRecords ItemBorrowRecord[]
+  category          ItemCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@map("items")
 }
 
-// 物品借用记录表
 model ItemBorrowRecord {
-  id              String   @id @default(cuid()) // 记录唯一标识
-  borrowDate      DateTime // 借用日期
-  borrowTime      String // 借用时间（HH:mm格式）
-  returnDate      DateTime? // 归还日期
-  returnTime      String? // 归还时间（HH:mm格式）
-  status          BorrowStatus @default(BORROWED) // 状态：BORROWED-已借出, RETURNED-已归还, OVERDUE-逾期
-  borrowDuration  Int? // 借用时长（小时）
-  createdAt       DateTime @default(now()) // 创建时间
-  updatedAt       DateTime @updatedAt // 更新时间
-
-  // 关联关系
-  workerId        String // 借用人（工人）ID
-  worker          Worker @relation(fields: [workerId], references: [id], onDelete: Cascade) // 关联的工人
-  siteId          String // 工地ID
-  site            Site @relation(fields: [siteId], references: [id], onDelete: Cascade) // 关联的工地
-  itemId          String // 物品ID
-  item            Item @relation(fields: [itemId], references: [id], onDelete: Cascade) // 关联的物品
-  borrowHandlerId String? // 经办人（门卫）ID
-  borrowHandler   Guard? @relation(fields: [borrowHandlerId], references: [id], onDelete: SetNull) // 关联的经办门卫
-  returnHandlerId String? // 归还经办人（门卫）ID
-  returnHandler   Guard? @relation("ReturnHandler", fields: [returnHandlerId], references: [id], onDelete: SetNull) // 关联的归还经办门卫
+  id              String       @id @default(cuid())
+  borrowDate      DateTime
+  borrowTime      String
+  returnDate      DateTime?
+  returnTime      String?
+  status          BorrowStatus @default(BORROWED)
+  borrowDuration  Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  workerId        String
+  siteId          String
+  itemId          String
+  borrowHandlerId String?
+  returnHandlerId String?
+  borrowHandler   Guard?       @relation(fields: [borrowHandlerId], references: [id])
+  item            Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  returnHandler   Guard?       @relation("ReturnHandler", fields: [returnHandlerId], references: [id])
+  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  worker          Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@map("item_borrow_records")
 }
 
-// 枚举类型定义
+model VisitorRecord {
+  id              String       @id @default(cuid())
+  workerId        String
+  siteId          String
+  checkInTime     DateTime?
+  checkOutTime    DateTime?
+  status          VisitorStatus @default(ON_SITE)
+  idType          String       // 证件类型
+  idNumber        String       // 证件号码
+  physicalCardId  String?      // 实体卡ID
+  registrarId     String?      // 登记人ID
+  notes           String?      // 备注
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  worker          Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  registrar       Guard?       @relation(fields: [registrarId], references: [id])
+
+  @@map("visitor_records")
+}
+
 enum UserRole {
-  ADMIN      // 管理员
-  DISTRIBUTOR // 分判商
-  GUARD      // 门卫
+  ADMIN
+  DISTRIBUTOR
+  GUARD
 }
 
 enum UserStatus {
-  ACTIVE     // 激活
-  DISABLED   // 禁用
+  ACTIVE
+  DISABLED
 }
 
 enum DistributorStatus {
-  ACTIVE     // 活跃
-  INACTIVE   // 不活跃
-  SUSPENDED  // 暂停
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
 
 enum SiteStatus {
-  ACTIVE     // 活跃
-  INACTIVE   // 不活跃
-  SUSPENDED  // 暂停
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
 
 enum GuardStatus {
-  ACTIVE     // 活跃
-  DISABLED   // 禁用
+  ACTIVE
+  DISABLED
 }
 
 enum Gender {
-  MALE       // 男
-  FEMALE     // 女
+  MALE
+  FEMALE
 }
 
 enum WorkerStatus {
-  ACTIVE     // 活跃
-  INACTIVE   // 不活跃
-  SUSPENDED  // 暂停
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
 
 enum ItemCategoryStatus {
-  ACTIVE     // 活跃
-  INACTIVE   // 不活跃
+  ACTIVE
+  INACTIVE
 }
 
 enum ItemStatus {
-  AVAILABLE    // 可用
-  BORROWED     // 已借出
-  MAINTENANCE  // 维护中
-  LOST         // 丢失
+  AVAILABLE
+  BORROWED
+  MAINTENANCE
+  LOST
 }
 
 enum BorrowStatus {
-  BORROWED   // 已借出
-  RETURNED   // 已归还
-  OVERDUE    // 逾期
+  BORROWED
+  RETURNED
+  OVERDUE
+}
+
+enum VisitorStatus {
+  ON_SITE
+  LEFT
+  PENDING
 }

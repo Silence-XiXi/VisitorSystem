@@ -35,12 +35,14 @@ export class GuardsController {
   @Roles(UserRole.GUARD)
   @ApiOperation({ summary: '获取物品借用记录' })
   @ApiQuery({ name: 'status', required: false, description: '借用状态：BORROWED/RETURNED' })
+  @ApiQuery({ name: 'workerId', required: false, description: '工人ID' })
   @ApiResponse({ status: 200, description: '获取成功' })
   async getSiteBorrowRecords(
     @GetCurrentUser() user: CurrentUser,
-    @Query('status') status?: string
+    @Query('status') status?: string,
+    @Query('workerId') workerId?: string
   ) {
-    return this.guardsService.getSiteBorrowRecords(user, status);
+    return this.guardsService.getSiteBorrowRecords(user, status, workerId);
   }
 
   @Post('borrow-records')

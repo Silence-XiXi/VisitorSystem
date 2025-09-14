@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Space, Input, Select, Row, Col, message, Modal } from 'antd';
-import { PlusOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Card, Button, Space, Input, Select, Row, Col, message, Modal, Upload } from 'antd';
+import { PlusOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import Draggable from 'react-draggable';
-import WorkerForm from '../components/WorkerForm';
+import WorkerForm, { WorkerFormRef } from '../components/WorkerForm';
 import WorkerTable from '../components/WorkerTable';
 import QRCodeModal from '../components/QRCodeModal';
-import ExcelImportExportModal from '../components/ExcelImportExportModal';
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Distributor, Site } from '../types/worker';
 import { mockDistributors, mockSites, mockWorkers } from '../data/mockData';
 import { useLocale } from '../contexts/LocaleContext';
 import { useSiteFilter } from '../contexts/SiteFilterContext';
+import apiService from '../services/api';
+import * as XLSX from 'xlsx';
+import dayjs from 'dayjs';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -18,10 +20,10 @@ const WorkerManagement: React.FC = () => {
   const { t } = useLocale();
   const { selectedSiteId } = useSiteFilter();
   const draggleRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<WorkerFormRef>(null);
   
   // 状态管理
   const [workers, setWorkers] = useState<Worker[]>([]);
-  const [filteredWorkers, setFilteredWorkers] = useState<Worker[]>([]);
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +31,6 @@ const WorkerManagement: React.FC = () => {
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [qrCodeVisible, setQrCodeVisible] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
-  const [excelModalVisible, setExcelModalVisible] = useState(false);
   
   // 搜索和筛选状态（多选）
   const [searchText, setSearchText] = useState('');
@@ -37,20 +38,42 @@ const WorkerManagement: React.FC = () => {
   const [distributorFilters, setDistributorFilters] = useState<string[]>([]);
   
 
-  // 加载模拟数据
+  // 加载数据
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 并行加载所有数据
+      const [workersData, distributorsData, sitesData] = await Promise.all([
+        apiService.getAllWorkers({ siteId: selectedSiteId }),
+        apiService.getAllDistributors(),
+        apiService.getAllSites()
+      ]);
+      
+      setWorkers(workersData);
+      setDistributors(distributorsData);
+      setSites(sitesData);
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      message.error('加载数据失败，请重试');
+      // 降级到模拟数据
+      loadMockData();
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedSiteId]);
+
   useEffect(() => {
-    loadMockData();
-  }, []);
+    loadData();
+  }, [loadData]);
 
   const loadMockData = () => {
     setDistributors(mockDistributors);
     setSites(mockSites);
     setWorkers(mockWorkers);
-    setFilteredWorkers(mockWorkers);
   };
 
   // 搜索和筛选
-  useEffect(() => {
+  const filteredWorkers = useMemo(() => {
     let result = workers;
 
     // 工地筛选（单选，优先筛选）
@@ -78,28 +101,21 @@ const WorkerManagement: React.FC = () => {
       result = result.filter(worker => distributorFilters.includes(worker.distributorId));
     }
 
-    setFilteredWorkers(result);
-  }, [workers, selectedSiteId, searchText, statusFilters, distributorFilters]);
+    return result;
+  }, [selectedSiteId, searchText, statusFilters, distributorFilters, workers]);
 
   // 处理新增工人
   const handleCreateWorker = async (values: CreateWorkerRequest) => {
     setLoading(true);
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newWorker: Worker = {
-        ...values,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
+      const newWorker = await apiService.createWorker(values);
       setWorkers(prev => [newWorker, ...prev]);
       setFormVisible(false);
-      message.success(t('worker.createSuccess'));
+      // 成功消息由WorkerForm统一处理
     } catch (error) {
-      message.error(t('worker.createFailed'));
+      console.error('创建工人失败:', error);
+      // 重新抛出错误，让WorkerForm处理错误消息
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -107,22 +123,23 @@ const WorkerManagement: React.FC = () => {
 
   // 处理更新工人
   const handleUpdateWorker = async (values: UpdateWorkerRequest) => {
+    if (!editingWorker) return;
+    
     setLoading(true);
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const updatedWorker = await apiService.updateWorker(editingWorker.id, values);
       
       setWorkers(prev => prev.map(worker =>
-        worker.id === values.id
-          ? { ...worker, ...values, updatedAt: new Date().toISOString() }
-          : worker
+        worker.id === editingWorker.id ? updatedWorker : worker
       ));
 
       setFormVisible(false);
       setEditingWorker(null);
-      message.success(t('worker.updateSuccess'));
+      // 成功消息由WorkerForm统一处理
     } catch (error) {
-      message.error(t('worker.updateFailed'));
+      console.error('更新工人失败:', error);
+      // 重新抛出错误，让WorkerForm处理错误消息
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -131,12 +148,13 @@ const WorkerManagement: React.FC = () => {
   // 处理删除工人
   const handleDeleteWorker = async (id: string) => {
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await apiService.deleteWorker(id);
       
       setWorkers(prev => prev.filter(worker => worker.id !== id));
+      setFilteredWorkers(prev => prev.filter(worker => worker.id !== id));
       message.success(t('worker.deleteSuccess'));
     } catch (error) {
+      console.error('删除工人失败:', error);
       message.error(t('worker.deleteFailed'));
     }
   };
@@ -153,32 +171,6 @@ const WorkerManagement: React.FC = () => {
     setQrCodeVisible(true);
   };
 
-  // 处理Excel导入
-  const handleExcelImport = async (importWorkers: CreateWorkerRequest[]) => {
-    setLoading(true);
-    try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // 为导入的工人生成ID和时间戳
-      const newWorkers: Worker[] = importWorkers.map(worker => ({
-        ...worker,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }));
-
-      // 添加到现有工人列表
-      setWorkers(prev => [...newWorkers, ...prev]);
-      message.success(t('worker.importSuccess').replace('{count}', importWorkers.length.toString()));
-      
-    } catch (error) {
-      message.error(t('worker.importFailed'));
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // 重置表单
   const handleCancelForm = () => {
@@ -187,10 +179,638 @@ const WorkerManagement: React.FC = () => {
   };
 
   // 下载模板
-  const handleDownloadTemplate = () => {
-    // TODO: 实现实际的模板下载逻辑
-    message.success(t('worker.templateDownloaded'));
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await apiService.downloadWorkerTemplate();
+      const { template } = response;
+      
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(template.sampleData);
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 15 }, // 工人编号
+        { wch: 10 }, // 姓名
+        { wch: 8 },  // 性别
+        { wch: 20 }, // 身份证号
+        { wch: 12 }, // 地区
+        { wch: 15 }, // 分判商
+        { wch: 15 }, // 工地
+        { wch: 15 }, // 电话
+        { wch: 20 }, // 邮箱
+        { wch: 15 }, // WhatsApp
+        { wch: 8 },  // 状态
+        { wch: 12 }  // 出生日期
+      ];
+      worksheet['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, t('worker.template'));
+      
+      const fileName = `工人导入模板_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
+      message.success(t('worker.templateDownloaded'));
+    } catch (error) {
+      console.error('下载模板失败:', error);
+      message.error(t('worker.templateDownloadFailed'));
+    }
   };
+
+  // 显示工人导出选择对话框
+  const showWorkerExportOptions = async () => {
+    const currentSiteName = selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.name : null
+    const currentSiteWorkers = selectedSiteId ? workers.filter(w => w.siteId === selectedSiteId) : []
+    const currentSiteCount = currentSiteWorkers.length
+    
+    // 获取全部工人数量
+    let allWorkersCount = 0
+    try {
+      const allWorkersResponse = await apiService.getAllWorkers({})
+      allWorkersCount = allWorkersResponse.length
+    } catch (error) {
+      console.error('获取全部工人数量失败:', error)
+      allWorkersCount = workers.length // 降级使用当前数据
+    }
+
+    Modal.confirm({
+      title: (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{t('admin.exportWorkersTitle')}</span>
+          <Button 
+            type="text" 
+            size="small" 
+            icon={<CloseOutlined />} 
+            onClick={() => Modal.destroyAll()}
+            style={{ marginRight: -8 }}
+          />
+        </div>
+      ),
+      icon: <DownloadOutlined style={{ color: '#1890ff' }} />,
+      content: (
+        <div>
+          <p style={{ marginBottom: '16px', fontSize: '14px' }}>
+            {t('admin.exportWorkersDescription')}
+          </p>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '12px',
+            marginBottom: '16px'
+          }}>
+            {/* 导出当前全局工地选择的工人数据 */}
+            <div 
+              style={{ 
+                padding: '12px 16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px',
+                cursor: 'pointer',
+                background: '#fafafa',
+                transition: 'all 0.2s'
+              }}
+              onClick={() => {
+                Modal.destroyAll()
+                handleExportCurrentSiteWorkers()
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '4px'
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                  {t('admin.exportCurrentSiteWorkers')}
+                </span>
+                <span style={{ 
+                  background: '#1890ff', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px',
+                  fontSize: '12px'
+                }}>
+                  {currentSiteCount}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {currentSiteName ? 
+                  t('admin.exportCurrentSiteWorkersDescription').replace('{siteName}', currentSiteName) :
+                  t('admin.noSiteSelected')
+                }
+              </div>
+            </div>
+
+            {/* 导出所有工人的数据 */}
+            <div 
+              style={{ 
+                padding: '12px 16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px',
+                cursor: 'pointer',
+                background: '#fafafa',
+                transition: 'all 0.2s'
+              }}
+              onClick={() => {
+                Modal.destroyAll()
+                handleExportAllWorkers()
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '4px'
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#52c41a' }}>
+                  {t('admin.exportAllWorkers')}
+                </span>
+                <span style={{ 
+                  background: '#52c41a', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px',
+                  fontSize: '12px'
+                }}>
+                  {allWorkersCount}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {t('admin.exportAllWorkersDescription')}
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+      okText: t('common.cancel'),
+      cancelText: null,
+      width: 500
+    })
+  }
+
+  // 导出当前全局工地选择的工人数据
+  const handleExportCurrentSiteWorkers = async () => {
+    if (!selectedSiteId) {
+      message.warning(t('admin.noSiteSelectedForExport'))
+      return
+    }
+
+    try {
+      const filters = {
+        siteId: selectedSiteId,
+        distributorId: distributorFilters.length === 1 ? distributorFilters[0] : undefined,
+        status: statusFilters.length === 1 ? statusFilters[0] : undefined
+      };
+
+      const response = await apiService.exportWorkers(filters);
+      const exportData = response.workers.map((worker: any) => ({
+        [t('worker.workerId')]: worker.workerId,
+        [t('worker.name')]: worker.name,
+        [t('worker.gender')]: worker.gender === 'MALE' ? t('worker.male') : t('worker.female'),
+        [t('worker.idCard')]: worker.idCard,
+        [t('worker.region')]: worker.region || '-',
+        [t('worker.distributor')]: worker.distributorName || '-',
+        [t('worker.site')]: worker.siteName || '-',
+        [t('worker.phone')]: worker.phone,
+        [t('worker.email')]: worker.email || '-',
+        [t('worker.whatsapp')]: worker.whatsapp || '-',
+        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : 
+                            worker.status === 'SUSPENDED' ? t('worker.suspended') : t('worker.inactive'),
+        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-'
+      }));
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 15 }, // 工人编号
+        { wch: 10 }, // 姓名
+        { wch: 8 },  // 性别
+        { wch: 20 }, // 身份证号
+        { wch: 12 }, // 地区
+        { wch: 15 }, // 分判商
+        { wch: 15 }, // 工地
+        { wch: 15 }, // 电话
+        { wch: 20 }, // 邮箱
+        { wch: 15 }, // WhatsApp
+        { wch: 8 },  // 状态
+        { wch: 12 }  // 出生日期
+      ];
+      worksheet['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, t('worker.export'));
+      
+      const fileName = `工人数据_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
+      message.success(t('admin.currentSiteWorkersExported').replace('{count}', exportData.length.toString()));
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error(t('worker.exportFailed'));
+    }
+  }
+
+  // 导出所有工人的数据
+  const handleExportAllWorkers = async () => {
+    try {
+      const response = await apiService.exportWorkers({});
+      const exportData = response.workers.map((worker: any) => ({
+        [t('worker.workerId')]: worker.workerId,
+        [t('worker.name')]: worker.name,
+        [t('worker.gender')]: worker.gender === 'MALE' ? t('worker.male') : t('worker.female'),
+        [t('worker.idCard')]: worker.idCard,
+        [t('worker.region')]: worker.region || '-',
+        [t('worker.distributor')]: worker.distributorName || '-',
+        [t('worker.site')]: worker.siteName || '-',
+        [t('worker.phone')]: worker.phone,
+        [t('worker.email')]: worker.email || '-',
+        [t('worker.whatsapp')]: worker.whatsapp || '-',
+        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : 
+                            worker.status === 'SUSPENDED' ? t('worker.suspended') : t('worker.inactive'),
+        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-'
+      }));
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 15 }, // 工人编号
+        { wch: 10 }, // 姓名
+        { wch: 8 },  // 性别
+        { wch: 20 }, // 身份证号
+        { wch: 12 }, // 地区
+        { wch: 15 }, // 分判商
+        { wch: 15 }, // 工地
+        { wch: 15 }, // 电话
+        { wch: 20 }, // 邮箱
+        { wch: 15 }, // WhatsApp
+        { wch: 8 },  // 状态
+        { wch: 12 }  // 出生日期
+      ];
+      worksheet['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, t('worker.export'));
+      
+      const fileName = `工人数据_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
+      message.success(t('admin.allWorkersExported').replace('{count}', exportData.length.toString()));
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error(t('worker.exportFailed'));
+    }
+  };
+
+  // 读取工人Excel文件
+  const readWorkerExcelFile = async (file: File, distributors: Distributor[], sites: Site[]) => {
+    return new Promise<{ workers: Record<string, unknown>[], errors: string[] }>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const workbook = XLSX.read(e.target?.result, { type: 'binary' })
+          const sheetName = workbook.SheetNames[0]
+          const worksheet = workbook.Sheets[sheetName]
+          const jsonData = XLSX.utils.sheet_to_json(worksheet)
+          
+          const workers: Record<string, unknown>[] = []
+          const errors: string[] = []
+
+          jsonData.forEach((row: any, index: number) => {
+            try {
+              // 性别映射
+              const genderMap: { [key: string]: string } = {
+                '男': 'MALE',
+                '女': 'FEMALE',
+                'male': 'MALE',
+                'female': 'FEMALE',
+                'MALE': 'MALE',
+                'FEMALE': 'FEMALE'
+              }
+
+              // 状态映射
+              const statusMap: { [key: string]: string } = {
+                '在职': 'ACTIVE',
+                '暂停': 'SUSPENDED',
+                '离职': 'INACTIVE',
+                'active': 'ACTIVE',
+                'suspended': 'SUSPENDED',
+                'inactive': 'INACTIVE',
+                'ACTIVE': 'ACTIVE',
+                'SUSPENDED': 'SUSPENDED',
+                'INACTIVE': 'INACTIVE'
+              }
+
+              const name = row['姓名'] || row[t('worker.name')]
+              const idCard = row['身份证号'] || row[t('worker.idCard')]
+              const phone = row['联系电话'] || row[t('worker.phone')]
+              const distributorName = row['分判商'] || row[t('worker.distributor')]
+              const siteName = row['所属工地'] || row[t('worker.site')]
+
+              // 验证必填字段
+              if (!name) {
+                errors.push(`第${index + 2}行: 姓名不能为空`)
+                return
+              }
+              if (!idCard) {
+                errors.push(`第${index + 2}行: 身份证号不能为空`)
+                return
+              }
+              if (!phone) {
+                errors.push(`第${index + 2}行: 联系电话不能为空`)
+                return
+              }
+
+              // 查找分判商和工地ID
+              const distributor = distributors.find(d => d.name === distributorName)
+              const site = sites.find(s => s.name === siteName)
+
+              if (distributorName && !distributor) {
+                errors.push(`第${index + 2}行: 分判商"${distributorName}"不存在`)
+                return
+              }
+
+              if (siteName && !site) {
+                errors.push(`第${index + 2}行: 工地"${siteName}"不存在`)
+                return
+              }
+
+              workers.push({
+                name,
+                gender: genderMap[row['性别']] || genderMap[row[t('worker.gender')]] || 'MALE',
+                idCard,
+                region: row['地区'] || row[t('worker.region')] || null,
+                phone,
+                email: row['邮箱'] || row[t('worker.email')] || null,
+                whatsapp: row['WhatsApp'] || row[t('worker.whatsapp')] || null,
+                status: statusMap[row['状态']] || statusMap[row[t('worker.status')]] || 'ACTIVE',
+                birthDate: row['出生日期'] || row[t('worker.birthDate')] || null,
+                distributorId: distributor?.id || null,
+                siteId: site?.id || null
+              })
+            } catch (error) {
+              errors.push(`第${index + 2}行: 数据格式错误`)
+            }
+          })
+
+          resolve({ workers, errors })
+        } catch (error) {
+          reject(error)
+        }
+      }
+      reader.onerror = () => reject(new Error('文件读取失败'))
+      reader.readAsBinaryString(file)
+    })
+  }
+
+  // 导入工人数据
+  const handleImport = async (file: File) => {
+    try {
+      const { workers: importedWorkers, errors } = await readWorkerExcelFile(file, distributors, sites)
+      
+      if (errors.length > 0) {
+        message.error(t('worker.importFailed').replace('{errors}', errors.join('; ')))
+        return
+      }
+      
+      if (importedWorkers.length === 0) {
+        message.warning(t('worker.noValidData'))
+        return
+      }
+      
+      // 显示导入确认对话框
+      Modal.confirm({
+        title: t('worker.importConfirm'),
+        content: (
+          <div>
+            <p>{t('worker.importConfirmMessage').replace('{count}', importedWorkers.length.toString())}</p>
+            <p style={{ color: '#1890ff', marginTop: '8px' }}>
+              {t('worker.importDefaultSiteMessage').replace('{siteName}', selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.name || '' : t('worker.noSiteSelected'))}
+            </p>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
+              {t('worker.importRulesMessage')}
+            </p>
+            {errors.length > 0 && (
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '8px', 
+                background: '#fff7e6', 
+                border: '1px solid #ffd591', 
+                borderRadius: '4px',
+                fontSize: '12px'
+              }}>
+                <div style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: '4px' }}>
+                  ⚠️ {t('worker.importWarnings')}:
+                </div>
+                {errors.slice(0, 3).map((error, index) => (
+                  <div key={index} style={{ color: '#666', marginBottom: '2px' }}>
+                    {error}
+                  </div>
+                ))}
+                {errors.length > 3 && (
+                  <div style={{ color: '#999', fontStyle: 'italic' }}>
+                    ... 还有 {errors.length - 3} 个警告
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ),
+        onOk: async () => {
+          await processWorkerImport(importedWorkers)
+        }
+      })
+    } catch (error) {
+      message.error(t('worker.importFailed').replace('{errors}', (error as Error).message))
+    }
+  }
+
+  // 处理工人导入
+  const processWorkerImport = async (importedWorkers: Record<string, unknown>[]) => {
+    try {
+      setLoading(true)
+      
+      let successCount = 0
+      let skipCount = 0
+      const errors: string[] = []
+
+      for (const workerData of importedWorkers) {
+        try {
+          // 准备导入数据
+          const importData = {
+            name: String(workerData.name || ''),
+            gender: String(workerData.gender || 'MALE'),
+            idCard: String(workerData.idCard || ''),
+            region: workerData.region ? String(workerData.region) : null,
+            phone: String(workerData.phone || ''),
+            email: workerData.email ? String(workerData.email) : null,
+            whatsapp: workerData.whatsapp ? String(workerData.whatsapp) : null,
+            status: String(workerData.status || 'ACTIVE'),
+            birthDate: workerData.birthDate ? String(workerData.birthDate) : null,
+            distributorId: workerData.distributorId ? String(workerData.distributorId) : null,
+            siteId: workerData.siteId ? String(workerData.siteId) : selectedSiteId
+          }
+
+          // 调用API创建工人
+          await apiService.createWorker(importData)
+          successCount++
+        } catch (error: any) {
+          if (error.status === 409) {
+            // 身份证号重复，跳过
+            skipCount++
+            console.log(`跳过重复的工人: ${workerData.name} (身份证: ${importData.idCard})`)
+          } else {
+            // 其他错误
+            errors.push(`${workerData.name}: ${error.message || '创建失败'}`)
+          }
+        }
+      }
+
+      // 重新加载数据
+      await loadData()
+
+      // 显示导入结果弹窗
+      showWorkerImportResultModal(successCount, skipCount, errors)
+    } catch (error) {
+      console.error('Import processing failed:', error)
+      message.error(t('worker.importFailed').replace('{errors}', (error as Error).message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 显示工人导入结果弹窗
+  const showWorkerImportResultModal = (successCount: number, skipCount: number, errors: string[]) => {
+    const totalCount = successCount + skipCount + errors.length
+    
+    Modal.info({
+      title: t('worker.importResultTitle'),
+      width: 600,
+      content: (
+        <div style={{ marginTop: '16px' }}>
+          {/* 总体统计 */}
+          <div style={{ 
+            background: '#f6ffed', 
+            border: '1px solid #b7eb8f', 
+            borderRadius: '6px', 
+            padding: '16px', 
+            marginBottom: '16px' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '8px' }} />
+              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                {t('worker.importCompleted')}
+              </span>
+            </div>
+            <div style={{ color: '#666', fontSize: '14px' }}>
+              {t('worker.importTotalProcessed').replace('{total}', totalCount.toString())}
+            </div>
+          </div>
+
+          {/* 详细统计 */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: successCount > 0 ? '#f6ffed' : '#f5f5f5',
+              border: `1px solid ${successCount > 0 ? '#b7eb8f' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: successCount > 0 ? '#52c41a' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {successCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('worker.importSuccessCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: skipCount > 0 ? '#fff7e6' : '#f5f5f5',
+              border: `1px solid ${skipCount > 0 ? '#ffd591' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: skipCount > 0 ? '#fa8c16' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {skipCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('worker.importSkipCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: errors.length > 0 ? '#fff2f0' : '#f5f5f5',
+              border: `1px solid ${errors.length > 0 ? '#ffccc7' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: errors.length > 0 ? '#ff4d4f' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {errors.length}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('worker.importErrorCount')}
+              </div>
+            </div>
+          </div>
+
+          {/* 错误详情 */}
+          {errors.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ 
+                color: '#ff4d4f', 
+                fontWeight: 'bold', 
+                marginBottom: '8px',
+                fontSize: '14px'
+              }}>
+                {t('worker.importErrorDetails')}:
+              </div>
+              <div style={{ 
+                maxHeight: '200px', 
+                overflowY: 'auto', 
+                background: '#fafafa', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '4px', 
+                padding: '8px'
+              }}>
+                {errors.map((error, index) => (
+                  <div key={index} style={{ 
+                    color: '#666', 
+                    fontSize: '12px', 
+                    marginBottom: '4px',
+                    padding: '4px 0',
+                    borderBottom: index < errors.length - 1 ? '1px solid #f0f0f0' : 'none'
+                  }}>
+                    {error}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+      okText: t('common.ok')
+    })
+  }
 
   return (
     <div style={{ padding: '24px' }}>
@@ -226,9 +846,9 @@ const WorkerManagement: React.FC = () => {
               style={{ width: '100%' }}
               allowClear
             >
-              <Option value="active">{t('worker.active')}</Option>
-              <Option value="suspended">{t('worker.suspended')}</Option>
-              <Option value="inactive">{t('worker.inactive')}</Option>
+              <Option value="ACTIVE">{t('worker.active')}</Option>
+              <Option value="SUSPENDED">{t('worker.suspended')}</Option>
+              <Option value="INACTIVE">{t('worker.inactive')}</Option>
             </Select>
           </Col>
           <Col span={6}>
@@ -254,19 +874,27 @@ const WorkerManagement: React.FC = () => {
               >
                 {t('guard.downloadTemplate')}
               </Button>
-              <Button
-                icon={<UploadOutlined />}
-                onClick={() => setExcelModalVisible(true)}
-                size="small"
+              <Upload
+                accept=".xlsx,.xls"
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  handleImport(file)
+                  return false
+                }}
               >
-                {t('guard.import')}
-              </Button>
+                <Button
+                  icon={<UploadOutlined />}
+                  size="small"
+                >
+                  {t('worker.import')}
+                </Button>
+              </Upload>
               <Button
                 icon={<DownloadOutlined />}
-                onClick={() => setExcelModalVisible(true)}
+                onClick={showWorkerExportOptions}
                 size="small"
               >
-                {t('guard.export')}
+                {t('worker.export')}
               </Button>
               <Button
                 type="primary"
@@ -280,6 +908,40 @@ const WorkerManagement: React.FC = () => {
           </Col>
         </Row>
       </Card>
+
+      {/* 筛选结果统计 */}
+      {!loading && (searchText.trim() || statusFilters.length > 0 || distributorFilters.length > 0) && (
+        <div style={{ 
+          marginBottom: 16, 
+          padding: '12px 16px', 
+          background: '#f5f5f5', 
+          borderRadius: '6px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ color: '#666', fontSize: '14px' }}>
+              {t('worker.filterResults').replace('{count}', filteredWorkers.length.toString())}
+              {workers.length !== filteredWorkers.length && (
+                <span style={{ marginLeft: 8, color: '#999' }}>
+                  {t('worker.fromTotalRecords').replace('{total}', workers.length.toString())}
+                </span>
+              )}
+            </span>
+          </div>
+          <Button 
+            size="small" 
+            onClick={() => {
+              setSearchText('')
+              setStatusFilters([])
+              setDistributorFilters([])
+            }}
+          >
+            {t('common.clearFilters')}
+          </Button>
+        </div>
+      )}
 
       {/* 工人表格 */}
       <Card>
@@ -324,11 +986,7 @@ const WorkerManagement: React.FC = () => {
             type="primary" 
             loading={loading}
             onClick={() => {
-              // 触发表单提交
-              const formElement = document.querySelector('.worker-form .ant-form') as HTMLFormElement;
-              if (formElement) {
-                formElement.requestSubmit();
-              }
+              formRef.current?.submit();
             }}
           >
             {editingWorker ? t('common.save') : t('common.add')}
@@ -340,10 +998,12 @@ const WorkerManagement: React.FC = () => {
           maxWidth: '1200px',
           minWidth: '600px'
         }}
-        bodyStyle={{ 
-          height: 'calc(100vh - 280px)', 
-          overflowY: 'auto',
-          padding: '20px'
+        styles={{
+          body: {
+            height: 'calc(100vh - 280px)', 
+            overflowY: 'auto',
+            padding: '20px'
+          }
         }}
         destroyOnClose
         maskClosable={false}
@@ -360,6 +1020,7 @@ const WorkerManagement: React.FC = () => {
         )}
       >
         <WorkerForm
+          ref={formRef}
           worker={editingWorker}
           distributors={distributors}
           sites={sites}
@@ -367,6 +1028,7 @@ const WorkerManagement: React.FC = () => {
           onCancel={handleCancelForm}
           loading={loading}
           showButtons={false}
+          selectedSiteId={selectedSiteId}
         />
       </Modal>
 
@@ -380,15 +1042,6 @@ const WorkerManagement: React.FC = () => {
         }}
       />
 
-      {/* Excel导入导出模态框 */}
-      <ExcelImportExportModal
-        visible={excelModalVisible}
-        onClose={() => setExcelModalVisible(false)}
-        workers={workers}
-        distributors={distributors}
-        sites={sites}
-        onImport={handleExcelImport}
-      />
     </div>
   );
 };

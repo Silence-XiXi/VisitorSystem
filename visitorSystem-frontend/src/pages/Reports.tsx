@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
-import { Card, DatePicker, Table, Space, Button, Row, Col, Statistic, message, Progress, Select, Tabs, Input, Tooltip, Modal, List, Tag } from 'antd'
+import { Card, DatePicker, Table, Space, Button, Row, Col, Statistic, message, Progress, Select, Tabs, Input, Tooltip, Modal, List, Tag, Spin } from 'antd'
 import { TeamOutlined, DownloadOutlined, SearchOutlined, QuestionCircleOutlined, ShoppingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs, { Dayjs } from '../utils/dayjs'
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
-import { mockWorkers, mockSites, mockDistributors, mockItemCategories, mockGuards } from '../data/mockData'
+import apiService from '../services/api'
+import * as XLSX from 'xlsx'
 
 interface AttendanceRecord {
   key: string
@@ -34,88 +35,78 @@ interface SiteSummary {
   currentOnSite: number
 }
 
-// 生成基础访客记录
-const baseAttendance: AttendanceRecord[] = mockWorkers.slice(0, 12).map((w, idx) => {
-  const siteIndex = idx % mockSites.length
-  const distIndex = idx % mockDistributors.length
-  const idTypes = ['身份证', '护照', '港澳通行证', '台湾通行证']
-  const borrowedItems = Math.floor(Math.random() * 5) + 1 // 1-5个借用物品
-  const returnedItems = Math.floor(Math.random() * (borrowedItems + 1)) // 0到借用数量的已归还数量
+// 将访客记录和借用记录转换为AttendanceRecord格式
+const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[]): AttendanceRecord[] => {
+  const recordMap = new Map<string, AttendanceRecord>()
   
-  // 获取该工地对应的门卫作为登记人
-  const siteGuards = mockGuards.filter(guard => guard.siteId === mockSites[siteIndex]?.id)
-  const randomGuard = siteGuards.length > 0 ? siteGuards[Math.floor(Math.random() * siteGuards.length)] : null
-  
-  return {
-    key: w.id,
-    workerId: w.workerId,
-    name: w.name,
-    distributorName: mockDistributors[distIndex]?.name || `分判商${distIndex + 1}`,
-    siteName: mockSites[siteIndex]?.name || `工地${siteIndex + 1}`,
-    contact: idx % 2 === 0 ? w.phone : w.whatsapp,
-    idType: idTypes[idx % idTypes.length],
-    idNumber: w.idCard,
-    physicalCardId: w.physicalCardId,
-    date: dayjs().subtract(idx % 7, 'day').format('YYYY-MM-DD'),
-    checkIn: dayjs().hour(8).minute(30 + (idx % 10)).format('HH:mm'),
-    checkOut: idx % 4 === 0 ? undefined : dayjs().hour(17 + (idx % 2)).minute(10).format('HH:mm'),
-    borrowedItems,
-    returnedItems,
-    registrarId: randomGuard?.guardId,
-    registrarName: randomGuard?.name || '未指定'
-  }
-})
-
-// 为北京CBD项目生成额外的访客记录
-const generateBeijingCBDRecords = (): AttendanceRecord[] => {
-  const beijingCBDWorkers = [
-    { name: '王建国', workerId: 'BJ001', phone: '13800138001', idCard: '110101198001011234', physicalCardId: 'CARD001' },
-    { name: '李小明', workerId: 'BJ002', phone: '13800138002', idCard: '110101198002021234', physicalCardId: 'CARD002' },
-    { name: '张伟', workerId: 'BJ003', phone: '13800138003', idCard: '110101198003031234', physicalCardId: 'CARD003' },
-    { name: '刘强', workerId: 'BJ004', phone: '13800138004', idCard: '110101198004041234', physicalCardId: 'CARD004' },
-    { name: '陈华', workerId: 'BJ005', phone: '13800138005', idCard: '110101198005051234', physicalCardId: 'CARD005' },
-    { name: '赵军', workerId: 'BJ006', phone: '13800138006', idCard: '110101198006061234', physicalCardId: 'CARD006' },
-    { name: '孙丽', workerId: 'BJ007', phone: '13800138007', idCard: '110101198007071234', physicalCardId: 'CARD007' },
-    { name: '周涛', workerId: 'BJ008', phone: '13800138008', idCard: '110101198008081234', physicalCardId: 'CARD008' },
-    { name: '吴敏', workerId: 'BJ009', phone: '13800138009', idCard: '110101198009091234', physicalCardId: 'CARD009' },
-    { name: '郑强', workerId: 'BJ010', phone: '13800138010', idCard: '110101198010101234', physicalCardId: 'CARD010' },
-    { name: '马超', workerId: 'BJ011', phone: '13800138011', idCard: '110101198011111234', physicalCardId: 'CARD011' },
-    { name: '朱亮', workerId: 'BJ012', phone: '13800138012', idCard: '110101198012121234', physicalCardId: 'CARD012' },
-    { name: '许峰', workerId: 'BJ013', phone: '13800138013', idCard: '110101198101011234', physicalCardId: 'CARD013' },
-    { name: '何勇', workerId: 'BJ014', phone: '13800138014', idCard: '110101198102021234', physicalCardId: 'CARD014' },
-    { name: '罗斌', workerId: 'BJ015', phone: '13800138015', idCard: '110101198103031234', physicalCardId: 'CARD015' }
-  ]
-  
-  const idTypes = ['身份证', '护照', '港澳通行证', '台湾通行证']
-  const beijingCBDGuards = mockGuards.filter(guard => guard.siteId === '1') // 北京CBD项目ID为'1'
-  
-  return beijingCBDWorkers.map((worker, idx) => {
-    const borrowedItems = Math.floor(Math.random() * 5) + 1
-    const returnedItems = Math.floor(Math.random() * (borrowedItems + 1))
-    const randomGuard = beijingCBDGuards.length > 0 ? beijingCBDGuards[Math.floor(Math.random() * beijingCBDGuards.length)] : null
+  // 处理访客记录
+  visitorRecords.forEach(record => {
+    const key = `${record.workerId}-${dayjs(record.checkInTime).format('YYYY-MM-DD')}`
+    const existingRecord = recordMap.get(key)
     
-    return {
-      key: `beijing-cbd-${idx}`,
-      workerId: worker.workerId,
-      name: worker.name,
-      distributorName: '北京建筑公司',
-      siteName: '北京CBD项目',
-      contact: worker.phone,
-      idType: idTypes[idx % idTypes.length],
-      idNumber: worker.idCard,
-      physicalCardId: worker.physicalCardId,
-      date: dayjs().subtract(idx % 10, 'day').format('YYYY-MM-DD'),
-      checkIn: dayjs().hour(7 + (idx % 3)).minute(30 + (idx % 30)).format('HH:mm'),
-      checkOut: idx % 5 === 0 ? undefined : dayjs().hour(16 + (idx % 3)).minute(10 + (idx % 50)).format('HH:mm'),
-      borrowedItems,
-      returnedItems,
-      registrarId: randomGuard?.guardId,
-      registrarName: randomGuard?.name || '未指定'
+    if (existingRecord) {
+      // 如果已存在记录，更新离场信息
+      existingRecord.checkOut = record.checkOutTime ? dayjs(record.checkOutTime).format('HH:mm') : undefined
+      existingRecord.registrarId = record.registrar?.id
+      existingRecord.registrarName = record.registrar?.name || '未指定'
+    } else {
+      // 创建新记录
+      recordMap.set(key, {
+        key,
+        workerId: record.worker.workerId,
+        name: record.worker.name,
+        distributorName: record.worker.distributor?.name || '未知分判商',
+        siteName: record.site?.name || '未知工地',
+        contact: record.worker.phone || record.worker.whatsapp || '',
+        idType: record.idType,
+        idNumber: record.idNumber,
+        physicalCardId: record.physicalCardId,
+        date: dayjs(record.checkInTime).format('YYYY-MM-DD'),
+        checkIn: dayjs(record.checkInTime).format('HH:mm'),
+        checkOut: record.checkOutTime ? dayjs(record.checkOutTime).format('HH:mm') : undefined,
+        borrowedItems: 0,
+        returnedItems: 0,
+        registrarId: record.registrar?.id,
+        registrarName: record.registrar?.name || '未指定'
+      })
     }
   })
+  
+  // 处理借用记录，统计每个工人的借用物品数量
+  borrowRecords.forEach(record => {
+    const key = `${record.worker.workerId}-${dayjs(record.borrowDate).format('YYYY-MM-DD')}`
+    const existingRecord = recordMap.get(key)
+    
+    if (existingRecord) {
+      existingRecord.borrowedItems++
+      if (record.status === 'RETURNED') {
+        existingRecord.returnedItems++
+      }
+    } else {
+      // 如果没有对应的访客记录，创建一个新的记录
+      recordMap.set(key, {
+        key,
+        workerId: record.worker.workerId,
+        name: record.worker.name,
+        distributorName: record.worker.distributor?.name || '未知分判商',
+        siteName: record.site?.name || '未知工地',
+        contact: record.worker.phone || record.worker.whatsapp || '',
+        idType: '身份证', // 默认值
+        idNumber: record.worker.idCard || '',
+        physicalCardId: record.worker.physicalCardId,
+        date: dayjs(record.borrowDate).format('YYYY-MM-DD'),
+        checkIn: dayjs(record.borrowDate).format('HH:mm'),
+        checkOut: record.status === 'RETURNED' && record.returnDate ? dayjs(record.returnDate).format('HH:mm') : undefined,
+        borrowedItems: 1,
+        returnedItems: record.status === 'RETURNED' ? 1 : 0,
+        registrarId: record.borrowHandler?.id,
+        registrarName: record.borrowHandler?.name || '未指定'
+      })
+    }
+  })
+  
+  return Array.from(recordMap.values())
 }
-
-const mockAttendance: AttendanceRecord[] = [...baseAttendance, ...generateBeijingCBDRecords()]
 
 const Reports: React.FC = () => {
   const { t } = useLocale()
@@ -131,7 +122,51 @@ const Reports: React.FC = () => {
   const [tableHeight, setTableHeight] = useState(400)
   const [pageSize, setPageSize] = useState(20)
   const [currentPage, setCurrentPage] = useState(1)
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // 数据状态
+  const [visitorRecords, setVisitorRecords] = useState<any[]>([])
+  const [borrowRecords, setBorrowRecords] = useState<any[]>([])
+  const [sites, setSites] = useState<any[]>([])
+  const [distributors, setDistributors] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // 加载数据
+  const loadData = async () => {
+    setLoading(true)
+    try {
+           const [visitorData, borrowData, sitesData, distributorsData] = await Promise.all([
+             apiService.getVisitorRecords({
+               siteId: selectedSiteId,
+               startDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD'),
+               endDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD')
+             }),
+             apiService.getAllBorrowRecords({
+               siteId: selectedSiteId,
+               startDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD'),
+               endDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD')
+             }),
+             apiService.getAllSites(),
+             apiService.getAllDistributors()
+           ])
+      
+      setVisitorRecords(visitorData)
+      setBorrowRecords(borrowData)
+      setSites(sitesData)
+      setDistributors(distributorsData)
+    } catch (error) {
+      console.error('加载数据失败:', error)
+      message.error('加载数据失败，请重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 监听筛选条件变化，重新加载数据
+  useEffect(() => {
+    loadData()
+  }, [selectedSiteId, singleDate, dateRange, dateType])
 
   // 计算表格高度
   const calculateTableHeight = () => {
@@ -181,40 +216,24 @@ const Reports: React.FC = () => {
 
   // 生成物品数据
   const generateItemData = (record: AttendanceRecord) => {
-    const itemTypes = [t('reports.accessCard'), t('reports.key'), t('reports.ladder'), t('reports.safetyHelmet'), t('reports.toolKit'), t('reports.protectiveSuit'), t('reports.gloves'), t('reports.goggles')]
-    const items = []
+    // 从借用记录中筛选出该工人的物品
+    const workerBorrowRecords = borrowRecords.filter(borrowRecord => 
+      borrowRecord.worker.workerId === record.workerId && 
+      dayjs(borrowRecord.borrowDate).format('YYYY-MM-DD') === record.date
+    )
     
-    for (let i = 0; i < record.borrowedItems; i++) {
-      const itemType = itemTypes[i % itemTypes.length]
-      const isReturned = i < record.returnedItems
-      
-      // 根据物品类型找到对应的分类
-      const category = mockItemCategories.find(cat => 
-        cat.name === itemType || 
-        (itemType === '门禁卡' && cat.name === '门禁卡') ||
-        (itemType === '钥匙' && cat.name === '钥匙') ||
-        (itemType === '梯子' && cat.name === '梯子') ||
-        (itemType === '安全帽' && cat.name === '安全帽') ||
-        (itemType === '工具包' && cat.name === '工具包') ||
-        (itemType === '防护服' && cat.name === '防护服') ||
-        (itemType === '手套' && cat.name === '手套') ||
-        (itemType === '护目镜' && cat.name === '护目镜')
-      )
-      
-      items.push({
-        id: `${record.key}-item-${i}`,
-        name: `${itemType} #${i + 1}`,
-        type: itemType,
-        category: category?.name || t('reports.uncategorized'),
-        categoryDescription: category?.description || t('reports.noDescription'),
-        borrowedTime: record.checkIn || '08:30',
-        returnedTime: isReturned ? (record.checkOut || '17:00') : null,
-        status: isReturned ? 'returned' : 'borrowed',
-        borrowHandler: record.registrarName || t('reports.unspecified')
-      })
-    }
-    
-    return items
+    return workerBorrowRecords.map((borrowRecord, index) => ({
+      id: borrowRecord.id,
+      name: borrowRecord.item?.name || `物品 #${index + 1}`,
+      type: borrowRecord.item?.category?.name || t('reports.uncategorized'),
+      category: borrowRecord.item?.category?.name || t('reports.uncategorized'),
+      categoryDescription: borrowRecord.item?.category?.description || t('reports.noDescription'),
+      borrowedTime: dayjs(borrowRecord.borrowDate).format('HH:mm'),
+      returnedTime: borrowRecord.status === 'RETURNED' && borrowRecord.returnDate ? 
+        dayjs(borrowRecord.returnDate).format('HH:mm') : null,
+      status: borrowRecord.status === 'RETURNED' ? 'returned' : 'borrowed',
+      borrowHandler: borrowRecord.borrowHandler?.name || record.registrarName || t('reports.unspecified')
+    }))
   }
 
   // 显示物品详情
@@ -223,12 +242,18 @@ const Reports: React.FC = () => {
     setItemDetailModalVisible(true)
   }
 
+
+  // 将真实数据转换为AttendanceRecord格式
+  const attendanceRecords = useMemo(() => {
+    return convertToAttendanceRecords(visitorRecords, borrowRecords)
+  }, [visitorRecords, borrowRecords])
+
   // 生成工地汇总数据
   const siteSummaries = useMemo((): SiteSummary[] => {
     const siteMap = new Map<string, SiteSummary>()
     
     // 初始化所有工地
-    mockSites.forEach(site => {
+    sites.forEach(site => {
       siteMap.set(site.id, {
         siteId: site.id,
         siteName: site.name,
@@ -240,9 +265,9 @@ const Reports: React.FC = () => {
     })
 
     // 统计每个工地的数据
-    mockAttendance.forEach(record => {
+    attendanceRecords.forEach(record => {
       // 根据工地名称找到对应的工地ID
-      const site = mockSites.find(s => s.name === record.siteName)
+      const site = sites.find(s => s.name === record.siteName)
       if (site) {
         const siteSummary = siteMap.get(site.id)
         if (siteSummary) {
@@ -258,7 +283,7 @@ const Reports: React.FC = () => {
     })
 
     return Array.from(siteMap.values())
-  }, [])
+  }, [sites, attendanceRecords])
 
   // 筛选后的工地汇总数据
   const filteredSiteSummaries = useMemo(() => {
@@ -273,7 +298,7 @@ const Reports: React.FC = () => {
 
   // 筛选后的出勤数据
   const filteredData = useMemo(() => {
-    let filtered = mockAttendance
+    let filtered = attendanceRecords
     
     // 搜索关键词筛选
     if (searchKeyword.trim()) {
@@ -288,7 +313,7 @@ const Reports: React.FC = () => {
     }
     
     if (selectedSiteId) {
-      const site = mockSites.find(s => s.id === selectedSiteId)
+      const site = sites.find(s => s.id === selectedSiteId)
       if (site) {
         filtered = filtered.filter(record => record.siteName === site.name)
       }
@@ -297,26 +322,26 @@ const Reports: React.FC = () => {
     if (selectedDistributors.length > 0) {
       filtered = filtered.filter(record => 
         selectedDistributors.some(distId => {
-          const dist = mockDistributors.find(d => d.id === distId)
+          const dist = distributors.find(d => d.id === distId)
           return dist && record.distributorName === dist.name
         })
       )
     }
     
     return filtered
-  }, [searchKeyword, selectedSiteId, selectedDistributors])
+  }, [attendanceRecords, searchKeyword, selectedSiteId, selectedDistributors, sites, distributors])
 
   // 计算各种统计数据 - 只与工地筛选框联动
   const siteOnlyFilteredData = useMemo(() => {
     if (!selectedSiteId) return []
-    const site = mockSites.find(s => s.id === selectedSiteId)
+    const site = sites.find(s => s.id === selectedSiteId)
     if (!site) return []
-    return mockAttendance.filter(record => record.siteName === site.name)
-  }, [selectedSiteId])
+    return attendanceRecords.filter(record => record.siteName === site.name)
+  }, [selectedSiteId, sites, attendanceRecords])
 
   const pending = siteOnlyFilteredData.filter(r => !r.checkOut) // 未离场人数
   const totalEntered = siteOnlyFilteredData.filter(r => !!r.checkIn).length // 当日进场人数
-  const currentOnSite = siteOnlyFilteredData.filter(r => !!r.checkIn && !r.checkOut).length // 当前在场人数
+  const leftCount = siteOnlyFilteredData.filter(r => !!r.checkIn && !!r.checkOut).length // 已离场人数
   
   // 物品统计数据
   const totalBorrowedItems = siteOnlyFilteredData.reduce((sum, r) => sum + r.borrowedItems, 0) // 已借出物品总数
@@ -325,14 +350,93 @@ const Reports: React.FC = () => {
 
   // Excel下载功能
   const downloadExcel = () => {
-    if (activeTab === 'site-summary') {
-      // 下载工地访客统计数据
-      message.success(t('reports.downloadVisitorStats'))
-      // 这里应该调用实际的Excel导出API，导出filteredSiteSummaries数据
-    } else if (activeTab === 'visitor-records') {
-      // 下载访客记录数据
-      message.success(t('reports.downloadVisitorRecords'))
-      // 这里应该调用实际的Excel导出API，导出filteredData数据
+    try {
+      if (activeTab === 'site-summary') {
+        // 下载工地访客统计数据
+        const exportData = filteredSiteSummaries.map(site => ({
+          [t('reports.siteName')]: site.siteName,
+          [t('reports.totalWorkers')]: site.totalWorkers,
+          [t('reports.checkedIn')]: site.checkedIn,
+          [t('reports.checkedOut')]: site.checkedOut,
+          [t('reports.currentOnSite')]: site.currentOnSite,
+          [t('reports.checkInRate')]: `${((site.checkedIn / site.totalWorkers) * 100).toFixed(1)}%`,
+          [t('reports.checkOutRate')]: `${((site.checkedOut / site.totalWorkers) * 100).toFixed(1)}%`
+        }))
+        
+        const workbook = XLSX.utils.book_new()
+        const worksheet = XLSX.utils.json_to_sheet(exportData)
+        
+        // 设置列宽
+        const colWidths = [
+          { wch: 20 }, // 工地名称
+          { wch: 12 }, // 总工人数
+          { wch: 12 }, // 已签到
+          { wch: 12 }, // 已签退
+          { wch: 12 }, // 当前在场
+          { wch: 12 }, // 签到率
+          { wch: 12 }  // 签退率
+        ]
+        worksheet['!cols'] = colWidths
+        
+        XLSX.utils.book_append_sheet(workbook, worksheet, t('reports.siteSummary'))
+        
+        const fileName = `工地访客统计_${new Date().toISOString().split('T')[0]}.xlsx`
+        XLSX.writeFile(workbook, fileName)
+        
+        message.success(t('reports.downloadVisitorStats').replace('{count}', filteredSiteSummaries.length.toString()))
+      } else if (activeTab === 'visitor-records') {
+        // 下载访客记录数据
+        const exportData = filteredData.map(record => ({
+          [t('reports.workerId')]: record.workerId,
+          [t('reports.name')]: record.name,
+          [t('reports.distributor')]: record.distributorName,
+          [t('reports.siteName')]: record.siteName,
+          [t('reports.contact')]: record.contact,
+          [t('reports.idType')]: record.idType,
+          [t('reports.idNumber')]: record.idNumber,
+          [t('reports.physicalCardId')]: record.physicalCardId || '-',
+          [t('reports.date')]: record.date,
+          [t('reports.checkIn')]: record.checkIn || '-',
+          [t('reports.checkOut')]: record.checkOut || '-',
+          [t('reports.borrowedItems')]: record.borrowedItems,
+          [t('reports.returnedItems')]: record.returnedItems,
+          [t('reports.unreturnedItems')]: record.borrowedItems - record.returnedItems,
+          [t('reports.registrar')]: record.registrarName || '-'
+        }))
+        
+        const workbook = XLSX.utils.book_new()
+        const worksheet = XLSX.utils.json_to_sheet(exportData)
+        
+        // 设置列宽
+        const colWidths = [
+          { wch: 15 }, // 工人编号
+          { wch: 15 }, // 姓名
+          { wch: 20 }, // 分判商
+          { wch: 20 }, // 工地名称
+          { wch: 15 }, // 联系方式
+          { wch: 12 }, // 证件类型
+          { wch: 20 }, // 证件号码
+          { wch: 15 }, // 实体卡ID
+          { wch: 12 }, // 日期
+          { wch: 10 }, // 签到时间
+          { wch: 10 }, // 签退时间
+          { wch: 12 }, // 借用物品
+          { wch: 12 }, // 归还物品
+          { wch: 12 }, // 未归还物品
+          { wch: 15 }  // 登记人
+        ]
+        worksheet['!cols'] = colWidths
+        
+        XLSX.utils.book_append_sheet(workbook, worksheet, t('reports.visitorRecords'))
+        
+        const fileName = `访客记录_${new Date().toISOString().split('T')[0]}.xlsx`
+        XLSX.writeFile(workbook, fileName)
+        
+        message.success(t('reports.downloadVisitorRecords').replace('{count}', filteredData.length.toString()))
+      }
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error(t('reports.exportFailed'))
     }
   }
 
@@ -574,8 +678,8 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title={t('reports.currentOnSiteCount')}
-              value={currentOnSite}
+              title={t('reports.leftCount')}
+              value={leftCount}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#1890ff', fontWeight: 700 }}
             />
@@ -754,7 +858,7 @@ const Reports: React.FC = () => {
               value={selectedDistributors}
               onChange={setSelectedDistributors}
               style={{ width: '100%' }}
-              options={mockDistributors.map(dist => ({ label: dist.name, value: dist.id }))}
+              options={distributors.map(dist => ({ label: dist.name, value: dist.id }))}
               allowClear
             />
           </Col>
@@ -796,7 +900,7 @@ const Reports: React.FC = () => {
           <Button 
             type="primary" 
             icon={<DownloadOutlined />} 
-            onClick={downloadExcel}
+            onClick={() => setDownloadModalVisible(true)}
           >
             {t('reports.downloadExcel')}
           </Button>
@@ -807,23 +911,25 @@ const Reports: React.FC = () => {
             label: t('reports.visitorRecords'),
             children: (
               <div style={{ height: tableHeight, display: 'flex', flexDirection: 'column' }}>
-                <Table
-                  columns={attendanceColumns}
-                  dataSource={filteredData}
-                  rowKey="key"
+                <Spin spinning={loading}>
+                  <Table
+                    columns={attendanceColumns}
+                    dataSource={filteredData}
+                    rowKey="key"
                     scroll={{ x: 1200, y: tableHeight - 90 }}
-                  pagination={{ 
-                    current: currentPage,
-                    pageSize: pageSize,
-                    total: filteredData.length,
-                    showSizeChanger: true,
-                    showQuickJumper: true,
-                    showTotal: (total, range) => t('reports.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
-                    pageSizeOptions: ['10', '20', '50', '100'],
-                    onChange: handlePageChange,
-                    onShowSizeChange: handlePageSizeChange
-                  }}
-                />
+                    pagination={{ 
+                      current: currentPage,
+                      pageSize: pageSize,
+                      total: filteredData.length,
+                      showSizeChanger: true,
+                      showQuickJumper: true,
+                      showTotal: (total, range) => t('reports.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
+                      pageSizeOptions: ['10', '20', '50', '100'],
+                      onChange: handlePageChange,
+                      onShowSizeChange: handlePageSizeChange
+                    }}
+                  />
+                </Spin>
               </div>
             )
           },
@@ -832,21 +938,23 @@ const Reports: React.FC = () => {
             label: t('reports.siteVisitorStats'),
             children: (
               <div style={{ height: tableHeight, display: 'flex', flexDirection: 'column' }}>
-                <Table
-                  columns={siteColumns}
-                  dataSource={filteredSiteSummaries}
-                  rowKey="siteId"
-                  size="small"
+                <Spin spinning={loading}>
+                  <Table
+                    columns={siteColumns}
+                    dataSource={filteredSiteSummaries}
+                    rowKey="siteId"
+                    size="small"
                     scroll={{ x: 800, y: tableHeight - 90 }}
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showQuickJumper: true,
-                    showTotal: (total, range) => t('reports.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
-                    pageSizeOptions: ['5', '10', '20'],
-                    size: 'small'
-                  }}
-                />
+                    pagination={{
+                      pageSize: 10,
+                      showSizeChanger: true,
+                      showQuickJumper: true,
+                      showTotal: (total, range) => t('reports.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
+                      pageSizeOptions: ['5', '10', '20'],
+                      size: 'small'
+                    }}
+                  />
+                </Spin>
               </div>
             )
           }
@@ -911,6 +1019,98 @@ const Reports: React.FC = () => {
             />
           </div>
         )}
+      </Modal>
+
+      {/* 下载选项模态框 */}
+      <Modal
+        title={t('reports.downloadOptionsTitle')}
+        open={downloadModalVisible}
+        onCancel={() => setDownloadModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setDownloadModalVisible(false)}>
+            {t('common.cancel')}
+          </Button>,
+          <Button 
+            key="downloadVisitorRecords" 
+            type="primary" 
+            onClick={() => {
+              setDownloadModalVisible(false)
+              setActiveTab('visitor-records')
+              setTimeout(() => downloadExcel(), 100)
+            }}
+          >
+            {t('reports.downloadVisitorRecordsTab')}
+          </Button>,
+          <Button 
+            key="downloadSiteSummary" 
+            type="primary" 
+            onClick={() => {
+              setDownloadModalVisible(false)
+              setActiveTab('site-summary')
+              setTimeout(() => downloadExcel(), 100)
+            }}
+          >
+            {t('reports.downloadSiteSummaryTab')}
+          </Button>
+        ]}
+        width={600}
+      >
+        <div style={{ marginTop: 16 }}>
+          <p style={{ marginBottom: 16, color: '#666' }}>
+            {t('reports.downloadOptionsDescription')}
+          </p>
+          
+          <div style={{ 
+            background: '#f5f5f5', 
+            padding: '12px 16px', 
+            borderRadius: '6px', 
+            marginBottom: 16 
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+              {t('reports.downloadVisitorRecordsTab')}
+            </div>
+            <div style={{ color: '#666', fontSize: '14px', marginBottom: 8 }}>
+              {t('reports.downloadVisitorRecordsDescription').replace('{count}', filteredData.length.toString())}
+            </div>
+            <div style={{ fontSize: '12px', color: '#999' }}>
+              {t('reports.downloadVisitorRecordsFields')}
+            </div>
+          </div>
+          
+          <div style={{ 
+            background: '#e6f7ff', 
+            padding: '12px 16px', 
+            borderRadius: '6px', 
+            border: '1px solid #91d5ff' 
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#1890ff' }}>
+              {t('reports.downloadSiteSummaryTab')}
+            </div>
+            <div style={{ color: '#666', fontSize: '14px', marginBottom: 8 }}>
+              {t('reports.downloadSiteSummaryDescription').replace('{count}', filteredSiteSummaries.length.toString())}
+            </div>
+            <div style={{ fontSize: '12px', color: '#999' }}>
+              {t('reports.downloadSiteSummaryFields')}
+            </div>
+          </div>
+          
+          <div style={{ 
+            marginTop: 16, 
+            padding: '12px', 
+            background: '#fff7e6', 
+            border: '1px solid #ffd591', 
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 4, color: '#fa8c16' }}>
+              💡 {t('reports.downloadTips')}:
+            </div>
+            <div>• {t('reports.downloadTip1')}</div>
+            <div>• {t('reports.downloadTip2')}</div>
+            <div>• {t('reports.downloadTip3')}</div>
+          </div>
+        </div>
       </Modal>
     </div>
   )

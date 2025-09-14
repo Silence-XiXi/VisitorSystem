@@ -41,10 +41,11 @@ export class AdminController {
 
   @Get('guards')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: '获取所有门卫列表' })
+  @ApiOperation({ summary: '获取门卫列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  async getAllGuards(@GetCurrentUser() user: CurrentUser) {
-    return this.adminService.getAllGuards(user);
+  @ApiQuery({ name: 'siteId', required: false, description: '工地ID，用于筛选特定工地的门卫' })
+  async getAllGuards(@GetCurrentUser() user: CurrentUser, @Query('siteId') siteId?: string) {
+    return this.adminService.getAllGuards(user, siteId);
   }
 
   @Get('workers')
@@ -62,6 +63,77 @@ export class AdminController {
   ) {
     const filters = { distributorId, siteId, status };
     return this.adminService.getAllWorkers(user, filters);
+  }
+
+  @Post('workers')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '创建工人' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async createWorker(
+    @GetCurrentUser() user: CurrentUser,
+    @Body() workerData: any
+  ) {
+    return this.adminService.createWorker(user, workerData);
+  }
+
+  @Put('workers/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '更新工人信息' })
+  @ApiResponse({ status: 200, description: '更新成功' })
+  @ApiResponse({ status: 404, description: '工人不存在' })
+  async updateWorker(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') workerId: string,
+    @Body() updateData: any
+  ) {
+    return this.adminService.updateWorker(user, workerId, updateData);
+  }
+
+  @Delete('workers/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '删除工人' })
+  @ApiResponse({ status: 200, description: '删除成功' })
+  @ApiResponse({ status: 404, description: '工人不存在' })
+  async deleteWorker(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') workerId: string
+  ) {
+    return this.adminService.deleteWorker(user, workerId);
+  }
+
+  @Get('workers/export')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '导出工人数据' })
+  @ApiQuery({ name: 'siteId', required: false, description: '工地ID' })
+  @ApiQuery({ name: 'distributorId', required: false, description: '分判商ID' })
+  @ApiQuery({ name: 'status', required: false, description: '状态筛选' })
+  async exportWorkers(
+    @GetCurrentUser() user: CurrentUser,
+    @Query('siteId') siteId?: string,
+    @Query('distributorId') distributorId?: string,
+    @Query('status') status?: string
+  ) {
+    return this.adminService.exportWorkers(user, { siteId, distributorId, status });
+  }
+
+  @Post('workers/import')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '导入工人数据' })
+  @ApiResponse({ status: 200, description: '导入成功' })
+  @ApiResponse({ status: 400, description: '导入数据格式错误' })
+  async importWorkers(
+    @GetCurrentUser() user: CurrentUser,
+    @Body() importData: { workers: any[] }
+  ) {
+    return this.adminService.importWorkers(user, importData.workers);
+  }
+
+  @Get('workers/template')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '下载工人导入模板' })
+  async downloadWorkerTemplate(@GetCurrentUser() user: CurrentUser) {
+    return this.adminService.downloadWorkerTemplate(user);
   }
 
   @Post('distributors')
@@ -112,6 +184,20 @@ export class AdminController {
     @Body() siteData: any
   ) {
     return this.adminService.createSite(user, siteData);
+  }
+
+  @Put('sites/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '更新工地' })
+  @ApiResponse({ status: 200, description: '更新成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  @ApiResponse({ status: 404, description: '工地不存在' })
+  async updateSite(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() siteData: any
+  ) {
+    return this.adminService.updateSite(user, id, siteData);
   }
 
   @Put('users/:id/status')
@@ -214,5 +300,29 @@ export class AdminController {
     @Param('id') distributorId: string
   ) {
     return this.adminService.deleteDistributor(user, distributorId);
+  }
+
+  @Get('borrow-records')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '获取所有借用物品记录' })
+  @ApiQuery({ name: 'siteId', required: false, description: '工地ID' })
+  @ApiQuery({ name: 'status', required: false, description: '借用状态：BORROWED/RETURNED' })
+  @ApiQuery({ name: 'startDate', required: false, description: '开始日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: '结束日期 (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async getAllBorrowRecords(
+    @GetCurrentUser() user: CurrentUser,
+    @Query('siteId') siteId?: string,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.adminService.getAllBorrowRecords(user, {
+      siteId,
+      status,
+      startDate,
+      endDate
+    });
   }
 }

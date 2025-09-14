@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Row, Col, Upload } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Row, Col, Upload, Select } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
 import { apiService } from '../services/api'
+import * as XLSX from 'xlsx'
 
 // 借用物品分类接口
 interface ItemCategory {
   id: string
+  code: string
   name: string
   description: string
   status: 'ACTIVE' | 'INACTIVE'
@@ -22,6 +24,8 @@ const ItemCategoryManagement: React.FC = () => {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
   // 加载分类数据
   const loadCategories = async () => {
@@ -40,6 +44,19 @@ const ItemCategoryManagement: React.FC = () => {
   useEffect(() => {
     loadCategories()
   }, [])
+
+  // 过滤分类数据
+  const filteredCategories = categories.filter(category => {
+    // 搜索关键词过滤
+    const matchesSearch = !searchKeyword.trim() || 
+      category.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+      category.description.toLowerCase().includes(searchKeyword.toLowerCase())
+    
+    // 状态过滤
+    const matchesStatus = statusFilter === 'all' || category.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
 
   // 显示确认删除对话框
   const showDeleteConfirm = (record: ItemCategory) => {
@@ -120,7 +137,7 @@ const ItemCategoryManagement: React.FC = () => {
 
   // 表格列定义
   const columns = [
-    { title: t('itemCategory.categoryId'), dataIndex: 'id', key: 'id', width: 100 },
+    { title: t('itemCategory.categoryCode'), dataIndex: 'code', key: 'code', width: 100 },
     { title: t('itemCategory.categoryName'), dataIndex: 'name', key: 'name', width: 160 },
     { title: t('itemCategory.descriptionLabel'), dataIndex: 'description', key: 'description' },
     { 
@@ -189,7 +206,7 @@ const ItemCategoryManagement: React.FC = () => {
         setCategories(prev => prev.map(c => c.id === editingCategory.id ? updatedCategory : c))
         message.success(t('itemCategory.updateSuccess'))
       } else {
-        // 新增分类
+        // 新增分类 - 不传递code字段，让后端自动生成
         const newCategory = await apiService.createItemCategory({
           name: values.name,
           description: values.description,
@@ -211,21 +228,407 @@ const ItemCategoryManagement: React.FC = () => {
 
   // 导出分类数据
   const handleExport = (exportAll: boolean = true) => {
-    const dataToExport = exportAll ? categories : categories.filter(category => selectedCategoryIds.includes(category.id))
+    const dataToExport = exportAll ? filteredCategories : filteredCategories.filter(category => selectedCategoryIds.includes(category.id))
     
     if (!exportAll && selectedCategoryIds.length === 0) {
       message.warning(t('itemCategory.pleaseSelectCategoriesToExport'))
       return
     }
     
-    // TODO: 实现实际的导出逻辑
-    message.success(t('itemCategory.exportSuccess').replace('{count}', dataToExport.length.toString()))
+    if (dataToExport.length === 0) {
+      message.warning(t('itemCategory.noDataToExport'))
+      return
+    }
+    
+    try {
+      // 准备导出数据
+      const exportData = dataToExport.map(category => ({
+        [t('itemCategory.categoryCode')]: category.code,
+        [t('itemCategory.categoryName')]: category.name,
+        [t('itemCategory.descriptionLabel')]: category.description,
+        [t('itemCategory.status')]: category.status === 'ACTIVE' ? t('itemCategory.active') : t('itemCategory.inactive')
+      }))
+      
+      // 创建工作簿
+      const workbook = XLSX.utils.book_new()
+      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 15 }, // 分类编号
+        { wch: 20 }, // 分类名称
+        { wch: 30 }, // 描述
+        { wch: 10 }  // 状态
+      ]
+      worksheet['!cols'] = colWidths
+      
+      // 添加工作表
+      XLSX.utils.book_append_sheet(workbook, worksheet, t('itemCategory.title'))
+      
+      // 生成文件名并下载
+      const fileName = `物品分类_${new Date().toISOString().split('T')[0]}.xlsx`
+      XLSX.writeFile(workbook, fileName)
+      
+      message.success(t('itemCategory.exportSuccess').replace('{count}', dataToExport.length.toString()))
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error(t('itemCategory.exportFailed'))
+    }
   }
 
   // 下载导入模板
   const handleDownloadTemplate = () => {
-    // TODO: 实现实际的模板下载逻辑
-    message.success(t('itemCategory.templateDownloaded'))
+    try {
+      // 准备模板数据
+      const templateData = [
+        {
+          [t('itemCategory.categoryCode')]: 'C1234567',
+          [t('itemCategory.categoryName')]: '安全帽',
+          [t('itemCategory.descriptionLabel')]: '用于保护头部安全的防护用品',
+          [t('itemCategory.status')]: t('itemCategory.active')
+        },
+        {
+          [t('itemCategory.categoryCode')]: 'C2345678',
+          [t('itemCategory.categoryName')]: '防护手套',
+          [t('itemCategory.descriptionLabel')]: '用于保护手部安全的防护用品',
+          [t('itemCategory.status')]: t('itemCategory.active')
+        },
+        {
+          [t('itemCategory.categoryCode')]: 'C3456789',
+          [t('itemCategory.categoryName')]: '安全鞋',
+          [t('itemCategory.descriptionLabel')]: '用于保护足部安全的防护用品',
+          [t('itemCategory.status')]: t('itemCategory.active')
+        }
+      ]
+      
+      // 创建工作簿
+      const workbook = XLSX.utils.book_new()
+      const worksheet = XLSX.utils.json_to_sheet(templateData)
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 15 }, // 分类编号
+        { wch: 20 }, // 分类名称
+        { wch: 40 }, // 描述
+        { wch: 10 }  // 状态
+      ]
+      worksheet['!cols'] = colWidths
+      
+      // 添加工作表
+      XLSX.utils.book_append_sheet(workbook, worksheet, t('itemCategory.importTemplate'))
+      
+      // 生成文件名并下载
+      const fileName = '物品分类导入模板.xlsx'
+      XLSX.writeFile(workbook, fileName)
+      
+      message.success(t('itemCategory.templateDownloaded'))
+    } catch (error) {
+      console.error('模板下载失败:', error)
+      message.error(t('itemCategory.templateDownloadFailed'))
+    }
+  }
+
+  // 处理文件导入
+  const handleImport = async (file: File) => {
+    try {
+      // 读取Excel文件
+      const data = new Uint8Array(await file.arrayBuffer())
+      const workbook = XLSX.read(data, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      
+      if (jsonData.length < 2) {
+        message.error(t('itemCategory.importFileEmpty'))
+        return
+      }
+      
+      const headers = jsonData[0] as string[]
+      const dataRows = jsonData.slice(1)
+      
+      // 解析导入数据
+      const importedCategories: Record<string, unknown>[] = []
+      const errors: string[] = []
+      
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i] as any[]
+        if (!row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
+          continue // 跳过空行
+        }
+        
+        const rowData: any = {}
+        headers.forEach((header, colIndex) => {
+          if (header && row[colIndex] !== undefined) {
+            rowData[header] = row[colIndex]
+          }
+        })
+        
+        // 验证必填字段
+        if (!rowData[t('itemCategory.categoryName')]) {
+          errors.push(`第${i + 2}行：${t('itemCategory.categoryName')}不能为空`)
+          continue
+        }
+        
+        importedCategories.push(rowData)
+      }
+      
+      if (importedCategories.length === 0) {
+        message.warning(t('itemCategory.noValidData'))
+        return
+      }
+      
+      // 显示导入确认对话框
+      Modal.confirm({
+        title: t('itemCategory.importConfirm'),
+        content: (
+          <div>
+            <p>{t('itemCategory.importConfirmMessage').replace('{count}', importedCategories.length.toString())}</p>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
+              {t('itemCategory.importRulesMessage')}
+            </p>
+            {errors.length > 0 && (
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '8px', 
+                background: '#fff7e6', 
+                border: '1px solid #ffd591', 
+                borderRadius: '4px',
+                fontSize: '12px'
+              }}>
+                <div style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: '4px' }}>
+                  ⚠️ {t('itemCategory.importWarnings')}:
+                </div>
+                {errors.slice(0, 3).map((error, index) => (
+                  <div key={index} style={{ color: '#666', marginBottom: '2px' }}>
+                    {error}
+                  </div>
+                ))}
+                {errors.length > 3 && (
+                  <div style={{ color: '#999', fontStyle: 'italic' }}>
+                    ... 还有 {errors.length - 3} 个警告
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ),
+        onOk: async () => {
+          await processItemCategoryImport(importedCategories)
+        }
+      })
+    } catch (error) {
+      console.error('导入失败:', error)
+      message.error(t('itemCategory.importFailed'))
+    }
+  }
+
+  // 处理物品分类导入
+  const processItemCategoryImport = async (importedCategories: Record<string, unknown>[]) => {
+    try {
+      setLoading(true)
+      
+      let successCount = 0
+      let skipCount = 0
+      const errors: string[] = []
+      
+      for (const categoryData of importedCategories) {
+        try {
+          // 准备导入数据
+          const importData = {
+            code: String(categoryData[t('itemCategory.categoryCode')] || '').trim() || undefined,
+            name: String(categoryData[t('itemCategory.categoryName')] || '').trim(),
+            description: String(categoryData[t('itemCategory.descriptionLabel')] || '').trim(),
+            status: categoryData[t('itemCategory.status')] === t('itemCategory.inactive') ? 'INACTIVE' : 'ACTIVE'
+          }
+          
+          // 检查是否已存在相同名称的分类
+          const existingCategory = categories.find(c => c.name === importData.name)
+          if (existingCategory) {
+            skipCount++
+            continue
+          }
+          
+          // 如果提供了code，检查是否已存在相同编号的分类
+          if (importData.code) {
+            const existingCode = categories.find(c => c.code === importData.code)
+            if (existingCode) {
+              skipCount++
+              continue
+            }
+          }
+          
+          // 创建分类
+          const newCategory = await apiService.createItemCategory(importData)
+          setCategories(prev => [newCategory, ...prev])
+          successCount++
+          
+        } catch (error: any) {
+          const errorMessage = error?.response?.data?.message || '创建失败'
+          errors.push(`${categoryData[t('itemCategory.categoryName')]}: ${errorMessage}`)
+        }
+      }
+      
+      // 显示导入结果弹窗
+      showImportResultModal(successCount, skipCount, errors, 'itemCategory')
+    } catch (error) {
+      console.error('Import processing failed:', error)
+      message.error(t('itemCategory.importFailed'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 显示导入结果弹窗
+  const showImportResultModal = (successCount: number, skipCount: number, errors: string[], type: 'itemCategory' = 'itemCategory') => {
+    const totalCount = successCount + skipCount + errors.length
+    const title = t('itemCategory.importResultTitle')
+    
+    Modal.info({
+      title: title,
+      width: 600,
+      content: (
+        <div style={{ marginTop: '16px' }}>
+          {/* 总体统计 */}
+          <div style={{ 
+            background: '#f6ffed', 
+            border: '1px solid #b7eb8f', 
+            borderRadius: '6px', 
+            padding: '16px', 
+            marginBottom: '16px' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '8px' }} />
+              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                {t('itemCategory.importCompleted')}
+              </span>
+            </div>
+            <div style={{ color: '#666', fontSize: '14px' }}>
+              {t('itemCategory.importTotalProcessed').replace('{total}', totalCount.toString())}
+            </div>
+          </div>
+
+          {/* 详细统计 */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: successCount > 0 ? '#f6ffed' : '#f5f5f5',
+              border: `1px solid ${successCount > 0 ? '#b7eb8f' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: successCount > 0 ? '#52c41a' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {successCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('itemCategory.importSuccessCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: skipCount > 0 ? '#fff7e6' : '#f5f5f5',
+              border: `1px solid ${skipCount > 0 ? '#ffd591' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: skipCount > 0 ? '#fa8c16' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {skipCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('itemCategory.importSkipCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: errors.length > 0 ? '#fff2f0' : '#f5f5f5',
+              border: `1px solid ${errors.length > 0 ? '#ffccc7' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: errors.length > 0 ? '#ff4d4f' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {errors.length}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('itemCategory.importErrorCount')}
+              </div>
+            </div>
+          </div>
+
+          {/* 错误详情 */}
+          {errors.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ 
+                color: '#ff4d4f', 
+                fontWeight: 'bold', 
+                marginBottom: '8px',
+                fontSize: '14px'
+              }}>
+                {t('itemCategory.importErrorDetails')}:
+              </div>
+              <div style={{ 
+                maxHeight: '200px', 
+                overflowY: 'auto', 
+                background: '#fafafa', 
+                padding: '12px', 
+                borderRadius: '4px',
+                border: '1px solid #d9d9d9'
+              }}>
+                {errors.map((error, index) => (
+                  <div key={index} style={{ 
+                    color: '#666', 
+                    fontSize: '12px', 
+                    marginBottom: '4px',
+                    padding: '4px 0',
+                    borderBottom: index < errors.length - 1 ? '1px solid #f0f0f0' : 'none'
+                  }}>
+                    {error}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 操作建议 */}
+          <div style={{ 
+            marginTop: '16px', 
+            padding: '12px', 
+            background: '#f0f9ff', 
+            border: '1px solid #91d5ff', 
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px', color: '#1890ff' }}>
+              💡 {t('itemCategory.importTips')}:
+            </div>
+            <div>• {t('itemCategory.importTip1')}</div>
+            <div>• {t('itemCategory.importTip2')}</div>
+            <div>• {t('itemCategory.importTip3')}</div>
+          </div>
+        </div>
+      ),
+      okText: t('common.confirm'),
+      width: 600
+    })
   }
 
   // 取消操作
@@ -249,15 +652,40 @@ const ItemCategoryManagement: React.FC = () => {
 
       <Card>
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={8}>
-            <Input placeholder={t('itemCategory.searchPlaceholder')} allowClear />
+          <Col span={6}>
+            <Input 
+              placeholder={t('itemCategory.searchPlaceholder')} 
+              allowClear 
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+            />
           </Col>
-          <Col span={16}>
+          <Col span={4}>
+            <Select
+              placeholder={t('itemCategory.statusFilter')}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="all">{t('itemCategory.allStatus')}</Select.Option>
+              <Select.Option value="ACTIVE">{t('itemCategory.active')}</Select.Option>
+              <Select.Option value="INACTIVE">{t('itemCategory.inactive')}</Select.Option>
+            </Select>
+          </Col>
+          <Col span={14}>
             <Space>
               <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
                 {t('itemCategory.downloadTemplate')}
               </Button>
-              <Upload accept=".xlsx,.xls" showUploadList={false}>
+              <Upload 
+                accept=".xlsx,.xls" 
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  handleImport(file)
+                  return false
+                }}
+              >
                 <Button icon={<UploadOutlined />}>{t('itemCategory.importCategories')}</Button>
               </Upload>
               <Button 
@@ -272,6 +700,7 @@ const ItemCategoryManagement: React.FC = () => {
                 onClick={() => { 
                   setEditingCategory(null)
                   form.resetFields()
+                  // 新增时不设置code字段，让后端自动生成
                   setModalOpen(true) 
                 }}
               >
@@ -280,6 +709,39 @@ const ItemCategoryManagement: React.FC = () => {
             </Space>
           </Col>
         </Row>
+        
+        {/* 筛选结果统计 */}
+        {!loading && (searchKeyword.trim() || statusFilter !== 'all') && (
+          <div style={{ 
+            marginBottom: 16, 
+            padding: '12px 16px', 
+            background: '#f5f5f5', 
+            borderRadius: '6px', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ color: '#666', fontSize: '14px' }}>
+                {t('itemCategory.filterResults').replace('{count}', filteredCategories.length.toString())}
+                {categories.length !== filteredCategories.length && (
+                  <span style={{ marginLeft: 8, color: '#999' }}>
+                    {t('itemCategory.fromTotalRecords').replace('{total}', categories.length.toString())}
+                  </span>
+                )}
+              </span>
+            </div>
+            <Button 
+              size="small" 
+              onClick={() => {
+                setSearchKeyword('')
+                setStatusFilter('all')
+              }}
+            >
+              {t('common.clearFilters')}
+            </Button>
+          </div>
+        )}
 
         {/* 选择状态显示 */}
         {selectedCategoryIds.length > 0 && (
@@ -299,7 +761,7 @@ const ItemCategoryManagement: React.FC = () => {
         <Table 
           rowKey="id" 
           columns={columns} 
-          dataSource={categories} 
+          dataSource={filteredCategories} 
           loading={loading}
           pagination={{ pageSize: 10, showSizeChanger: true }}
           rowSelection={{
@@ -322,6 +784,19 @@ const ItemCategoryManagement: React.FC = () => {
         width={600}
       >
         <Form form={form} layout="vertical">
+          {!editingCategory && (
+            <Form.Item 
+              name="code" 
+              label={t('itemCategory.categoryCode')}
+              extra={t('itemCategory.codeAutoGenerate')}
+            >
+              <Input 
+                placeholder={t('itemCategory.codePlaceholder')} 
+                disabled
+                style={{ backgroundColor: '#f5f5f5' }}
+              />
+            </Form.Item>
+          )}
           <Form.Item 
             name="name" 
             label={t('itemCategory.categoryName')} 

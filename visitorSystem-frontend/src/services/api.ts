@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export interface LoginRequest {
   username: string;
@@ -60,6 +60,85 @@ interface Site {
   distributorIds?: string[];
   distributors?: Array<{ id: string; name: string }>;
   guards?: Array<{ id: string; name: string }>;
+}
+
+interface Worker {
+  id: string;
+  workerId: string;
+  name: string;
+  phone: string;
+  idCard: string;
+  physicalCardId?: string;
+  gender: 'MALE' | 'FEMALE';
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  distributorId: string;
+  siteId: string;
+  createdAt: string;
+  updatedAt: string;
+  distributor?: {
+    id: string;
+    name: string;
+  };
+  site?: {
+    id: string;
+    name: string;
+  };
+}
+
+interface VisitorRecord {
+  id: string;
+  workerId: string;
+  siteId: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  status: 'ON_SITE' | 'LEFT' | 'PENDING';
+  idType: string;
+  idNumber: string;
+  physicalCardId?: string;
+  registrarId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  worker?: {
+    id: string;
+    workerId: string;
+    name: string;
+    distributor?: {
+      id: string;
+      name: string;
+    };
+    site?: {
+      id: string;
+      name: string;
+    };
+  };
+  site?: {
+    id: string;
+    name: string;
+  };
+  registrar?: {
+    id: string;
+    name: string;
+  };
+}
+
+interface CreateWorkerRequest {
+  name: string;
+  phone: string;
+  idCard: string;
+  physicalCardId?: string;
+  gender: 'MALE' | 'FEMALE';
+  siteId: string;
+}
+
+interface UpdateWorkerRequest {
+  name?: string;
+  phone?: string;
+  idCard?: string;
+  physicalCardId?: string;
+  gender?: 'MALE' | 'FEMALE';
+  siteId?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 }
 
 export interface LoginResponse {
@@ -151,9 +230,10 @@ class ApiService {
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
         let errorCode = response.status;
+        let errorData: any = null;
         
         try {
-          const errorData = await response.json();
+          errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
           errorCode = errorData.statusCode || response.status;
         } catch (parseError) {
@@ -172,6 +252,9 @@ class ApiService {
           case 404:
             errorMessage = '请求的资源不存在';
             break;
+          case 409:
+            errorMessage = errorData?.message || '数据冲突，请检查输入信息';
+            break;
           case 422:
             errorMessage = '请求参数验证失败';
             break;
@@ -189,7 +272,14 @@ class ApiService {
         throw error;
       }
 
-      return await response.json();
+      // 检查响应是否有内容
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        // 对于DELETE等可能返回空响应的请求，返回空对象
+        return {} as T;
+      }
     } catch (error) {
       console.error('API request failed:', error);
       
@@ -290,10 +380,15 @@ class ApiService {
     });
   }
 
-  async getAllGuards(): Promise<Guard[]> {
-    return this.requestWithRetry('/admin/guards', {
+  async getAllGuards(siteId?: string): Promise<Guard[]> {
+    const url = siteId ? `/admin/guards?siteId=${siteId}` : '/admin/guards';
+    return this.requestWithRetry(url, {
       method: 'GET',
     });
+  }
+
+  async getGuardsBySite(siteId: string): Promise<Guard[]> {
+    return this.getAllGuards(siteId);
   }
 
   async createDistributor(distributorData: {
@@ -401,12 +496,33 @@ class ApiService {
     phone: string;
     email?: string;
     whatsapp?: string;
+    guardId?: string;
     username: string;
     password: string;
   }): Promise<Guard> {
     return this.requestWithRetry('/admin/guards', {
       method: 'POST',
       body: JSON.stringify(guardData),
+    });
+  }
+
+  async importGuards(guards: any[]): Promise<{
+    success: number;
+    skipped: number;
+    errors: string[];
+  }> {
+    return this.requestWithRetry('/admin/guards/import', {
+      method: 'POST',
+      body: JSON.stringify({ guards }),
+    });
+  }
+
+  async checkGuardExists(guardId: string, username: string): Promise<{
+    guardIdExists: boolean;
+    usernameExists: boolean;
+  }> {
+    return this.requestWithRetry(`/admin/guards/check-exists?guardId=${guardId}&username=${username}`, {
+      method: 'GET',
     });
   }
 
@@ -425,6 +541,21 @@ class ApiService {
     });
   }
 
+  async updateSite(siteId: string, siteData: {
+    name: string;
+    address: string;
+    code?: string;
+    manager?: string;
+    phone?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    distributorIds?: string[];
+  }): Promise<Site> {
+    return this.requestWithRetry(`/admin/sites/${siteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(siteData),
+    });
+  }
+
   async updateUserStatus(userId: string, status: string): Promise<{
     id: string;
     username: string;
@@ -439,6 +570,7 @@ class ApiService {
   // 物品分类管理 API
   async getAllItemCategories(): Promise<Array<{
     id: string;
+    code: string;
     name: string;
     description: string;
     status: string;
@@ -449,11 +581,13 @@ class ApiService {
   }
 
   async createItemCategory(categoryData: {
+    code?: string;
     name: string;
     description?: string;
     status?: string;
   }): Promise<{
     id: string;
+    code: string;
     name: string;
     description: string;
     status: string;
@@ -467,11 +601,13 @@ class ApiService {
   }
 
   async updateItemCategory(id: string, categoryData: {
+    code?: string;
     name?: string;
     description?: string;
     status?: string;
   }): Promise<{
     id: string;
+    code: string;
     name: string;
     description: string;
     status: string;
@@ -492,6 +628,7 @@ class ApiService {
 
   async toggleItemCategoryStatus(id: string): Promise<{
     id: string;
+    code: string;
     name: string;
     description: string;
     status: string;
@@ -503,7 +640,223 @@ class ApiService {
     });
   }
 
+  // 工人管理 API
+  async getAllWorkers(filters?: {
+    distributorId?: string;
+    siteId?: string;
+    status?: string;
+  }): Promise<Worker[]> {
+    const params = new URLSearchParams();
+    if (filters?.distributorId) params.append('distributorId', filters.distributorId);
+    if (filters?.siteId) params.append('siteId', filters.siteId);
+    if (filters?.status) params.append('status', filters.status);
+    
+    const url = `/admin/workers${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.requestWithRetry(url, {
+      method: 'GET',
+    });
+  }
+
+  async createWorker(workerData: CreateWorkerRequest): Promise<Worker> {
+    return this.requestWithRetry('/admin/workers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(workerData),
+    });
+  }
+
+  async updateWorker(workerId: string, workerData: UpdateWorkerRequest): Promise<Worker> {
+    return this.requestWithRetry(`/admin/workers/${workerId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(workerData),
+    });
+  }
+
+  async deleteWorker(workerId: string): Promise<void> {
+    await this.request(`/admin/workers/${workerId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // 导出工人数据
+  async exportWorkers(filters?: {
+    siteId?: string;
+    distributorId?: string;
+    status?: string;
+  }): Promise<any> {
+    const params = new URLSearchParams();
+    if (filters?.siteId) params.append('siteId', filters.siteId);
+    if (filters?.distributorId) params.append('distributorId', filters.distributorId);
+    if (filters?.status) params.append('status', filters.status);
+    
+    const url = `/admin/workers/export${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.requestWithRetry(url, {
+      method: 'GET',
+    });
+  }
+
+  // 导入工人数据
+  async importWorkers(workers: any[]): Promise<any> {
+    return this.requestWithRetry('/admin/workers/import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ workers }),
+    });
+  }
+
+  // 下载工人导入模板
+  async downloadWorkerTemplate(): Promise<any> {
+    return this.requestWithRetry('/admin/workers/template', {
+      method: 'GET',
+    });
+  }
+
+  async getDistributorWorkers(siteId?: string): Promise<Worker[]> {
+    const url = siteId ? `/distributors/workers?siteId=${siteId}` : '/distributors/workers';
+    return this.requestWithRetry(url, {
+      method: 'GET',
+    });
+  }
+
+  async getSiteWorkers(): Promise<Worker[]> {
+    return this.requestWithRetry('/guards/workers', {
+      method: 'GET',
+    });
+  }
+
+  // 访客记录相关接口
+  async getVisitorRecords(filters?: {
+    workerId?: string;
+    siteId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<VisitorRecord[]> {
+    const params = new URLSearchParams();
+    if (filters?.workerId) params.append('workerId', filters.workerId);
+    if (filters?.siteId) params.append('siteId', filters.siteId);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    
+    const url = `/visitor-records${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.requestWithRetry(url, {
+      method: 'GET',
+    });
+  }
+
+  async getWorkerVisitorRecords(workerId: string): Promise<VisitorRecord[]> {
+    return this.requestWithRetry(`/visitor-records/worker/${workerId}`, {
+      method: 'GET',
+    });
+  }
+
+  async createVisitorRecord(data: {
+    workerId: string;
+    siteId: string;
+    checkInTime?: string;
+    checkOutTime?: string;
+    status?: 'ON_SITE' | 'LEFT' | 'PENDING';
+    idType: string;
+    idNumber: string;
+    physicalCardId?: string;
+    registrarId?: string;
+    notes?: string;
+  }): Promise<VisitorRecord> {
+    return this.requestWithRetry('/visitor-records', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateVisitorRecord(id: string, data: Partial<{
+    workerId: string;
+    siteId: string;
+    checkInTime?: string;
+    checkOutTime?: string;
+    status?: 'ON_SITE' | 'LEFT' | 'PENDING';
+    idType: string;
+    idNumber: string;
+    physicalCardId?: string;
+    registrarId?: string;
+    notes?: string;
+  }>): Promise<VisitorRecord> {
+    return this.requestWithRetry(`/visitor-records/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkOutVisitor(id: string, checkOutTime?: string): Promise<VisitorRecord> {
+    return this.requestWithRetry(`/visitor-records/${id}/checkout`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ checkOutTime }),
+    });
+  }
+
+  async deleteVisitorRecord(id: string): Promise<void> {
+    return this.requestWithRetry(`/visitor-records/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // 获取工人借用物品记录
+  async getWorkerBorrowRecords(workerId: string): Promise<any[]> {
+    return this.requestWithRetry(`/guards/borrow-records?workerId=${workerId}`, {
+      method: 'GET',
+    });
+  }
+
+  // 获取所有借用物品记录（管理员用）
+  async getAllBorrowRecords(filters?: {
+    siteId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.siteId) params.append('siteId', filters.siteId);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    
+    const url = `/admin/borrow-records${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.requestWithRetry(url, {
+      method: 'GET',
+    });
+  }
+
+  // 修改密码
+  async changePassword(oldPassword: string, newPassword: string): Promise<{ message: string }> {
+    return this.requestWithRetry('/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ oldPassword, newPassword }),
+    });
+  }
+
 }
 
 export const apiService = new ApiService();
 export default apiService;
+
+// 导出工人相关类型
+export type { Worker, CreateWorkerRequest, UpdateWorkerRequest, VisitorRecord };

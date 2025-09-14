@@ -132,4 +132,40 @@ export class AuthService {
       },
     });
   }
+
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    // 获取用户信息
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+
+    // 验证旧密码
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isOldPasswordValid) {
+      throw new UnauthorizedException('当前密码错误');
+    }
+
+    // 验证新密码长度
+    if (newPassword.length < 6) {
+      throw new UnauthorizedException('新密码长度至少6位');
+    }
+
+    // 加密新密码
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // 更新密码
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedNewPassword }
+    });
+
+    // 清除Redis中的用户会话，强制重新登录
+    await this.redisService.deleteUserSession(userId);
+
+    return { message: '密码修改成功，请重新登录' };
+  }
 }

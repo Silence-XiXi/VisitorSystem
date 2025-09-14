@@ -1,9 +1,23 @@
-import React, { useState } from 'react';
-import { Table, Button, Space, Avatar, Modal, Tag, Tooltip, Row, Col, message, Timeline, Divider } from 'antd';
-import { EditOutlined, DeleteOutlined, QrcodeOutlined, EyeOutlined, UserOutlined, MailOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import React, { useState, useMemo } from 'react';
+import { Table, Button, Space, Modal, Tag, Tooltip, Row, Col, message, Timeline, Divider, List, Card, Statistic } from 'antd';
+import { EditOutlined, DeleteOutlined, QrcodeOutlined, EyeOutlined, MailOutlined, WhatsAppOutlined, HistoryOutlined, ClockCircleOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Worker, Distributor, Site } from '../types/worker';
-import dayjs from 'dayjs';
+import { VisitorRecord } from '../services/api';
+import dayjs from '../utils/dayjs';
 import { useLocale } from '../contexts/LocaleContext';
+import apiService from '../services/api';
+
+// 计算年龄的函数
+const calcAgeFromBirth = (birthDate: string): number => {
+  if (!birthDate) return 0;
+  const b = dayjs(birthDate);
+  const now = dayjs();
+  let age = now.year() - b.year();
+  if (now.month() < b.month() || (now.month() === b.month() && now.date() < b.date())) {
+    age -= 1;
+  }
+  return Math.max(age, 0);
+};
 
 interface WorkerTableProps {
   workers: Worker[];
@@ -29,6 +43,11 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [sendingLoading, setSendingLoading] = useState(false);
+  
+  // 访客记录和借用物品记录相关状态
+  const [visitorRecords, setVisitorRecords] = useState<VisitorRecord[]>([]);
+  const [borrowRecords, setBorrowRecords] = useState<any[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
 
   // 获取分判商名称
   const getDistributorName = (distributorId: string) => {
@@ -42,37 +61,78 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     return site ? site.name : '-';
   };
 
-  // 生成当日活动（示例：上班 -> 借物 -> 还物/下班）
-  const getTodayActivities = (worker: Worker) => {
-    const base = dayjs().startOf('day');
-    const activities: Array<{ time: string; event: string; detail?: string; color?: string }> = [];
+  // 生成今日活动时间线（整合访客记录和借用物品记录）
+  const todayActivities = useMemo(() => {
+    if (!selectedWorker) return [];
+    
+    const today = dayjs().startOf('day');
+    const activities: Array<{ time: string; event: string; detail?: string; color?: string; type: string }> = [];
 
-    // 上班
-    activities.push({ time: base.add(8, 'hour').add(Math.floor(Math.random() * 30), 'minute').format('HH:mm'), event: t('guard.clockIn'), color: 'green' });
-    // 借用物品 0-2 次
-    const borrowTimes = Math.floor(Math.random() * 3);
-    for (let i = 0; i < borrowTimes; i++) {
-      activities.push({
-        time: base.add(9 + i * 2, 'hour').add(Math.floor(Math.random() * 50), 'minute').format('HH:mm'),
-        event: t('guard.borrowItem'),
-        detail: `编号#${Math.floor(Math.random() * 9000) + 1000}`,
-        color: 'blue'
+    // 添加访客记录活动
+    visitorRecords.forEach(record => {
+      if (record.checkInTime && dayjs(record.checkInTime).isSame(today, 'day')) {
+        activities.push({
+          time: dayjs(record.checkInTime).format('HH:mm'),
+          event: t('visitorRecords.checkInTime'),
+          detail: `${t('visitorRecords.idType')}: ${record.idType}`,
+          color: 'green',
+          type: 'visitor'
+        });
+      }
+      if (record.checkOutTime && dayjs(record.checkOutTime).isSame(today, 'day')) {
+        activities.push({
+          time: dayjs(record.checkOutTime).format('HH:mm'),
+          event: t('visitorRecords.checkOutTime'),
+          detail: record.registrar?.name ? `${t('visitorRecords.registrar')}: ${record.registrar.name}` : undefined,
+          color: 'blue',
+          type: 'visitor'
+        });
+      }
+    });
+
+    // 添加借用物品记录活动
+    borrowRecords.forEach(record => {
+      if (record.borrowDate && dayjs(record.borrowDate).isSame(today, 'day')) {
+        activities.push({
+          time: record.borrowTime || dayjs(record.borrowDate).format('HH:mm'),
+          event: t('guard.borrowItem'),
+          detail: record.item?.name ? `${t('borrowRecords.itemName')}: ${record.item.name}` : `编号#${record.id}`,
+          color: 'orange',
+          type: 'borrow'
+        });
+      }
+      if (record.returnDate && dayjs(record.returnDate).isSame(today, 'day')) {
+        activities.push({
+          time: record.returnTime || dayjs(record.returnDate).format('HH:mm'),
+          event: t('guard.returnItem'),
+          detail: record.item?.name ? `${t('borrowRecords.itemName')}: ${record.item.name}` : `编号#${record.id}`,
+          color: 'gold',
+          type: 'return'
+        });
+      }
+    });
+
+    // 如果没有实际记录，显示提示信息
+    if (activities.length === 0) {
+      activities.push({ 
+        time: '--:--', 
+        event: t('guard.noActivitiesToday'), 
+        color: 'gray',
+        type: 'empty'
       });
     }
-    // 可能的还物
-    if (borrowTimes > 0) {
-      activities.push({ time: base.add(16, 'hour').add(Math.floor(Math.random() * 40), 'minute').format('HH:mm'), event: t('guard.returnItem'), color: 'gold' });
-    }
-    // 下班（有时未下班，用状态体现，这里默认有）
-    activities.push({ time: base.add(17, 'hour').add(Math.floor(Math.random() * 50), 'minute').format('HH:mm'), event: t('guard.clockOut'), color: 'gray' });
 
     // 按时间排序
     return activities.sort((a, b) => (a.time > b.time ? 1 : -1));
-  };
+  }, [selectedWorker, visitorRecords, borrowRecords, t]);
 
   // 获取状态标签
   const getStatusTag = (status: string) => {
     const statusConfig = {
+      ACTIVE: { color: 'green', text: t('worker.active') },
+      SUSPENDED: { color: 'orange', text: t('worker.suspended') },
+      INACTIVE: { color: 'red', text: t('worker.inactive') },
+      // 兼容小写状态
       active: { color: 'green', text: t('worker.active') },
       suspended: { color: 'orange', text: t('worker.suspended') },
       inactive: { color: 'red', text: t('worker.inactive') }
@@ -82,9 +142,46 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
+  // 获取访客状态标签
+  const getVisitorStatusTag = (status: string) => {
+    const statusConfig = {
+      ON_SITE: { color: 'green', text: t('visitorRecords.onSite') },
+      LEFT: { color: 'blue', text: t('visitorRecords.left') },
+      PENDING: { color: 'orange', text: t('visitorRecords.pending') }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || { color: 'default', text: status };
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
+  // 查看工人详情（包含访客记录和借用物品记录）
+  const handleViewDetail = async (worker: Worker) => {
+    setSelectedWorker(worker);
+    setDetailVisible(true);
+    
+    // 加载访客记录和借用物品记录
+    setRecordsLoading(true);
+    try {
+      const [visitorRecordsData, borrowRecordsData] = await Promise.all([
+        apiService.getWorkerVisitorRecords(worker.id),
+        apiService.getWorkerBorrowRecords(worker.id)
+      ]);
+      setVisitorRecords(visitorRecordsData);
+      setBorrowRecords(borrowRecordsData);
+    } catch (error) {
+      console.error('获取工人记录失败:', error);
+      // 不显示错误消息，因为详情页面仍然可以显示其他信息
+    } finally {
+      setRecordsLoading(false);
+    }
+  };
+
   // 获取性别标签
   const getGenderTag = (gender: string) => {
     const genderConfig = {
+      MALE: { color: 'blue', text: t('worker.male') },
+      FEMALE: { color: 'pink', text: t('worker.female') },
+      // 兼容小写性别
       male: { color: 'blue', text: t('worker.male') },
       female: { color: 'pink', text: t('worker.female') }
     };
@@ -109,12 +206,6 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       okType: 'danger',
       onOk: () => onDelete(worker.id)
     });
-  };
-
-  // 处理查看详情
-  const handleViewDetail = (worker: Worker) => {
-    setSelectedWorker(worker);
-    setDetailVisible(true);
   };
 
   // 处理单个发送二维码
@@ -189,16 +280,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       width: 100,
       fixed: 'left' as const,
       sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name),
-      render: (name: string, record: Worker) => (
-        <Space>
-          <Avatar 
-            size="small" 
-            icon={<UserOutlined />} 
-            src={record.photo}
-          />
-          {name}
-        </Space>
-      ),
+      render: (name: string, record: Worker) => name,
     },
     {
       title: t('worker.gender'),
@@ -214,15 +296,31 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       key: 'birthDate',
       width: 120,
       sorter: (a: Worker, b: Worker) => (a.birthDate || '').localeCompare(b.birthDate || ''),
-      render: (d?: string) => d || '-',
+      render: (d?: string) => {
+        if (!d) return '-';
+        try {
+          return dayjs(d).format('YYYY-MM-DD');
+        } catch (error) {
+          return d;
+        }
+      },
     },
     {
       title: t('worker.age'),
       dataIndex: 'age',
       key: 'age',
       width: 80,
-      sorter: (a: Worker, b: Worker) => (a.age || 0) - (b.age || 0),
-      render: (age?: number) => (typeof age === 'number' ? age : '-'),
+      sorter: (a: Worker, b: Worker) => {
+        const ageA = a.birthDate ? calcAgeFromBirth(a.birthDate) : 0;
+        const ageB = b.birthDate ? calcAgeFromBirth(b.birthDate) : 0;
+        return ageA - ageB;
+      },
+      render: (age: number, record: Worker) => {
+        if (record.birthDate) {
+          return calcAgeFromBirth(record.birthDate);
+        }
+        return '-';
+      },
     },
     {
       title: t('worker.idCard'),
@@ -374,7 +472,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           alignItems: 'center'
         }}>
           <span>
-            {t('guard.selectedWorkers').replace('{count}', selectedRowKeys.length.toString())}
+            {t('worker.selectedWorkers').replace('{count}', selectedRowKeys.length.toString())}
           </span>
           <Space>
             <Button
@@ -383,7 +481,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => handleBatchSendQRCode('email')}
               loading={sendingLoading}
             >
-              {t('guard.batchSendToEmail')} ({selectedRowKeys.length})
+              {t('worker.batchSendToEmail')} ({selectedRowKeys.length})
             </Button>
             <Button
               type="primary"
@@ -391,12 +489,12 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => handleBatchSendQRCode('whatsapp')}
               loading={sendingLoading}
             >
-              {t('guard.batchSendToWhatsApp')} ({selectedRowKeys.length})
+              {t('worker.batchSendToWhatsApp')} ({selectedRowKeys.length})
             </Button>
             <Button
               onClick={() => setSelectedRowKeys([])}
             >
-              {t('guard.cancelSelection')}
+              {t('worker.cancelSelection')}
             </Button>
           </Space>
         </div>
@@ -440,8 +538,8 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                 <p><strong>{t('worker.workerId')}:</strong> {selectedWorker.workerId}</p>
                 <p><strong>{t('worker.name')}:</strong> {selectedWorker.name}</p>
                 <p><strong>{t('worker.gender')}:</strong> {getGenderTag(selectedWorker.gender)}</p>
-                <p><strong>{t('worker.birthDate')}:</strong> {selectedWorker.birthDate || '-'}</p>
-                <p><strong>{t('worker.age')}:</strong> {typeof selectedWorker.age === 'number' ? selectedWorker.age : '-'}</p>
+                <p><strong>{t('worker.birthDate')}:</strong> {selectedWorker.birthDate ? dayjs(selectedWorker.birthDate).format('YYYY-MM-DD') : '-'}</p>
+                <p><strong>{t('worker.age')}:</strong> {selectedWorker.birthDate ? calcAgeFromBirth(selectedWorker.birthDate) : '-'}</p>
               </Col>
               <Col span={12}>
                 <p><strong>{t('worker.distributor')}:</strong> {getDistributorName(selectedWorker.distributorId)}</p>
@@ -453,21 +551,107 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               </Col>
             </Row>
             <Divider />
+            
+            {/* 今日活动时间线 */}
             <div>
               <p style={{ fontWeight: 600, marginBottom: 8 }}>{t('guard.todayActivities')}</p>
-              <Timeline
-                items={getTodayActivities(selectedWorker).map(a => ({
-                  color: a.color,
-                  children: (
-                    <div>
-                      <span style={{ color: '#8c8c8c', marginRight: 8 }}>{a.time}</span>
-                      <span style={{ fontWeight: 500 }}>{a.event}</span>
-                      {a.detail ? <span style={{ color: '#8c8c8c' }}>（{a.detail}）</span> : null}
-                    </div>
-                  )
-                }))}
-              />
+              {recordsLoading ? (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <div>加载中...</div>
+                </div>
+              ) : (
+                <Timeline
+                  items={todayActivities.map(a => ({
+                    color: a.color,
+                    children: (
+                      <div>
+                        <span style={{ color: '#8c8c8c', marginRight: 8 }}>{a.time}</span>
+                        <span style={{ fontWeight: 500 }}>{a.event}</span>
+                        {a.detail ? <span style={{ color: '#8c8c8c' }}>（{a.detail}）</span> : null}
+                      </div>
+                    )
+                  }))}
+                />
+              )}
             </div>
+
+            {/* 访客记录统计 */}
+            {visitorRecords.length > 0 && (
+              <>
+                <Divider />
+                <div>
+                  <p style={{ fontWeight: 600, marginBottom: 12 }}>{t('visitorRecords.title')}</p>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <Card size="small">
+                        <Statistic
+                          title="总记录数"
+                          value={visitorRecords.length}
+                          valueStyle={{ color: '#1890ff' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small">
+                        <Statistic
+                          title="在场记录"
+                          value={visitorRecords.filter(r => r.status === 'ON_SITE').length}
+                          valueStyle={{ color: '#52c41a' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small">
+                        <Statistic
+                          title="已离场记录"
+                          value={visitorRecords.filter(r => r.status === 'LEFT').length}
+                          valueStyle={{ color: '#1890ff' }}
+                        />
+                      </Card>
+                    </Col>
+                  </Row>
+                </div>
+              </>
+            )}
+
+            {/* 借用物品记录统计 */}
+            {borrowRecords.length > 0 && (
+              <>
+                <Divider />
+                <div>
+                  <p style={{ fontWeight: 600, marginBottom: 12 }}>{t('borrowRecords.title')}</p>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <Card size="small">
+                        <Statistic
+                          title={t('borrowRecords.totalBorrowed')}
+                          value={borrowRecords.length}
+                          valueStyle={{ color: '#1890ff' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small">
+                        <Statistic
+                          title={t('borrowRecords.returned')}
+                          value={borrowRecords.filter(r => r.status === 'RETURNED').length}
+                          valueStyle={{ color: '#52c41a' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small">
+                        <Statistic
+                          title={t('borrowRecords.notReturned')}
+                          value={borrowRecords.filter(r => r.status === 'BORROWED').length}
+                          valueStyle={{ color: '#ff4d4f' }}
+                        />
+                      </Card>
+                    </Col>
+                  </Row>
+                </div>
+              </>
+            )}
           </div>
         )}
       </Modal>
