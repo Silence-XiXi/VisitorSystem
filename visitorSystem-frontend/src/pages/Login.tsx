@@ -114,7 +114,7 @@ const Login: React.FC = () => {
         navigate('/dashboard', { replace: true })
       }
     }
-  }, [isLoading]) // 只在isLoading变化时触发，避免重复跳转
+  }, [isLoading, isAuthenticated, user, navigate]) // 添加所有相关依赖
 
   const onFinish = async (values: { username: string; password: string; captcha: string }) => {
     // 检查网络状态

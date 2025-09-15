@@ -8,7 +8,7 @@ export type LocaleType = 'zh-CN' | 'zh-TW' | 'en-US';
 export interface LocaleContextType {
   locale: LocaleType;
   setLocale: (locale: LocaleType) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string>) => string;
   messages: typeof zhCN;
 }
 
@@ -41,7 +41,7 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
 
   const messages = locales[locale];
 
-  const t = (key: string): string => {
+  const t = (key: string, params?: Record<string, string>): string => {
     const keys = key.split('.');
     let value: any = messages;
     
@@ -53,7 +53,18 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
       }
     }
     
-    return typeof value === 'string' ? value : key;
+    if (typeof value !== 'string') {
+      return key;
+    }
+    
+    // 如果有参数，进行参数替换
+    if (params) {
+      return value.replace(/\{(\w+)\}/g, (match, paramKey) => {
+        return params[paramKey] || match;
+      });
+    }
+    
+    return value;
   };
 
   const handleSetLocale = (newLocale: LocaleType) => {

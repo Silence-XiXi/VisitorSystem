@@ -1,8 +1,9 @@
-import React, { useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Form, Input, Select, Button, message, Row, Col, DatePicker, Tooltip } from 'antd';
-import { UserOutlined, PhoneOutlined, MailOutlined, WhatsAppOutlined, IdcardOutlined, CalendarOutlined, CreditCardOutlined } from '@ant-design/icons';
+import { useEffect, forwardRef, useImperativeHandle, useState } from 'react';
+import { Form, Input, Select, Button, message, Row, Col, DatePicker } from 'antd';
+import { PhoneOutlined, MailOutlined, WhatsAppOutlined, IdcardOutlined, CalendarOutlined } from '@ant-design/icons';
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Distributor, Site } from '../types/worker';
 import { useLocale } from '../contexts/LocaleContext';
+import { apiService } from '../services/api';
 import dayjs, { Dayjs } from 'dayjs';
 
 const { Option } = Select;
@@ -10,28 +11,19 @@ const { Option } = Select;
 interface WorkerFormProps {
   worker?: Worker;
   distributors: Distributor[];
-  sites: Site[];
+  sites?: Site[]; // 改为可选，因为现在从API获取
   onSubmit: (values: CreateWorkerRequest | UpdateWorkerRequest) => void;
   onCancel: () => void;
   loading?: boolean;
   showButtons?: boolean;
   selectedSiteId?: string;
+  isDistributorForm?: boolean; // 新增属性，标识是否为分销商表单
 }
 
 export interface WorkerFormRef {
   submit: () => void;
 }
 
-const calcAgeFromBirth = (birthDate: string): number => {
-  if (!birthDate) return 0;
-  const b = dayjs(birthDate);
-  const now = dayjs();
-  let age = now.year() - b.year();
-  if (now.month() < b.month() || (now.month() === b.month() && now.date() < b.date())) {
-    age -= 1;
-  }
-  return Math.max(age, 0);
-};
 
 const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
   worker,
@@ -41,11 +33,14 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
   onCancel,
   loading = false,
   showButtons = true,
-  selectedSiteId
+  selectedSiteId,
+  isDistributorForm = false
 }, ref) => {
   const { t } = useLocale();
   const [form] = Form.useForm();
   const isEdit = !!worker;
+  const [sitesData, setSitesData] = useState<Site[]>(sites || []);
+  const [sitesLoading, setSitesLoading] = useState(false);
 
   useImperativeHandle(ref, () => ({
     submit: () => {
@@ -53,8 +48,31 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
     }
   }));
 
+  // 加载工地数据
+  useEffect(() => {
+    const loadSites = async () => {
+      if (isDistributorForm && (!sites || sites.length === 0)) {
+        setSitesLoading(true);
+        try {
+          const sitesFromApi = await apiService.getDistributorSites();
+          setSitesData(sitesFromApi);
+        } catch (error) {
+          console.error('加载工地数据失败:', error);
+          message.error('加载工地数据失败');
+        } finally {
+          setSitesLoading(false);
+        }
+      } else if (sites) {
+        setSitesData(sites);
+      }
+    };
+
+    loadSites();
+  }, [isDistributorForm, sites]);
+
   useEffect(() => {
     if (worker) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { workerId, ...workerData } = worker;
       form.setFieldsValue({
         ...workerData,
@@ -68,40 +86,44 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
     }
   }, [worker, form, selectedSiteId]);
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: Record<string, unknown>) => {
     console.log('WorkerForm handleSubmit called with values:', values);
     try {
       const birthDateStr: string | undefined = values.birthDate ? (values.birthDate as Dayjs).format('YYYY-MM-DD') : undefined;
 
-      const formData = {
+      const formData: CreateWorkerRequest | UpdateWorkerRequest = {
         ...values,
         birthDate: birthDateStr
-      };
+      } as CreateWorkerRequest | UpdateWorkerRequest;
       
       // 移除workerId字段，因为现在由后端自动生成
-      delete formData.workerId;
+      if ('workerId' in formData) {
+        delete (formData as Record<string, unknown>).workerId;
+      }
       
       console.log('Processed formData:', formData);
       console.log('isEdit:', isEdit);
       
       if (isEdit) {
         console.log('Calling onSubmit for edit with id:', worker!.id);
-        await onSubmit({ ...formData, id: worker!.id });
+        await onSubmit({ ...formData, id: worker!.id } as UpdateWorkerRequest);
       } else {
         console.log('Calling onSubmit for create');
-        await onSubmit(formData);
+        await onSubmit(formData as CreateWorkerRequest);
       }
       
       // 只有在没有错误的情况下才显示成功消息和重置表单
       message.success(t(isEdit ? 'worker.updateSuccess' : 'worker.createSuccess'));
       form.resetFields();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('WorkerForm handleSubmit error:', error);
       
       // 检查是否是身份证号重复错误
-      if (error?.message?.includes('身份证号已存在')) {
+      if (error && typeof error === 'object' && 'message' in error && 
+          typeof error.message === 'string' && error.message.includes('身份证号已存在')) {
         message.error('身份证号已存在');
-      } else if (error?.message?.includes('工人编号已存在')) {
+      } else if (error && typeof error === 'object' && 'message' in error && 
+                 typeof error.message === 'string' && error.message.includes('工人编号已存在')) {
         message.error('工人编号已存在');
       } else {
         message.error(t(isEdit ? 'worker.updateFailed' : 'worker.createFailed'));
@@ -214,8 +236,11 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
             label={t('worker.site')}
             rules={[{ required: true, message: t('form.required') }]}
           >
-            <Select placeholder={t('form.selectPlaceholder') + t('worker.site')}>
-              {sites.map(site => (
+            <Select 
+              placeholder={t('form.selectPlaceholder') + t('worker.site')}
+              loading={sitesLoading}
+            >
+              {sitesData.map(site => (
                 <Option key={site.id} value={site.id}>{site.name}</Option>
               ))}
             </Select>
@@ -265,7 +290,6 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
           >
             <Select placeholder={t('form.selectPlaceholder') + t('worker.status')}>
               <Option value="ACTIVE">{t('worker.active')}</Option>
-              <Option value="SUSPENDED">{t('worker.suspended')}</Option>
               <Option value="INACTIVE">{t('worker.inactive')}</Option>
             </Select>
           </Form.Item>

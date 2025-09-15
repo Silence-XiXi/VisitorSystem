@@ -14,9 +14,19 @@ export interface Worker {
   birthDate?: string; // 出生日期 ISO 字符串 YYYY-MM-DD
   age?: number; // 年龄（根据出生日期计算）
   physicalCardId?: string; // 实体卡编号（每日发放，非固定）
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'; // 状态
+  status: 'ACTIVE' | 'INACTIVE'; // 状态
   createdAt: string;
   updatedAt: string;
+  distributor?: {
+    id: string;
+    distributorId: string; // 分判商编号
+    name: string;
+  };
+  site?: {
+    id: string;
+    name: string;
+    code?: string; // 工地编号
+  };
 }
 
 export interface CreateWorkerRequest {
@@ -33,7 +43,7 @@ export interface CreateWorkerRequest {
   birthDate?: string;
   age?: number;
   physicalCardId?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface UpdateWorkerRequest extends Partial<CreateWorkerRequest> {
@@ -58,7 +68,7 @@ export interface Site {
   id: string;
   name: string;
   address: string;
-  code: string;
+  code?: string; // 改为可选
   manager?: string; // 负责人
   phone?: string; // 联系电话
   status?: 'active' | 'inactive' | 'suspended'; // 状态

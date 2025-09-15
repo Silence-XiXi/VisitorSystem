@@ -117,7 +117,7 @@ const AdminSites: React.FC = () => {
 
   // 状态转换辅助函数
   const transformSiteStatus = (status: string) => {
-    return status === 'ACTIVE' ? 'active' : status === 'INACTIVE' ? 'inactive' : status === 'SUSPENDED' ? 'suspended' : 'active'
+    return status === 'ACTIVE' ? 'active' : 'inactive'
   }
 
   const loadData = async () => {

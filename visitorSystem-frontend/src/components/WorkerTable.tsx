@@ -130,11 +130,9 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   const getStatusTag = (status: string) => {
     const statusConfig = {
       ACTIVE: { color: 'green', text: t('worker.active') },
-      SUSPENDED: { color: 'orange', text: t('worker.suspended') },
       INACTIVE: { color: 'red', text: t('worker.inactive') },
       // 兼容小写状态
       active: { color: 'green', text: t('worker.active') },
-      suspended: { color: 'orange', text: t('worker.suspended') },
       inactive: { color: 'red', text: t('worker.inactive') }
     };
     

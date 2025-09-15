@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { apiService } from '../services/api'
+import { useAuth } from '../hooks/useAuth'
 
 interface Site {
   id: string
@@ -35,6 +36,7 @@ interface SiteFilterProviderProps {
 }
 
 export const SiteFilterProvider: React.FC<SiteFilterProviderProps> = ({ children }) => {
+  const { user, isLoading: authLoading } = useAuth() // 获取用户信息和加载状态
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(() => {
     // 从localStorage恢复上次选择的工地
     try {
@@ -52,20 +54,75 @@ export const SiteFilterProvider: React.FC<SiteFilterProviderProps> = ({ children
   const loadSites = async () => {
     try {
       setLoading(true)
-      const sitesData = await apiService.getAllSites()
       
-      // 转换数据格式以匹配前端期望的格式，并过滤掉禁用的工地
-      const transformedSites = sitesData
-        .filter(site => site.status === 'ACTIVE') // 只显示启用的工地
-        .map(site => ({
-          id: site.id,
-          name: site.name,
-          address: site.address,
-          code: site.code || '',
-          manager: site.manager,
-          phone: site.phone,
-          status: 'active' // 统一转换为小写
-        }))
+      // 如果用户信息还在加载中，等待加载完成
+      if (authLoading) {
+        console.log('Auth still loading, skipping site load')
+        return
+      }
+      
+      // 如果没有用户信息，使用默认站点
+      if (!user) {
+        console.log('No user info, using default sites')
+        const defaultSites = [
+          {
+            id: 'default-site',
+            name: '默认工地',
+            address: '默认地址',
+            code: 'DEFAULT',
+            manager: '默认负责人',
+            phone: '000-0000-0000',
+            status: 'active'
+          }
+        ]
+        setSites(defaultSites)
+        return
+      }
+      
+      // 根据用户角色使用不同的API
+      let transformedSites = []
+      
+      if (user?.role?.toLowerCase() === 'distributor') {
+        // 分判商用户：从用户信息中获取关联的站点，或使用模拟数据
+        if (user.distributor?.sites && user.distributor.sites.length > 0) {
+          transformedSites = user.distributor.sites.map(site => ({
+            id: site.id,
+            name: site.name,
+            address: '', // 分判商可能没有完整站点信息
+            code: '',
+            manager: '',
+            phone: '',
+            status: 'active'
+          }))
+        } else {
+          // 使用模拟数据作为后备
+          transformedSites = [
+            {
+              id: 'default-site',
+              name: '默认工地',
+              address: '默认地址',
+              code: 'DEFAULT',
+              manager: '默认负责人',
+              phone: '000-0000-0000',
+              status: 'active'
+            }
+          ]
+        }
+      } else {
+        // 管理员用户：使用完整API
+        const sitesData = await apiService.getAllSites()
+        transformedSites = sitesData
+          .filter(site => site.status === 'ACTIVE') // 只显示启用的工地
+          .map(site => ({
+            id: site.id,
+            name: site.name,
+            address: site.address,
+            code: site.code || '',
+            manager: site.manager,
+            phone: site.phone,
+            status: 'active' // 统一转换为小写
+          }))
+      }
       
       setSites(transformedSites)
       
@@ -85,8 +142,19 @@ export const SiteFilterProvider: React.FC<SiteFilterProviderProps> = ({ children
       }
     } catch (error) {
       console.error('Failed to load sites:', error)
-      // 如果API调用失败，使用空数组
-      setSites([])
+      // 如果API调用失败，使用默认站点
+      const defaultSites = [
+        {
+          id: 'default-site',
+          name: '默认工地',
+          address: '默认地址',
+          code: 'DEFAULT',
+          manager: '默认负责人',
+          phone: '000-0000-0000',
+          status: 'active'
+        }
+      ]
+      setSites(defaultSites)
     } finally {
       setLoading(false)
     }
@@ -111,10 +179,13 @@ export const SiteFilterProvider: React.FC<SiteFilterProviderProps> = ({ children
     await loadSites()
   }
 
-  // 组件挂载时加载工地数据
+  // 组件挂载时加载工地数据，监听用户认证状态变化
   useEffect(() => {
-    loadSites()
-  }, [])
+    // 只有在用户认证完成后才加载站点数据
+    if (!authLoading) {
+      loadSites()
+    }
+  }, [authLoading, user])
 
   const selectedSite = selectedSiteId 
     ? sites.find(site => site.id === selectedSiteId) 

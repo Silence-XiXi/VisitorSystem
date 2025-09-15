@@ -76,7 +76,6 @@ export default {
     suspendedWorkers: 'Suspended Workers',
     inactiveWorkers: 'Inactive Workers',
     noPhoto: 'No Photo',
-    confirmDelete: 'Are you sure you want to delete this worker?',
     deleteWarning: 'This action cannot be undone!',
     createSuccess: 'Worker created successfully!',
     updateSuccess: 'Worker updated successfully!',
@@ -381,7 +380,6 @@ export default {
     // Field labels
     workerIdLabel: 'Worker ID:',
     nameLabel: 'Name:',
-    phoneLabel: 'Phone:',
     itemIdLabel: 'ID:',
     // Message prompts
     workerAlreadyEntered: 'Worker has already entered, please check status',
@@ -806,11 +804,8 @@ export default {
     workerName: 'Worker Name:',
     workerIdLabel: 'Worker ID:',
     phoneLabel: 'Contact Phone:',
-    emailLabel: 'Email:',
-    whatsappLabel: 'WhatsApp:',
     selectSendMethod: 'Select Send Method',
     sendEmail: 'Send Email',
-    sendWhatsapp: 'Send WhatsApp',
     noContactInfo: 'Worker has no email or WhatsApp info, cannot send QR code',
     pleaseEnterWorkerId: 'Please enter worker ID',
     pleaseEnterName: 'Please enter name',
@@ -975,8 +970,6 @@ export default {
     // Form Labels
     nameLabel: 'Name:',
     contactLabel: 'Contact:',
-    phoneLabel: 'Phone:',
-    emailLabel: 'Email:',
     whatsAppLabel: 'WhatsApp',
     initialPasswordLabel: 'Initial Password',
     codeLabel: 'Code',
@@ -1011,7 +1004,6 @@ export default {
     batchEnable: 'Batch Enable',
     batchDisable: 'Batch Disable',
     // Confirmation Dialogs
-    confirmDelete: 'Confirm Delete',
     confirmDeleteMessage: 'Are you sure you want to delete the selected items? This action cannot be undone.',
     confirmBatchDelete: 'Confirm Batch Delete',
     confirmBatchDeleteMessage: 'Are you sure you want to delete the selected {count} items? This action cannot be undone.',
@@ -1065,6 +1057,13 @@ export default {
     guardImportDefaultSiteMessage: 'Default associated site: {siteName}',
     guardImportRulesMessage: 'Import rules: Duplicate guard IDs or usernames will be skipped, empty IDs will be auto-assigned, default password is 123456',
     guardImportResultTitle: 'Guard Import Results',
+    // QR Code Modal related
+    workerName: 'Worker Name:',
+    workerIdLabel: 'Worker ID:',
+    phoneLabel: 'Contact Phone:',
+    emailLabel: 'Email:',
+    whatsappLabel: 'WhatsApp:',
+    sendWhatsapp: 'Send WhatsApp',
   },
   visitorRecords: {
     title: 'Visitor Records',

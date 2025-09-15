@@ -721,7 +721,7 @@ const Reports: React.FC = () => {
               title={t('reports.unreturnedItemsCount')}
               value={totalUnreturnedItems}
               prefix={<ExclamationCircleOutlined />}
-              valueStyle={{ color: totalUnreturnedItems > 0 ? '#fa541c' : '#52c41a', fontWeight: 700 }}
+              valueStyle={{ color: totalUnreturnedItems > 0 ? '#1890ff' : '#52c41a', fontWeight: 700 }}
             />
           </Card>
         </Col>

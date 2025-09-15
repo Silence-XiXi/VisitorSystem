@@ -206,13 +206,11 @@ enum UserStatus {
 enum DistributorStatus {
   ACTIVE
   INACTIVE
-  SUSPENDED
 }
 
 enum SiteStatus {
   ACTIVE
   INACTIVE
-  SUSPENDED
 }
 
 enum GuardStatus {
@@ -228,7 +226,6 @@ enum Gender {
 enum WorkerStatus {
   ACTIVE
   INACTIVE
-  SUSPENDED
 }
 
 enum ItemCategoryStatus {

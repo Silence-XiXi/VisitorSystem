@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -33,6 +33,42 @@ export class DistributorsService {
     }
 
     return distributor;
+  }
+
+  // 更新分销商资料
+  async updateDistributorProfile(user: CurrentUser, updateData: any) {
+    if (user.role !== 'DISTRIBUTOR') {
+      throw new ForbiddenException('只有分销商可以更新资料');
+    }
+
+    const distributor = await this.prisma.distributor.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!distributor) {
+      throw new NotFoundException('分销商信息不存在');
+    }
+
+    // 更新分销商信息
+    const updatedDistributor = await this.prisma.distributor.update({
+      where: { id: distributor.id },
+      data: {
+        name: updateData.name,
+        contactName: updateData.contactName,
+        phone: updateData.phone,
+        email: updateData.email,
+        whatsapp: updateData.whatsapp
+      },
+      include: {
+        sites: {
+          include: {
+            site: true
+          }
+        }
+      }
+    });
+
+    return updatedDistributor;
   }
 
   // 获取分销商管理的工地列表
@@ -84,6 +120,7 @@ export class DistributorsService {
     const workers = await this.prisma.worker.findMany({
       where: whereClause,
       include: {
+        distributor: true,
         site: true
       },
       orderBy: {
@@ -145,16 +182,73 @@ export class DistributorsService {
     // 生成工人编号
     const workerId = await this.generateWorkerId();
 
-    return this.prisma.worker.create({
-      data: {
-        ...workerData,
-        workerId,
-        distributorId: distributor.id
-      },
-      include: {
-        site: true
+    try {
+      return await this.prisma.worker.create({
+        data: {
+          ...workerData,
+          workerId,
+          distributorId: distributor.id
+        },
+        include: {
+          site: true
+        }
+      });
+    } catch (error: any) {
+      console.log('创建工人时的错误:', error);
+      console.log('错误代码:', error?.code);
+      console.log('错误元数据:', error?.meta);
+      console.log('错误消息:', error?.message);
+      
+      // 检查是否是Prisma唯一约束冲突错误
+      if (error?.code === 'P2002') {
+        console.log('检测到唯一约束冲突');
+        const target = error?.meta?.target;
+        console.log('冲突字段:', target);
+        
+        if (Array.isArray(target)) {
+          if (target.includes('idCard')) {
+            console.log('身份证号冲突');
+            throw new ConflictException('身份证号已存在');
+          } else if (target.includes('workerId')) {
+            console.log('工人编号冲突');
+            throw new ConflictException('工人编号已存在');
+          } else if (target.includes('phone')) {
+            console.log('手机号冲突');
+            throw new ConflictException('手机号码已存在');
+          }
+        } else if (typeof target === 'string') {
+          if (target.includes('idCard')) {
+            console.log('身份证号冲突');
+            throw new ConflictException('身份证号已存在');
+          } else if (target.includes('workerId')) {
+            console.log('工人编号冲突');
+            throw new ConflictException('工人编号已存在');
+          } else if (target.includes('phone')) {
+            console.log('手机号冲突');
+            throw new ConflictException('手机号码已存在');
+          }
+        }
+        
+        console.log('其他唯一约束冲突:', target);
+        throw new ConflictException('数据已存在，请检查输入信息');
       }
-    });
+      
+      // 检查错误消息中是否包含重复信息
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('Unique constraint') || errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
+        if (errorMessage.includes('idCard') || errorMessage.includes('身份证')) {
+          throw new ConflictException('身份证号已存在');
+        } else if (errorMessage.includes('workerId') || errorMessage.includes('工号')) {
+          throw new ConflictException('工人编号已存在');
+        } else if (errorMessage.includes('phone') || errorMessage.includes('手机')) {
+          throw new ConflictException('手机号码已存在');
+        }
+        throw new ConflictException('数据已存在，请检查输入信息');
+      }
+      
+      console.log('非唯一约束错误，重新抛出');
+      throw error;
+    }
   }
 
   // 更新工人信息

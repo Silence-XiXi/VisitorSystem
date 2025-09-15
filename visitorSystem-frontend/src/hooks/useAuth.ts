@@ -32,6 +32,7 @@ export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [validationInProgress, setValidationInProgress] = useState(false)
   
   // 安全地获取翻译函数，如果不在LocaleProvider中则使用默认值
   let t: (key: string) => string
@@ -60,11 +61,12 @@ export const useAuth = () => {
 
   useEffect(() => {
     // 防止重复初始化
-    if (isInitialized) {
+    if (isInitialized || validationInProgress) {
       return
     }
 
     const validateAuth = async () => {
+      setValidationInProgress(true)
       console.log('useAuth: Starting authentication validation')
       
       // 检查本地存储中是否有用户信息和token
@@ -77,7 +79,32 @@ export const useAuth = () => {
         try {
           const userData = JSON.parse(storedUser)
           console.log('useAuth: Parsed user data:', userData)
-          setUser(userData)
+          
+          // 如果是分判商用户，获取完整的分判商信息
+          if (userData.role === 'DISTRIBUTOR') {
+            try {
+              console.log('useAuth: Fetching distributor profile for user:', userData.username)
+              const distributorInfo = await apiService.getDistributorProfile()
+              console.log('useAuth: Distributor profile received:', distributorInfo)
+              console.log('useAuth: Distributor profile keys:', Object.keys(distributorInfo || {}))
+              console.log('useAuth: Distributor sites:', distributorInfo?.sites)
+              console.log('useAuth: Distributor sites type:', typeof distributorInfo?.sites)
+              console.log('useAuth: Distributor sites is array:', Array.isArray(distributorInfo?.sites))
+              setUser({
+                ...userData,
+                distributor: distributorInfo
+              })
+            } catch (error) {
+              console.error('useAuth: Failed to fetch distributor profile:', error)
+              console.error('useAuth: Error details:', error.message)
+              console.error('useAuth: Error status:', error.statusCode)
+              // 如果获取分判商信息失败，仍然使用基本用户信息
+              setUser(userData)
+            }
+          } else {
+            setUser(userData)
+          }
+          
           setIsAuthenticated(true)
         } catch (error) {
           console.error('useAuth: Error parsing stored user data:', error)
@@ -96,10 +123,11 @@ export const useAuth = () => {
       console.log('useAuth: Authentication validation complete, isLoading set to false')
       setIsLoading(false)
       setIsInitialized(true)
+      setValidationInProgress(false)
     }
 
     validateAuth()
-  }, [isInitialized])
+  }, []) // 只在组件挂载时执行一次
 
   const login = async (username: string, password: string): Promise<{ success: boolean; role?: string; error?: string; errorCode?: number }> => {
     try {
@@ -198,7 +226,49 @@ export const useAuth = () => {
       localStorage.removeItem('access_token')
       setUser(null)
       setIsAuthenticated(false)
+      setIsLoading(false)
       setIsInitialized(false)
+      setValidationInProgress(false)
+    }
+  }
+
+  // 刷新用户信息
+  const refreshUser = async () => {
+    try {
+      const userData = await apiService.getProfile()
+      console.log('useAuth: Refreshed user data:', userData)
+      
+      if (userData && userData.id && userData.username && userData.role) {
+        // 如果是分判商用户，获取完整的分判商信息
+        if (userData.role === 'DISTRIBUTOR') {
+          try {
+            console.log('useAuth: Fetching distributor profile for user:', userData.username)
+            const distributorInfo = await apiService.getDistributorProfile()
+            console.log('useAuth: Distributor profile received:', distributorInfo)
+            console.log('useAuth: Distributor profile keys:', Object.keys(distributorInfo || {}))
+
+            setUser({
+              ...userData,
+              distributor: distributorInfo
+            })
+          } catch (error) {
+            console.error('useAuth: Failed to fetch distributor profile:', error)
+            setUser(userData)
+          }
+        } else {
+          setUser(userData)
+        }
+        
+        setIsAuthenticated(true)
+      } else {
+        console.error('useAuth: Invalid user data received:', userData)
+        setIsAuthenticated(false)
+        setUser(null)
+      }
+    } catch (error) {
+      console.error('useAuth: Failed to refresh user data:', error)
+      setIsAuthenticated(false)
+      setUser(null)
     }
   }
 
@@ -207,6 +277,7 @@ export const useAuth = () => {
     isAuthenticated,
     isLoading,
     login,
-    logout
+    logout,
+    refreshUser
   }
 }

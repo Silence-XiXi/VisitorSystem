@@ -12,6 +12,10 @@ import { useSiteFilter } from '../contexts/SiteFilterContext';
 import apiService from '../services/api';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
+import { 
+  readWorkerExcelFile,
+  generateImportTemplate
+} from '../utils/excelUtils';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -193,14 +197,14 @@ const WorkerManagement: React.FC = () => {
         { wch: 10 }, // 姓名
         { wch: 8 },  // 性别
         { wch: 20 }, // 身份证号
+        { wch: 12 }, // 出生日期
         { wch: 12 }, // 地区
         { wch: 15 }, // 分判商
         { wch: 15 }, // 工地
         { wch: 15 }, // 电话
         { wch: 20 }, // 邮箱
         { wch: 15 }, // WhatsApp
-        { wch: 8 },  // 状态
-        { wch: 12 }  // 出生日期
+        { wch: 8 }   // 状态
       ];
       worksheet['!cols'] = colWidths;
       
@@ -362,21 +366,22 @@ const WorkerManagement: React.FC = () => {
       };
 
       const response = await apiService.exportWorkers(filters);
+      
       const exportData = response.workers.map((worker: any) => ({
         [t('worker.workerId')]: worker.workerId,
         [t('worker.name')]: worker.name,
         [t('worker.gender')]: worker.gender === 'MALE' ? t('worker.male') : t('worker.female'),
         [t('worker.idCard')]: worker.idCard,
+        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-',
         [t('worker.region')]: worker.region || '-',
-        [t('worker.distributor')]: worker.distributorName || '-',
-        [t('worker.site')]: worker.siteName || '-',
+        [t('worker.distributor')]: worker.distributorId || '-',
+        [t('worker.site')]: worker.siteCode || '-',
         [t('worker.phone')]: worker.phone,
         [t('worker.email')]: worker.email || '-',
         [t('worker.whatsapp')]: worker.whatsapp || '-',
-        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : 
-                            worker.status === 'SUSPENDED' ? t('worker.suspended') : t('worker.inactive'),
-        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-'
+        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : t('worker.inactive')
       }));
+      
 
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -387,14 +392,14 @@ const WorkerManagement: React.FC = () => {
         { wch: 10 }, // 姓名
         { wch: 8 },  // 性别
         { wch: 20 }, // 身份证号
+        { wch: 12 }, // 出生日期
         { wch: 12 }, // 地区
         { wch: 15 }, // 分判商
         { wch: 15 }, // 工地
         { wch: 15 }, // 电话
         { wch: 20 }, // 邮箱
         { wch: 15 }, // WhatsApp
-        { wch: 8 },  // 状态
-        { wch: 12 }  // 出生日期
+        { wch: 8 }   // 状态
       ];
       worksheet['!cols'] = colWidths;
       
@@ -414,21 +419,22 @@ const WorkerManagement: React.FC = () => {
   const handleExportAllWorkers = async () => {
     try {
       const response = await apiService.exportWorkers({});
+      
       const exportData = response.workers.map((worker: any) => ({
         [t('worker.workerId')]: worker.workerId,
         [t('worker.name')]: worker.name,
         [t('worker.gender')]: worker.gender === 'MALE' ? t('worker.male') : t('worker.female'),
         [t('worker.idCard')]: worker.idCard,
+        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-',
         [t('worker.region')]: worker.region || '-',
-        [t('worker.distributor')]: worker.distributorName || '-',
-        [t('worker.site')]: worker.siteName || '-',
+        [t('worker.distributor')]: worker.distributorId || '-',
+        [t('worker.site')]: worker.siteCode || '-',
         [t('worker.phone')]: worker.phone,
         [t('worker.email')]: worker.email || '-',
         [t('worker.whatsapp')]: worker.whatsapp || '-',
-        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : 
-                            worker.status === 'SUSPENDED' ? t('worker.suspended') : t('worker.inactive'),
-        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-'
+        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : t('worker.inactive')
       }));
+      
 
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -439,14 +445,14 @@ const WorkerManagement: React.FC = () => {
         { wch: 10 }, // 姓名
         { wch: 8 },  // 性别
         { wch: 20 }, // 身份证号
+        { wch: 12 }, // 出生日期
         { wch: 12 }, // 地区
         { wch: 15 }, // 分判商
         { wch: 15 }, // 工地
         { wch: 15 }, // 电话
         { wch: 20 }, // 邮箱
         { wch: 15 }, // WhatsApp
-        { wch: 8 },  // 状态
-        { wch: 12 }  // 出生日期
+        { wch: 8 }   // 状态
       ];
       worksheet['!cols'] = colWidths;
       
@@ -462,106 +468,6 @@ const WorkerManagement: React.FC = () => {
     }
   };
 
-  // 读取工人Excel文件
-  const readWorkerExcelFile = async (file: File, distributors: Distributor[], sites: Site[]) => {
-    return new Promise<{ workers: Record<string, unknown>[], errors: string[] }>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const workbook = XLSX.read(e.target?.result, { type: 'binary' })
-          const sheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[sheetName]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet)
-          
-          const workers: Record<string, unknown>[] = []
-          const errors: string[] = []
-
-          jsonData.forEach((row: any, index: number) => {
-            try {
-              // 性别映射
-              const genderMap: { [key: string]: string } = {
-                '男': 'MALE',
-                '女': 'FEMALE',
-                'male': 'MALE',
-                'female': 'FEMALE',
-                'MALE': 'MALE',
-                'FEMALE': 'FEMALE'
-              }
-
-              // 状态映射
-              const statusMap: { [key: string]: string } = {
-                '在职': 'ACTIVE',
-                '暂停': 'SUSPENDED',
-                '离职': 'INACTIVE',
-                'active': 'ACTIVE',
-                'suspended': 'SUSPENDED',
-                'inactive': 'INACTIVE',
-                'ACTIVE': 'ACTIVE',
-                'SUSPENDED': 'SUSPENDED',
-                'INACTIVE': 'INACTIVE'
-              }
-
-              const name = row['姓名'] || row[t('worker.name')]
-              const idCard = row['身份证号'] || row[t('worker.idCard')]
-              const phone = row['联系电话'] || row[t('worker.phone')]
-              const distributorName = row['分判商'] || row[t('worker.distributor')]
-              const siteName = row['所属工地'] || row[t('worker.site')]
-
-              // 验证必填字段
-              if (!name) {
-                errors.push(`第${index + 2}行: 姓名不能为空`)
-                return
-              }
-              if (!idCard) {
-                errors.push(`第${index + 2}行: 身份证号不能为空`)
-                return
-              }
-              if (!phone) {
-                errors.push(`第${index + 2}行: 联系电话不能为空`)
-                return
-              }
-
-              // 查找分判商和工地ID
-              const distributor = distributors.find(d => d.name === distributorName)
-              const site = sites.find(s => s.name === siteName)
-
-              if (distributorName && !distributor) {
-                errors.push(`第${index + 2}行: 分判商"${distributorName}"不存在`)
-                return
-              }
-
-              if (siteName && !site) {
-                errors.push(`第${index + 2}行: 工地"${siteName}"不存在`)
-                return
-              }
-
-              workers.push({
-                name,
-                gender: genderMap[row['性别']] || genderMap[row[t('worker.gender')]] || 'MALE',
-                idCard,
-                region: row['地区'] || row[t('worker.region')] || null,
-                phone,
-                email: row['邮箱'] || row[t('worker.email')] || null,
-                whatsapp: row['WhatsApp'] || row[t('worker.whatsapp')] || null,
-                status: statusMap[row['状态']] || statusMap[row[t('worker.status')]] || 'ACTIVE',
-                birthDate: row['出生日期'] || row[t('worker.birthDate')] || null,
-                distributorId: distributor?.id || null,
-                siteId: site?.id || null
-              })
-            } catch (error) {
-              errors.push(`第${index + 2}行: 数据格式错误`)
-            }
-          })
-
-          resolve({ workers, errors })
-        } catch (error) {
-          reject(error)
-        }
-      }
-      reader.onerror = () => reject(new Error('文件读取失败'))
-      reader.readAsBinaryString(file)
-    })
-  }
 
   // 导入工人数据
   const handleImport = async (file: File) => {
@@ -641,12 +547,12 @@ const WorkerManagement: React.FC = () => {
             name: String(workerData.name || ''),
             gender: String(workerData.gender || 'MALE'),
             idCard: String(workerData.idCard || ''),
-            region: workerData.region ? String(workerData.region) : null,
+            birthDate: workerData.birthDate ? String(workerData.birthDate) : '',
+            region: workerData.region ? String(workerData.region) : '中国大陆',
             phone: String(workerData.phone || ''),
-            email: workerData.email ? String(workerData.email) : null,
-            whatsapp: workerData.whatsapp ? String(workerData.whatsapp) : null,
+            email: workerData.email ? String(workerData.email) : '',
+            whatsapp: workerData.whatsapp ? String(workerData.whatsapp) : '',
             status: String(workerData.status || 'ACTIVE'),
-            birthDate: workerData.birthDate ? String(workerData.birthDate) : null,
             distributorId: workerData.distributorId ? String(workerData.distributorId) : null,
             siteId: workerData.siteId ? String(workerData.siteId) : selectedSiteId
           }
@@ -847,7 +753,6 @@ const WorkerManagement: React.FC = () => {
               allowClear
             >
               <Option value="ACTIVE">{t('worker.active')}</Option>
-              <Option value="SUSPENDED">{t('worker.suspended')}</Option>
               <Option value="INACTIVE">{t('worker.inactive')}</Option>
             </Select>
           </Col>

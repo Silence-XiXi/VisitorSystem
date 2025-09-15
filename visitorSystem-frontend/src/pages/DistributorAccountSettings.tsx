@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Form, Input, Button, Row, Col, Select, message, Tabs } from 'antd'
+import { Card, Form, Input, Button, Row, Col, message, Tabs } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
+import apiService from '../services/api'
 
 const DistributorAccountSettings: React.FC = () => {
-  const { locale, setLocale, t } = useLocale()
-  const { user } = useAuth()
+  const { t } = useLocale()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [form] = Form.useForm()
 
@@ -17,40 +18,84 @@ const DistributorAccountSettings: React.FC = () => {
       const data = JSON.parse(raw)
       form.setFieldsValue(data)
     } else {
-      // 设置默认值
+      // 设置默认值，使用分判商信息
       form.setFieldsValue({
         username: user?.username || '',
-        displayName: user?.username || '',
-        language: locale
+        displayName: user?.distributor?.contactName || user?.username || '',
+        company: user?.distributor?.name || '', // 使用分判商名称作为公司名称
+        phone: user?.distributor?.phone || '', // 使用分判商电话
+        email: user?.distributor?.email || '', // 使用分判商邮箱
+        whatsapp: user?.distributor?.whatsapp || '' // 使用分判商WhatsApp
       })
     }
-  }, [form, user, locale])
+  }, [form, user])
 
   const onSave = async () => {
     try {
       const values = await form.validateFields()
-      localStorage.setItem('distributor_account_settings', JSON.stringify(values))
-      if (values.language && values.language !== locale) {
-        setLocale(values.language)
+      
+      // 调用后端API更新分判商资料
+      const updateData = {
+        name: values.company, // 公司名称对应分判商名称
+        contactName: values.displayName, // 显示名称对应联系人
+        phone: values.phone,
+        email: values.email,
+        whatsapp: values.whatsapp
       }
+      
+      await apiService.updateDistributorProfile(updateData)
+      
+      // 刷新用户信息以更新右上角显示
+      await refreshUser()
+      
+      // 保存到本地存储
+      localStorage.setItem('distributor_account_settings', JSON.stringify(values))
+      
       message.success(t('distributor.accountInfoSaved'))
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('保存失败:', error)
+      
+      // 显示具体错误信息
+      let errorMessage = t('distributor.operationFailed')
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMsg = (error as { message: string }).message
+        if (errorMsg && errorMsg !== '操作失败') {
+          errorMessage = errorMsg
+        }
+      }
+      
+      message.error(errorMessage)
     }
   }
 
   const onChangePassword = async () => {
     try {
-      const { newPassword, confirmPassword } = await form.validateFields(['oldPassword', 'newPassword', 'confirmPassword'])
+      const { oldPassword, newPassword, confirmPassword } = await form.validateFields(['oldPassword', 'newPassword', 'confirmPassword'])
+      
       if (newPassword !== confirmPassword) {
         message.error(t('distributor.passwordMismatch'))
         return
       }
-      // TODO: 接入后端修改密码接口
+      
+      // 调用后端API修改密码
+      await apiService.changePassword(oldPassword, newPassword)
+      
+      // 清空密码字段
       form.resetFields(['oldPassword', 'newPassword', 'confirmPassword'])
       message.success(t('distributor.passwordUpdated'))
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('密码修改失败:', error)
+      
+      // 显示具体错误信息
+      let errorMessage = t('distributor.operationFailed')
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMsg = (error as { message: string }).message
+        if (errorMsg && errorMsg !== '操作失败') {
+          errorMessage = errorMsg
+        }
+      }
+      
+      message.error(errorMessage)
     }
   }
 
@@ -113,27 +158,8 @@ const DistributorAccountSettings: React.FC = () => {
                         </Form.Item>
                       </Col>
                       <Col span={12}>
-                        <Form.Item name="language" label={t('distributor.interfaceLanguage')} initialValue={locale}>
-                          <Select
-                            options={[
-                              { value: 'zh-CN', label: t('languages.zhCN') },
-                              { value: 'zh-TW', label: t('languages.zhTW') },
-                              { value: 'en-US', label: t('languages.enUS') }
-                            ]}
-                          />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Form.Item name="timezone" label={t('distributor.timezoneSettings')} initialValue={'Asia/Shanghai'}>
-                          <Select
-                            options={[
-                              { value: 'Asia/Shanghai', label: t('distributor.beijingTime') },
-                              { value: 'Asia/Hong_Kong', label: t('distributor.hongkongTime') },
-                              { value: 'UTC', label: t('distributor.utcTime') }
-                            ]}
-                          />
+                        <Form.Item name="whatsapp" label={t('distributor.whatsapp')}>
+                          <Input placeholder={t('distributor.whatsappPlaceholder')} />
                         </Form.Item>
                       </Col>
                     </Row>

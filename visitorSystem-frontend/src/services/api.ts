@@ -70,7 +70,7 @@ interface Worker {
   idCard: string;
   physicalCardId?: string;
   gender: 'MALE' | 'FEMALE';
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: 'ACTIVE' | 'INACTIVE';
   distributorId: string;
   siteId: string;
   createdAt: string;
@@ -129,6 +129,9 @@ interface CreateWorkerRequest {
   physicalCardId?: string;
   gender: 'MALE' | 'FEMALE';
   siteId: string;
+  birthDate?: string | null;
+  email?: string | null;
+  whatsapp?: string | null;
 }
 
 interface UpdateWorkerRequest {
@@ -138,7 +141,10 @@ interface UpdateWorkerRequest {
   physicalCardId?: string;
   gender?: 'MALE' | 'FEMALE';
   siteId?: string;
-  status?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status?: 'ACTIVE' | 'INACTIVE';
+  birthDate?: string | null;
+  email?: string | null;
+  whatsapp?: string | null;
 }
 
 export interface LoginResponse {
@@ -725,6 +731,75 @@ class ApiService {
     });
   }
 
+  // 获取分销商关联的工地列表
+  async getDistributorSites(): Promise<Site[]> {
+    return this.requestWithRetry('/distributors/sites', {
+      method: 'GET',
+    });
+  }
+
+  // 获取分销商资料
+  async getDistributorProfile(): Promise<Distributor> {
+    return this.requestWithRetry('/distributors/profile', {
+      method: 'GET',
+    });
+  }
+
+  // 更新分销商资料
+  async updateDistributorProfile(updateData: {
+    name?: string;
+    contactName?: string;
+    phone?: string;
+    email?: string;
+    whatsapp?: string;
+  }): Promise<Distributor> {
+    return this.requestWithRetry('/distributors/profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+  }
+
+  // 修改密码
+  async changePassword(oldPassword: string, newPassword: string): Promise<{ message: string }> {
+    return this.requestWithRetry('/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ oldPassword, newPassword }),
+    });
+  }
+
+  // 分判商专用的工人管理API
+  async createDistributorWorker(workerData: CreateWorkerRequest): Promise<Worker> {
+    return this.requestWithRetry('/distributors/workers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(workerData),
+    });
+  }
+
+  async updateDistributorWorker(workerId: string, workerData: UpdateWorkerRequest): Promise<Worker> {
+    return this.requestWithRetry(`/distributors/workers/${workerId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(workerData),
+    });
+  }
+
+  async deleteDistributorWorker(workerId: string): Promise<void> {
+    await this.request(`/distributors/workers/${workerId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async getSiteWorkers(): Promise<Worker[]> {
     return this.requestWithRetry('/guards/workers', {
       method: 'GET',
@@ -839,17 +914,6 @@ class ApiService {
     const url = `/admin/borrow-records${params.toString() ? `?${params.toString()}` : ''}`;
     return this.requestWithRetry(url, {
       method: 'GET',
-    });
-  }
-
-  // 修改密码
-  async changePassword(oldPassword: string, newPassword: string): Promise<{ message: string }> {
-    return this.requestWithRetry('/auth/change-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ oldPassword, newPassword }),
     });
   }
 

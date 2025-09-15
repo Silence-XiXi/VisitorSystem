@@ -109,7 +109,7 @@ const ExcelImportExportModal: React.FC<ExcelImportExportModalProps> = ({
     }
     
     try {
-      exportWorkersToExcel(workers, distributors, sites);
+      exportWorkersToExcel(workers, distributors, sites, t);
       message.success('导出成功！');
     } catch (error) {
       message.error('导出失败：' + (error as Error).message);

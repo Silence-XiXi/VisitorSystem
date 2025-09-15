@@ -3,6 +3,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
+// 设置时区为中国时区
+process.env.TZ = 'Asia/Shanghai';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 

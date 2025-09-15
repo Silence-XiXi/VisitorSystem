@@ -187,7 +187,7 @@ const DistributorLayout: React.FC = () => {
               }}
             >
               <Text style={{ color: '#666', fontSize: '14px' }}>
-                {user?.username || distributorInfo.username}（{t('common.subcontractor')}）
+                {user?.distributor?.contactName || user?.username}（{t('common.subcontractor')}）
               </Text>
             </Button>
           </Dropdown>

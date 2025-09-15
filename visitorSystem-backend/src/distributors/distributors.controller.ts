@@ -23,6 +23,18 @@ export class DistributorsController {
     return this.distributorsService.getCurrentDistributor(user);
   }
 
+  @Put('profile')
+  @Roles(UserRole.DISTRIBUTOR)
+  @ApiOperation({ summary: '更新当前分销商信息' })
+  @ApiResponse({ status: 200, description: '更新成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async updateDistributorProfile(
+    @GetCurrentUser() user: CurrentUser,
+    @Body() updateData: any
+  ) {
+    return this.distributorsService.updateDistributorProfile(user, updateData);
+  }
+
   @Get('sites')
   @Roles(UserRole.DISTRIBUTOR)
   @ApiOperation({ summary: '获取分销商管理的工地列表' })

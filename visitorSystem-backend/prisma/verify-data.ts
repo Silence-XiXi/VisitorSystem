@@ -37,12 +37,10 @@ async function main() {
     // 按状态统计工人
     const activeWorkers = await prisma.worker.count({ where: { status: 'ACTIVE' } });
     const inactiveWorkers = await prisma.worker.count({ where: { status: 'INACTIVE' } });
-    const suspendedWorkers = await prisma.worker.count({ where: { status: 'SUSPENDED' } });
 
     console.log('👷 工人状态分布:');
     console.log(`- 活跃: ${activeWorkers}`);
-    console.log(`- 不活跃: ${inactiveWorkers}`);
-    console.log(`- 暂停: ${suspendedWorkers}\n`);
+    console.log(`- 不活跃: ${inactiveWorkers}\n`);
 
     // 按分销商统计工人
     const workersByDistributor = await prisma.worker.groupBy({
