@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -60,6 +60,153 @@ export class GuardsService {
     });
 
     return workers;
+  }
+
+  // 根据工人编号查询工人信息
+  async getWorkerByWorkerId(user: CurrentUser, workerId: string) {
+    if (user.role !== 'GUARD') {
+      throw new ForbiddenException('只有门卫可以访问此接口');
+    }
+
+    const guard = await this.prisma.guard.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!guard) {
+      throw new NotFoundException('门卫信息不存在');
+    }
+
+    const worker = await this.prisma.worker.findFirst({
+      where: { 
+        workerId: workerId,
+        siteId: guard.siteId  // 确保工人属于门卫所在的工地
+      },
+      include: {
+        distributor: true,
+        site: true
+      }
+    });
+
+    if (!worker) {
+      throw new NotFoundException('工人不存在或不属于当前工地');
+    }
+
+    return worker;
+  }
+
+  // 根据工人编号或实体卡编号查询工人信息
+  async getWorkerByIdentifier(user: CurrentUser, identifier: string) {
+    if (user.role !== 'GUARD') {
+      throw new ForbiddenException('只有门卫可以访问此接口');
+    }
+
+    const guard = await this.prisma.guard.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!guard) {
+      throw new NotFoundException('门卫信息不存在');
+    }
+
+    // 首先尝试通过工人编号查找
+    let worker = await this.prisma.worker.findFirst({
+      where: { 
+        workerId: identifier,
+        siteId: guard.siteId  // 确保工人属于门卫所在的工地
+      },
+      include: {
+        distributor: true,
+        site: true
+      }
+    });
+
+    // 如果通过工人编号没找到，尝试通过实体卡编号查找
+    if (!worker) {
+      const visitorRecord = await this.prisma.visitorRecord.findFirst({
+        where: {
+          physicalCardId: identifier,
+          siteId: guard.siteId,
+          status: 'ON_SITE'  // 只查找当前在场的记录
+        },
+        include: {
+          worker: {
+            include: {
+              distributor: true,
+              site: true
+            }
+          }
+        },
+        orderBy: {
+          checkInTime: 'desc'
+        }
+      });
+
+      if (visitorRecord) {
+        worker = visitorRecord.worker;
+      }
+    }
+
+    if (!worker) {
+      throw new NotFoundException('工人不存在或不属于当前工地');
+    }
+
+    return worker;
+  }
+
+  // 检查工人是否有有效的入场记录
+  async checkWorkerEntryRecord(user: CurrentUser, identifier: string) {
+    if (user.role !== 'GUARD') {
+      throw new ForbiddenException('只有门卫可以访问此接口');
+    }
+
+    const guard = await this.prisma.guard.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!guard) {
+      throw new NotFoundException('门卫信息不存在');
+    }
+
+    // 查找有效的入场记录（状态为ON_SITE）
+    let entryRecord = await this.prisma.visitorRecord.findFirst({
+      where: {
+        OR: [
+          {
+            worker: {
+              workerId: identifier,
+              siteId: guard.siteId
+            }
+          },
+          {
+            physicalCardId: identifier,
+            siteId: guard.siteId
+          }
+        ],
+        status: 'ON_SITE'
+      },
+      include: {
+        worker: {
+          include: {
+            distributor: true,
+            site: true
+          }
+        },
+        site: true,
+        registrar: true
+      },
+      orderBy: {
+        checkInTime: 'desc'
+      }
+    });
+
+    if (!entryRecord) {
+      throw new BadRequestException('该工人未入场，无法借用物品');
+    }
+
+    return {
+      worker: entryRecord.worker,
+      entryRecord: entryRecord
+    };
   }
 
   // 获取门卫所在工地的物品借用记录
@@ -137,24 +284,47 @@ export class GuardsService {
       throw new ForbiddenException('该工人不在您管理的工地');
     }
 
-    // 验证物品是否可用
-    const item = await this.prisma.item.findFirst({
+    // 验证物品类型是否存在
+    const category = await this.prisma.itemCategory.findUnique({
+      where: { id: recordData.categoryId }
+    });
+
+    if (!category) {
+      throw new NotFoundException('物品类型不存在');
+    }
+
+    // 查找或创建物品
+    let item = await this.prisma.item.findFirst({
       where: {
-        id: recordData.itemId,
-        status: 'AVAILABLE'
+        itemCode: recordData.itemCode,
+        categoryId: recordData.categoryId
       }
     });
 
     if (!item) {
+      // 如果物品不存在，创建新物品
+      item = await this.prisma.item.create({
+        data: {
+          itemCode: recordData.itemCode,
+          name: `${category.name} - ${recordData.itemCode}`,
+          description: recordData.remark || '',
+          categoryId: recordData.categoryId,
+          status: 'AVAILABLE'
+        }
+      });
+    } else if (item.status !== 'AVAILABLE') {
       throw new ForbiddenException('该物品不可借用');
     }
 
     // 创建借用记录
     const borrowRecord = await this.prisma.itemBorrowRecord.create({
       data: {
-        ...recordData,
+        workerId: recordData.workerId,
+        itemId: item.id,
         siteId: guard.siteId,
         borrowHandlerId: guard.id,
+        borrowDate: recordData.borrowDate || new Date(),
+        borrowTime: recordData.borrowTime || new Date().toTimeString().split(' ')[0],
         status: 'BORROWED'
       },
       include: {
@@ -174,7 +344,7 @@ export class GuardsService {
 
     // 更新物品状态为已借出
     await this.prisma.item.update({
-      where: { id: recordData.itemId },
+      where: { id: item.id },
       data: { status: 'BORROWED' }
     });
 
@@ -253,7 +423,21 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
-    const [totalWorkers, activeWorkers, borrowedItems, returnedItems] = await Promise.all([
+    // 获取今日日期范围
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    const [
+      totalWorkers, 
+      activeWorkers, 
+      borrowedItems, 
+      returnedItems,
+      todayVisitorRecords,
+      todayEntered,
+      todayExited,
+      onSiteWorkers
+    ] = await Promise.all([
       this.prisma.worker.count({
         where: { siteId: guard.siteId }
       }),
@@ -274,6 +458,43 @@ export class GuardsService {
           siteId: guard.siteId,
           status: 'RETURNED'
         }
+      }),
+      // 今日访客记录总数
+      this.prisma.visitorRecord.count({
+        where: {
+          siteId: guard.siteId,
+          createdAt: {
+            gte: startOfDay,
+            lt: endOfDay
+          }
+        }
+      }),
+      // 今日入场人数
+      this.prisma.visitorRecord.count({
+        where: {
+          siteId: guard.siteId,
+          checkInTime: {
+            gte: startOfDay,
+            lt: endOfDay
+          }
+        }
+      }),
+      // 今日离场人数
+      this.prisma.visitorRecord.count({
+        where: {
+          siteId: guard.siteId,
+          checkOutTime: {
+            gte: startOfDay,
+            lt: endOfDay
+          }
+        }
+      }),
+      // 当前在场人数
+      this.prisma.visitorRecord.count({
+        where: {
+          siteId: guard.siteId,
+          status: 'ON_SITE'
+        }
       })
     ]);
 
@@ -282,7 +503,132 @@ export class GuardsService {
       activeWorkers,
       inactiveWorkers: totalWorkers - activeWorkers,
       borrowedItems,
-      returnedItems
+      returnedItems,
+      todayVisitorRecords,
+      todayEntered,
+      todayExited,
+      onSiteWorkers
     };
+  }
+
+  // 获取门卫所在工地的访客记录
+  async getGuardSiteVisitorRecords(user: CurrentUser, startDate?: string, endDate?: string, status?: string) {
+    if (user.role !== 'GUARD') {
+      throw new ForbiddenException('只有门卫可以访问访客记录');
+    }
+
+    const guard = await this.prisma.guard.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!guard) {
+      throw new NotFoundException('门卫信息不存在');
+    }
+
+    const whereClause: any = {
+      siteId: guard.siteId
+    };
+
+    // 添加日期筛选
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) {
+        whereClause.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const endDateObj = new Date(endDate);
+        endDateObj.setDate(endDateObj.getDate() + 1); // 包含结束日期当天
+        whereClause.createdAt.lt = endDateObj;
+      }
+    }
+
+    // 添加状态筛选
+    if (status) {
+      whereClause.status = status.toUpperCase();
+    }
+
+    const records = await this.prisma.visitorRecord.findMany({
+      where: whereClause,
+      include: {
+        worker: {
+          include: {
+            distributor: true
+          }
+        },
+        site: true,
+        registrar: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return records;
+  }
+
+  // 创建访客记录（入场登记）
+  async createVisitorRecord(user: CurrentUser, recordData: any) {
+    if (user.role !== 'GUARD') {
+      throw new ForbiddenException('只有门卫可以创建访客记录');
+    }
+
+    const guard = await this.prisma.guard.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!guard) {
+      throw new NotFoundException('门卫信息不存在');
+    }
+
+    // 验证工人是否存在且属于当前工地
+    const worker = await this.prisma.worker.findFirst({
+      where: { 
+        workerId: recordData.workerId,
+        siteId: guard.siteId
+      }
+    });
+
+    if (!worker) {
+      throw new NotFoundException('工人不存在或不属于当前工地');
+    }
+
+    // 检查工人是否已经在场
+    const existingRecord = await this.prisma.visitorRecord.findFirst({
+      where: {
+        workerId: worker.id,
+        status: 'ON_SITE'
+      }
+    });
+
+    if (existingRecord) {
+      throw new BadRequestException('该工人已经在场，无法重复登记');
+    }
+
+    // 创建访客记录
+    const visitorRecord = await this.prisma.visitorRecord.create({
+      data: {
+        workerId: worker.id,
+        siteId: guard.siteId,
+        checkInTime: new Date(),
+        status: 'ON_SITE',
+        idType: recordData.idType || '身份证',
+        idNumber: recordData.idNumber || worker.idCard,
+        physicalCardId: recordData.physicalCardId,
+        registrarId: guard.id,
+        notes: recordData.notes
+      },
+      include: {
+        worker: {
+          include: {
+            distributor: true,
+            site: true
+          }
+        },
+        site: true,
+        registrar: true
+      }
+    });
+
+    return visitorRecord;
   }
 }

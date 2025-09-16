@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -127,6 +128,20 @@ export class AdminController {
     @Body() importData: { workers: any[] }
   ) {
     return this.adminService.importWorkers(user, importData.workers);
+  }
+
+  @Post('workers/import-excel')
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: '通过Excel文件导入工人数据' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, description: '导入成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async importWorkersFromExcel(
+    @GetCurrentUser() user: CurrentUser,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.adminService.importWorkersFromExcel(user, file);
   }
 
   @Get('workers/template')

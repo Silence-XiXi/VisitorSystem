@@ -5,15 +5,12 @@ export interface Worker {
   gender: 'MALE' | 'FEMALE'; // 性别
   idCard: string; // 身份证号
   region: string; // 地区
-  photo: string; // 照片URL
   distributorId: string; // 分判商ID
   siteId: string; // 所属工地ID
   phone: string; // 联系电话
   email: string; // 邮箱
   whatsapp: string; // WhatsApp
   birthDate?: string; // 出生日期 ISO 字符串 YYYY-MM-DD
-  age?: number; // 年龄（根据出生日期计算）
-  physicalCardId?: string; // 实体卡编号（每日发放，非固定）
   status: 'ACTIVE' | 'INACTIVE'; // 状态
   createdAt: string;
   updatedAt: string;
@@ -31,19 +28,17 @@ export interface Worker {
 
 export interface CreateWorkerRequest {
   name: string;
-  gender: 'MALE' | 'FEMALE';
+  gender: string; // 改为string类型，支持任意值
   idCard: string;
   region: string;
-  photo?: string;
   distributorId: string;
   siteId: string;
   phone: string;
   email?: string;
   whatsapp?: string;
   birthDate?: string;
-  age?: number;
-  physicalCardId?: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: string; // 改为string类型，支持任意值
+  workerId?: string; // 工人编号，可选，系统会自动生成
 }
 
 export interface UpdateWorkerRequest extends Partial<CreateWorkerRequest> {

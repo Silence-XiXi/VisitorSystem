@@ -373,7 +373,7 @@ const ItemCategoryManagement: React.FC = () => {
       }
       
       if (importedCategories.length === 0) {
-        message.warning(t('itemCategory.noValidData'))
+        message.warning('Excel文件中没有找到有效的物品类别数据，请检查文件格式和内容')
         return
       }
       

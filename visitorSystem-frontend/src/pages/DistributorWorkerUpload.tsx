@@ -1,17 +1,17 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Upload, DatePicker, Pagination } from 'antd'
+import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, QrcodeOutlined, MailOutlined, MessageOutlined } from '@ant-design/icons'
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Site } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
 import { 
   exportWorkersToExcel, 
-  readWorkerExcelFile,
-  generateWorkerImportTemplate
+  readWorkerExcelFile
 } from '../utils/excelUtils'
 import { useLocale } from '../contexts/LocaleContext'
 import { useAuth } from '../hooks/useAuth'
 import apiService from '../services/api'
 import dayjs from 'dayjs'
+import ExcelImportExportModal from '../components/ExcelImportExportModal'
 
 
 // 表格样式
@@ -48,6 +48,7 @@ const DistributorWorkerUpload: React.FC = () => {
   const [workerModalOpen, setWorkerModalOpen] = useState(false)
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null)
   const [workerForm] = Form.useForm()
+  const [excelModalOpen, setExcelModalOpen] = useState(false)
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [qrCodeModalOpen, setQrCodeModalOpen] = useState(false)
@@ -158,6 +159,7 @@ const DistributorWorkerUpload: React.FC = () => {
           idCard: values.idCard,
           gender: values.gender?.toUpperCase() as 'MALE' | 'FEMALE',
           status: values.status?.toUpperCase() as 'ACTIVE' | 'INACTIVE',
+          region: values.region, // 包含地区信息
           siteId: values.siteId, // 包含工地信息
           birthDate: values.birthDate ? values.birthDate.toISOString() : null,
           email: values.email || null,
@@ -189,8 +191,7 @@ const DistributorWorkerUpload: React.FC = () => {
           phone: values.phone,
           idCard: values.idCard,
           gender: values.gender?.toUpperCase() as 'MALE' | 'FEMALE',
-          region: values.region || '中国大陆',
-          physicalCardId: values.physicalCardId,
+          region: values.region || t('regions.mainland'),
           siteId: selectedSiteId, // 使用表单中选择的工地
           distributorId: currentDistributor?.id || 'default-distributor',
           status: (values.status?.toUpperCase() || 'ACTIVE') as 'ACTIVE' | 'INACTIVE',
@@ -223,11 +224,11 @@ const DistributorWorkerUpload: React.FC = () => {
         
         // 检查是否是身份证重复的错误
         if (errorMsg.includes('身份证') || errorMsg.includes('idCard') || errorMsg.includes('duplicate') || errorMsg.includes('已存在')) {
-          errorMessage = '身份证号码已存在，请使用其他身份证号码'
+          errorMessage = '身份证号码已存在，请检查身份证号码是否正确或使用其他身份证号码'
         } else if (errorMsg.includes('手机号') || errorMsg.includes('phone') || errorMsg.includes('电话')) {
           errorMessage = '手机号码已存在，请使用其他手机号码'
         } else if (errorMsg.includes('工号') || errorMsg.includes('workerId')) {
-          errorMessage = '工号已存在，请使用其他工号'
+          errorMessage = '工人编号已存在，请使用其他工人编号或留空让系统自动分配'
         } else if (errorMsg.includes('网络') || errorMsg.includes('连接')) {
           errorMessage = '网络连接失败，请检查网络设置'
         } else if (errorMsg.includes('权限') || errorMsg.includes('permission')) {
@@ -251,7 +252,7 @@ const DistributorWorkerUpload: React.FC = () => {
     Modal.confirm({
       title: t('distributor.confirmDelete'),
       icon: <ExclamationCircleOutlined />,
-      content: t('distributor.confirmDeleteContent').replace('{name}', worker.name),
+      content: t('distributor.confirmDeleteContent', { name: worker.name }),
       onOk: async () => {
         try {
           setLoading(true)
@@ -285,7 +286,7 @@ const DistributorWorkerUpload: React.FC = () => {
         name: targetWorker.name,
         phone: targetWorker.phone
       })
-      message.success(t('distributor.qrCodeSentToEmail').replace('{email}', targetWorker.email))
+      message.success(t('distributor.qrCodeSentToEmail', { email: targetWorker.email }))
     } else if (method === 'whatsapp') {
       if (!targetWorker.whatsapp) {
         message.warning(t('distributor.noWhatsappWarning'))
@@ -297,7 +298,7 @@ const DistributorWorkerUpload: React.FC = () => {
         name: targetWorker.name,
         phone: targetWorker.phone
       })
-      message.success(t('distributor.qrCodeSentToWhatsapp').replace('{whatsapp}', targetWorker.whatsapp))
+      message.success(t('distributor.qrCodeSentToWhatsapp', { whatsapp: targetWorker.whatsapp }))
     }
 
     setQrCodeModalOpen(false)
@@ -322,7 +323,7 @@ const DistributorWorkerUpload: React.FC = () => {
     }
 
     // 这里应该调用实际的批量发送API
-    message.success(t('distributor.qrCodeBatchSent').replace('{count}', validWorkers.length.toString()))
+    message.success(t('distributor.qrCodeBatchSent', { count: validWorkers.length.toString() }))
     setSelectedWorkerIds([])
   }
 
@@ -367,25 +368,20 @@ const DistributorWorkerUpload: React.FC = () => {
       
       
       // 使用当前分判商信息进行导出
-      exportWorkersToExcel(dataToExport, currentDistributorInfo, sites, t)
-      message.success(t('distributor.exportedWorkers').replace('{count}', dataToExport.length.toString()))
+      exportWorkersToExcel(dataToExport, currentDistributorInfo, sites)
+      message.success(t('distributor.exportedWorkers', { count: dataToExport.length.toString() }))
     } catch (error) {
       console.error('导出失败:', error)
       message.error('导出失败，请重试')
     }
   }
 
-  // 下载模板
-  const handleDownloadTemplate = () => {
-    generateWorkerImportTemplate()
-    message.success(t('distributor.templateDownloaded'))
-  }
 
   // 导入工人数据
   const handleImport = async (file: File) => {
     setLoading(true)
     try {
-      const { workers: importedWorkers, errors } = await readWorkerExcelFile(file)
+      const { workers: importedWorkers, errors } = await readWorkerExcelFile(file, undefined, undefined, t, workers)
       
       if (errors.length > 0) {
         message.error(t('distributor.importFailed', { errors: errors.join('; ') }))
@@ -393,7 +389,7 @@ const DistributorWorkerUpload: React.FC = () => {
       }
       
       if (importedWorkers.length === 0) {
-        message.warning(t('distributor.noValidData'))
+        message.warning('Excel文件中没有找到有效的工人数据，请检查文件格式和内容')
         return
       }
       
@@ -412,46 +408,7 @@ const DistributorWorkerUpload: React.FC = () => {
           </div>
         ),
         onOk: async () => {
-          try {
-            // 批量创建工人
-            const createPromises = importedWorkers.map(worker => {
-              // 根据工地ID或工地编号找到对应的工地
-              let targetSiteId = worker.siteId
-              if (!targetSiteId && worker.siteId) {
-                // 如果siteId是工地编号，需要转换为工地ID
-                const site = sites.find(s => s.code === worker.siteId || s.id === worker.siteId)
-                targetSiteId = site?.id
-              }
-              if (!targetSiteId) {
-                // 如果没有指定工地，使用第一个可用工地
-                targetSiteId = sites.length > 0 ? sites[0].id : 'default-site'
-              }
-
-              const createData: CreateWorkerRequest = {
-                workerId: worker.workerId || `WK${Date.now()}${Math.random().toString(36).substr(2, 4)}`,
-                name: worker.name,
-                gender: worker.gender || 'MALE',
-                idCard: worker.idCard,
-                birthDate: worker.birthDate || '',
-                region: worker.region || '中国大陆',
-                phone: worker.phone,
-                email: worker.email || '',
-                whatsapp: worker.whatsapp || '',
-                siteId: targetSiteId,
-                status: worker.status || 'ACTIVE'
-              }
-              return apiService.createDistributorWorker(createData)
-            })
-
-            await Promise.all(createPromises)
-            message.success(t('distributor.importSuccess', { count: createPromises.length.toString() }))
-            
-            // 重新加载数据
-            await loadWorkers()
-          } catch (error) {
-            console.error('导入失败:', error)
-            message.error(t('distributor.importError', { error: error.message }))
-          }
+          await processWorkerImport(importedWorkers)
         }
       })
     } catch (error) {
@@ -460,6 +417,204 @@ const DistributorWorkerUpload: React.FC = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 处理工人导入 - 直接上传Excel文件
+  const processWorkerImport = async (file: File | any[]) => {
+    try {
+      setLoading(true)
+      
+      let result;
+      
+      // 判断输入类型
+      if (file instanceof File) {
+        // 直接上传Excel文件给后端处理
+        console.log(`准备上传Excel文件: ${file.name}`)
+        result = await apiService.importDistributorWorkersFromExcel(file)
+      } else {
+        // 处理已解析的工人数据（兼容旧逻辑）
+        console.log(`准备批量导入 ${file.length} 个工人`)
+        result = await apiService.importDistributorWorkers(file)
+      }
+      
+      // 刷新工人列表
+      await loadWorkers()
+      
+      // 显示导入结果
+      showWorkerImportResultModal(result.success, result.skipped, result.errorDetails || [])
+      
+    } catch (error) {
+      console.error('Import processing failed:', error)
+      message.error(t('distributor.importFailed'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 显示工人导入结果弹窗 - 与dashboard页面保持一致
+  const showWorkerImportResultModal = (successCount: number, skipCount: number, errors: string[]) => {
+    const totalCount = successCount + skipCount + errors.length
+    
+    Modal.info({
+      title: t('worker.importResultTitle'),
+      width: 600,
+      content: (
+        <div style={{ marginTop: '16px' }}>
+          {/* 总体统计 */}
+          <div style={{ 
+            background: '#f6ffed', 
+            border: '1px solid #b7eb8f', 
+            borderRadius: '6px', 
+            padding: '16px', 
+            marginBottom: '16px' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '8px' }} />
+              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                {t('worker.importCompleted')}
+              </span>
+            </div>
+            <div style={{ color: '#666', fontSize: '14px' }}>
+              {t('worker.importTotalProcessed').replace('{total}', totalCount.toString())}
+            </div>
+          </div>
+
+          {/* 详细统计 */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: successCount > 0 ? '#f6ffed' : '#f5f5f5',
+              border: `1px solid ${successCount > 0 ? '#b7eb8f' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: successCount > 0 ? '#52c41a' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {successCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('worker.importSuccessCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: skipCount > 0 ? '#fff7e6' : '#f5f5f5',
+              border: `1px solid ${skipCount > 0 ? '#ffd591' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: skipCount > 0 ? '#fa8c16' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {skipCount}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('worker.importSkipCount')}
+              </div>
+            </div>
+            
+            <div style={{ 
+              flex: 1, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: errors.length > 0 ? '#fff2f0' : '#f5f5f5',
+              border: `1px solid ${errors.length > 0 ? '#ffccc7' : '#d9d9d9'}`,
+              borderRadius: '6px'
+            }}>
+              <div style={{ 
+                color: errors.length > 0 ? '#ff4d4f' : '#999', 
+                fontSize: '24px', 
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                {errors.length}
+              </div>
+              <div style={{ color: '#666', fontSize: '12px' }}>
+                {t('worker.importErrorCount')}
+              </div>
+            </div>
+          </div>
+
+          {/* 跳过原因详情 */}
+          {skipCount > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ 
+                color: '#fa8c16', 
+                fontWeight: 'bold', 
+                marginBottom: '8px',
+                fontSize: '14px'
+              }}>
+                {t('worker.importSkipReasons')}:
+              </div>
+              <div style={{ 
+                background: '#fff7e6', 
+                border: '1px solid #ffd591', 
+                borderRadius: '4px', 
+                padding: '12px'
+              }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                  <div style={{ color: '#666', fontSize: '12px' }}>
+                    <span style={{ fontWeight: 'bold' }}>身份证重复:</span> {skipCount} 条
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 错误汇总 - 只显示一条失败信息 */}
+          {errors.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ 
+                background: '#fff2f0', 
+                border: '1px solid #ffccc7', 
+                borderRadius: '6px', 
+                padding: '12px',
+                textAlign: 'center'
+              }}>
+                <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: '16px', marginRight: '8px' }} />
+                <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
+                  {t('worker.importErrorSummary', { count: errors.length.toString() })}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 成功提示 - 当没有错误时显示 */}
+          {errors.length === 0 && successCount > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ 
+                background: '#f6ffed', 
+                border: '1px solid #b7eb8f', 
+                borderRadius: '6px', 
+                padding: '12px',
+                textAlign: 'center'
+              }}>
+                <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '8px' }} />
+                <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
+                  {t('worker.importSuccessMessage', { count: successCount.toString() })}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+      okText: t('common.ok')
+    })
+  }
+
+  // 从ExcelImportExportModal导入工人数据
+  const handleImportFromModal = async (importedWorkers: CreateWorkerRequest[]) => {
+    await processWorkerImport(importedWorkers)
   }
 
   // 工人表格列定义
@@ -524,7 +679,15 @@ const DistributorWorkerUpload: React.FC = () => {
       }
     },
     { title: t('distributor.idCard'), dataIndex: 'idCard', key: 'idCard', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.idCard.localeCompare(b.idCard) },
-    { title: t('distributor.region'), dataIndex: 'region', key: 'region', width: 100, ellipsis: true, sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region) },
+    { 
+      title: t('distributor.region'), 
+      dataIndex: 'region', 
+      key: 'region', 
+      width: 100, 
+      ellipsis: true, 
+      sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region),
+      render: (region: string) => region || '-'
+    },
     { 
       title: t('distributor.site'), 
       dataIndex: 'siteId', 
@@ -568,7 +731,8 @@ const DistributorWorkerUpload: React.FC = () => {
               ...record,
               workerId: record.workerId, // 确保工号被设置
               birthDate: record.birthDate ? dayjs(record.birthDate) : undefined,
-              siteId: record.siteId // 确保工地ID被设置
+              siteId: record.siteId, // 确保工地ID被设置
+              region: record.region // 直接使用数据库原始值
             })
             setWorkerModalOpen(true) 
           }}
@@ -623,6 +787,7 @@ const DistributorWorkerUpload: React.FC = () => {
     const cfg = map[status] || { color: 'default', text: status || '-' }
     return <Tag color={cfg.color}>{cfg.text}</Tag>
   }
+
 
   // 行选择配置
   const rowSelection = {
@@ -701,21 +866,12 @@ const DistributorWorkerUpload: React.FC = () => {
             
             {/* 操作按钮 */}
             <Space>
-              <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
-                {t('distributor.downloadTemplate')}
-              </Button>
-              <Upload
-                accept=".xlsx,.xls"
-                showUploadList={false}
-                beforeUpload={(file) => {
-                  handleImport(file)
-                  return false
-                }}
+              <Button 
+                icon={<UploadOutlined />} 
+                onClick={() => setExcelModalOpen(true)}
               >
-                <Button icon={<UploadOutlined />} loading={loading}>
-                  {t('distributor.excelImport')}
-                </Button>
-              </Upload>
+                {t('distributor.excelImport')}
+              </Button>
               <Button 
                 icon={<DownloadOutlined />} 
                 onClick={() => handleExport(selectedWorkerIds.length === 0)}
@@ -746,7 +902,7 @@ const DistributorWorkerUpload: React.FC = () => {
                   const defaultSiteId = sites.length > 0 ? sites[0].id : null
                   workerForm.setFieldsValue({
                     status: 'active',
-                    region: '中国大陆',
+                    region: t('regions.mainland'),
                     siteId: defaultSiteId, // 设置默认工地为第一个工地
                     birthDate: null, // 初始日期为空
                     email: '', // 初始邮箱为空
@@ -827,10 +983,10 @@ const DistributorWorkerUpload: React.FC = () => {
           {/* 选择状态显示 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ color: '#666', fontSize: '14px' }}>
-              {t('distributor.selectedWorkers').replace('{count}', selectedWorkerIds.length.toString())}
+              {t('distributor.selectedWorkers', { count: selectedWorkerIds.length.toString() })}
               {selectedWorkerIds.length > 0 && (
                 <span style={{ color: '#999', marginLeft: '8px' }}>
-                  / {t('distributor.totalWorkers').replace('{count}', filteredWorkers.length.toString())}
+                  / {t('distributor.totalWorkers', { count: filteredWorkers.length.toString() })}
                 </span>
               )}
             </span>
@@ -860,7 +1016,7 @@ const DistributorWorkerUpload: React.FC = () => {
             showSizeChanger
             showQuickJumper
             showTotal={(total, range) => 
-              t('distributor.pageInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString())
+              t('distributor.pageInfo', { start: range[0].toString(), end: range[1].toString(), total: total.toString() })
             }
             pageSizeOptions={['10', '20', '50', '100']}
             onChange={handlePageChange}
@@ -935,10 +1091,10 @@ const DistributorWorkerUpload: React.FC = () => {
             <Col span={12}>
               <Form.Item name="region" label={t('distributor.region')} rules={[{ required: true, message: t('distributor.pleaseSelectRegion') }]}>
                 <Select placeholder={t('distributor.regionPlaceholder')} options={[
-                  { value: '中国大陆', label: t('distributor.chinaMainland') },
-                  { value: '中国香港', label: t('distributor.chinaHongkong') },
-                  { value: '中国澳门', label: t('distributor.chinaMacau') },
-                  { value: '中国台湾', label: t('distributor.chinaTaiwan') }
+                  { value: t('regions.mainland'), label: t('regions.mainland') },
+                  { value: t('regions.hongkong'), label: t('regions.hongkong') },
+                  { value: t('regions.macau'), label: t('regions.macau') },
+                  { value: t('regions.taiwan'), label: t('regions.taiwan') }
                 ]} />
               </Form.Item>
             </Col>
@@ -1030,6 +1186,16 @@ const DistributorWorkerUpload: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* Excel导入导出对话框 */}
+      <ExcelImportExportModal
+        visible={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+        workers={workers}
+        distributors={user?.distributor ? [user.distributor] : []}
+        sites={sites}
+        onImport={handleImportFromModal}
+      />
     </div>
   )
 }

@@ -155,7 +155,6 @@ const WorkerManagement: React.FC = () => {
       await apiService.deleteWorker(id);
       
       setWorkers(prev => prev.filter(worker => worker.id !== id));
-      setFilteredWorkers(prev => prev.filter(worker => worker.id !== id));
       message.success(t('worker.deleteSuccess'));
     } catch (error) {
       console.error('删除工人失败:', error);
@@ -185,33 +184,8 @@ const WorkerManagement: React.FC = () => {
   // 下载模板
   const handleDownloadTemplate = async () => {
     try {
-      const response = await apiService.downloadWorkerTemplate();
-      const { template } = response;
-      
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(template.sampleData);
-      
-      // 设置列宽
-      const colWidths = [
-        { wch: 15 }, // 工人编号
-        { wch: 10 }, // 姓名
-        { wch: 8 },  // 性别
-        { wch: 20 }, // 身份证号
-        { wch: 12 }, // 出生日期
-        { wch: 12 }, // 地区
-        { wch: 15 }, // 分判商
-        { wch: 15 }, // 工地
-        { wch: 15 }, // 电话
-        { wch: 20 }, // 邮箱
-        { wch: 15 }, // WhatsApp
-        { wch: 8 }   // 状态
-      ];
-      worksheet['!cols'] = colWidths;
-      
-      XLSX.utils.book_append_sheet(workbook, worksheet, t('worker.template'));
-      
-      const fileName = `工人导入模板_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
+      // 使用统一的英文表头模板，与分判商页面保持一致
+      generateImportTemplate();
       
       message.success(t('worker.templateDownloaded'));
     } catch (error) {
@@ -368,18 +342,18 @@ const WorkerManagement: React.FC = () => {
       const response = await apiService.exportWorkers(filters);
       
       const exportData = response.workers.map((worker: any) => ({
-        [t('worker.workerId')]: worker.workerId,
-        [t('worker.name')]: worker.name,
-        [t('worker.gender')]: worker.gender === 'MALE' ? t('worker.male') : t('worker.female'),
-        [t('worker.idCard')]: worker.idCard,
-        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-',
-        [t('worker.region')]: worker.region || '-',
-        [t('worker.distributor')]: worker.distributorId || '-',
-        [t('worker.site')]: worker.siteCode || '-',
-        [t('worker.phone')]: worker.phone,
-        [t('worker.email')]: worker.email || '-',
-        [t('worker.whatsapp')]: worker.whatsapp || '-',
-        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : t('worker.inactive')
+        'Worker ID': worker.workerId,
+        'Name': worker.name,
+        'Gender': worker.gender === 'MALE' ? 'Male' : 'Female',
+        'ID Card': worker.idCard,
+        'Birth Date': worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '',
+        'Region': worker.region || '',
+        'Distributor ID': worker.distributorId || '',
+        'Site ID': worker.siteCode || '',
+        'Phone': worker.phone,
+        'Email': worker.email || '',
+        'WhatsApp': worker.whatsapp || '',
+        'Status': worker.status === 'ACTIVE' ? 'Active' : 'Inactive'
       }));
       
 
@@ -421,18 +395,18 @@ const WorkerManagement: React.FC = () => {
       const response = await apiService.exportWorkers({});
       
       const exportData = response.workers.map((worker: any) => ({
-        [t('worker.workerId')]: worker.workerId,
-        [t('worker.name')]: worker.name,
-        [t('worker.gender')]: worker.gender === 'MALE' ? t('worker.male') : t('worker.female'),
-        [t('worker.idCard')]: worker.idCard,
-        [t('worker.birthDate')]: worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '-',
-        [t('worker.region')]: worker.region || '-',
-        [t('worker.distributor')]: worker.distributorId || '-',
-        [t('worker.site')]: worker.siteCode || '-',
-        [t('worker.phone')]: worker.phone,
-        [t('worker.email')]: worker.email || '-',
-        [t('worker.whatsapp')]: worker.whatsapp || '-',
-        [t('worker.status')]: worker.status === 'ACTIVE' ? t('worker.active') : t('worker.inactive')
+        'Worker ID': worker.workerId,
+        'Name': worker.name,
+        'Gender': worker.gender === 'MALE' ? 'Male' : 'Female',
+        'ID Card': worker.idCard,
+        'Birth Date': worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '',
+        'Region': worker.region || '',
+        'Distributor ID': worker.distributorId || '',
+        'Site ID': worker.siteCode || '',
+        'Phone': worker.phone,
+        'Email': worker.email || '',
+        'WhatsApp': worker.whatsapp || '',
+        'Status': worker.status === 'ACTIVE' ? 'Active' : 'Inactive'
       }));
       
 
@@ -472,61 +446,17 @@ const WorkerManagement: React.FC = () => {
   // 导入工人数据
   const handleImport = async (file: File) => {
     try {
-      const { workers: importedWorkers, errors } = await readWorkerExcelFile(file, distributors, sites)
+      // 直接上传Excel文件给后端处理
+      console.log(`准备上传Excel文件: ${file.name}`)
+      const result = await apiService.importAdminWorkersFromExcel(file)
       
-      if (errors.length > 0) {
-        message.error(t('worker.importFailed').replace('{errors}', errors.join('; ')))
-        return
-      }
-      
-      if (importedWorkers.length === 0) {
-        message.warning(t('worker.noValidData'))
-        return
-      }
-      
-      // 显示导入确认对话框
-      Modal.confirm({
-        title: t('worker.importConfirm'),
-        content: (
-          <div>
-            <p>{t('worker.importConfirmMessage').replace('{count}', importedWorkers.length.toString())}</p>
-            <p style={{ color: '#1890ff', marginTop: '8px' }}>
-              {t('worker.importDefaultSiteMessage').replace('{siteName}', selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.name || '' : t('worker.noSiteSelected'))}
-            </p>
-            <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
-              {t('worker.importRulesMessage')}
-            </p>
-            {errors.length > 0 && (
-              <div style={{ 
-                marginTop: '12px', 
-                padding: '8px', 
-                background: '#fff7e6', 
-                border: '1px solid #ffd591', 
-                borderRadius: '4px',
-                fontSize: '12px'
-              }}>
-                <div style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: '4px' }}>
-                  ⚠️ {t('worker.importWarnings')}:
-                </div>
-                {errors.slice(0, 3).map((error, index) => (
-                  <div key={index} style={{ color: '#666', marginBottom: '2px' }}>
-                    {error}
-                  </div>
-                ))}
-                {errors.length > 3 && (
-                  <div style={{ color: '#999', fontStyle: 'italic' }}>
-                    ... 还有 {errors.length - 3} 个警告
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ),
-        onOk: async () => {
-          await processWorkerImport(importedWorkers)
-        }
-      })
+      // 重新加载数据
+      await loadData()
+
+      // 显示导入结果弹窗
+      showWorkerImportResultModal(result.success, result.skipped, result.errorDetails || [])
     } catch (error) {
+      console.error('Import failed:', error)
       message.error(t('worker.importFailed').replace('{errors}', (error as Error).message))
     }
   }
@@ -536,47 +466,29 @@ const WorkerManagement: React.FC = () => {
     try {
       setLoading(true)
       
-      let successCount = 0
-      let skipCount = 0
-      const errors: string[] = []
+      // 准备导入数据
+      const workersData = importedWorkers.map(workerData => ({
+        name: String(workerData.name || ''),
+        gender: String(workerData.gender || 'MALE'),
+        idCard: String(workerData.idCard || ''),
+        birthDate: workerData.birthDate ? String(workerData.birthDate) : '',
+        region: workerData.region ? String(workerData.region) : t('regions.mainland'),
+        phone: String(workerData.phone || ''),
+        email: workerData.email ? String(workerData.email) : '',
+        whatsapp: workerData.whatsapp ? String(workerData.whatsapp) : '',
+        status: String(workerData.status || 'ACTIVE'),
+        distributorId: workerData.distributorId ? String(workerData.distributorId) : null,
+        siteId: workerData.siteId ? String(workerData.siteId) : selectedSiteId
+      }))
 
-      for (const workerData of importedWorkers) {
-        try {
-          // 准备导入数据
-          const importData = {
-            name: String(workerData.name || ''),
-            gender: String(workerData.gender || 'MALE'),
-            idCard: String(workerData.idCard || ''),
-            birthDate: workerData.birthDate ? String(workerData.birthDate) : '',
-            region: workerData.region ? String(workerData.region) : '中国大陆',
-            phone: String(workerData.phone || ''),
-            email: workerData.email ? String(workerData.email) : '',
-            whatsapp: workerData.whatsapp ? String(workerData.whatsapp) : '',
-            status: String(workerData.status || 'ACTIVE'),
-            distributorId: workerData.distributorId ? String(workerData.distributorId) : null,
-            siteId: workerData.siteId ? String(workerData.siteId) : selectedSiteId
-          }
-
-          // 调用API创建工人
-          await apiService.createWorker(importData)
-          successCount++
-        } catch (error: any) {
-          if (error.status === 409) {
-            // 身份证号重复，跳过
-            skipCount++
-            console.log(`跳过重复的工人: ${workerData.name} (身份证: ${importData.idCard})`)
-          } else {
-            // 其他错误
-            errors.push(`${workerData.name}: ${error.message || '创建失败'}`)
-          }
-        }
-      }
-
+      // 使用批量导入API
+      const result = await apiService.importWorkers(workersData)
+      
       // 重新加载数据
       await loadData()
 
       // 显示导入结果弹窗
-      showWorkerImportResultModal(successCount, skipCount, errors)
+      showWorkerImportResultModal(result.success, result.skipped, result.errorDetails || [])
     } catch (error) {
       console.error('Import processing failed:', error)
       message.error(t('worker.importFailed').replace('{errors}', (error as Error).message))

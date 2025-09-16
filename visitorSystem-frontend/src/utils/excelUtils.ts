@@ -9,13 +9,29 @@ export const getExcelColumns = (t: (key: string) => string) => ({
   idCard: t('worker.idCard'),
   birthDate: t('worker.birthDate'),
   region: t('worker.region'),
-  distributor: t('worker.distributor'),
-  site: t('worker.site'),
+  distributorId: t('admin.distributorId'),
+  siteId: t('admin.siteId'),
   phone: t('worker.phone'),
   email: t('worker.email'),
   whatsapp: t('worker.whatsapp'),
   status: t('worker.status')
 });
+
+// 英语列名配置 - 用于验证错误信息
+export const ENGLISH_EXCEL_COLUMNS = {
+  workerId: 'Worker ID',
+  name: 'Name',
+  gender: 'Gender',
+  idCard: 'ID Card',
+  birthDate: 'Birth Date',
+  region: 'Region',
+  distributorId: 'Distributor ID',
+  siteId: 'Site ID',
+  phone: 'Phone',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  status: 'Status'
+};
 
 // 兼容性：保留原有的硬编码配置（用于向后兼容）
 export const EXCEL_COLUMNS = {
@@ -38,7 +54,9 @@ export const GENDER_MAP = {
   '男': 'male',
   '女': 'female',
   'male': 'male',
-  'female': 'female'
+  'female': 'female',
+  'Male': 'male',
+  'Female': 'female'
 };
 
 // 状态映射
@@ -46,156 +64,205 @@ export const STATUS_MAP = {
   '启用': 'active',
   '停用': 'inactive',
   'active': 'active',
-  'inactive': 'inactive'
+  'inactive': 'inactive',
+  'Active': 'active',
+  'Inactive': 'inactive'
 };
 
-// 地区映射
-export const REGION_MAP = {
-  '中国大陆': '中国大陆',
-  '中国香港': '中国香港',
-  '中国澳门': '中国澳门',
-  '中国台湾': '中国台湾',
-  '其他': '其他'
-};
-
-// 验证必填字段
-export const validateRequiredFields = (data: any): string[] => {
-  const errors: string[] = [];
-  const requiredFields = ['workerId', 'name', 'gender', 'idCard', 'birthDate', 'region', 'distributorId', 'siteId', 'phone', 'email', 'whatsapp', 'status'];
+// 地区映射 - 支持多语言和英语
+export const getRegionMap = (t?: (key: string) => string) => {
+  if (!t) {
+    // 默认简体中文映射
+    return {
+      '中国大陆': '中国大陆',
+      '中国香港': '中国香港',
+      '中国澳门': '中国澳门',
+      '中国台湾': '中国台湾',
+      '其他': '其他',
+      // 英语地区名称
+      'Mainland China': '中国大陆',
+      'Hong Kong': '中国香港',
+      'Macau': '中国澳门',
+      'Taiwan': '中国台湾',
+      'Other': '其他'
+    };
+  }
   
-  requiredFields.forEach(field => {
-    if (!data[field] || data[field].toString().trim() === '') {
-      errors.push(`${EXCEL_COLUMNS[field as keyof typeof EXCEL_COLUMNS]}不能为空`);
-    }
-  });
+  // 多语言映射
+  return {
+    [t('regions.mainland')]: t('regions.mainland'),
+    [t('regions.hongkong')]: t('regions.hongkong'),
+    [t('regions.macau')]: t('regions.macau'),
+    [t('regions.taiwan')]: t('regions.taiwan'),
+    [t('regions.other')]: t('regions.other'),
+    // 英语地区名称映射到当前语言
+    'Mainland China': t('regions.mainland'),
+    'Hong Kong': t('regions.hongkong'),
+    'Macau': t('regions.macau'),
+    'Taiwan': t('regions.taiwan'),
+    'Other': t('regions.other')
+  };
+};
+
+// 验证必填字段 - 只保留身份证号验证
+export const validateRequiredFields = (data: any, t?: (key: string) => string): string[] => {
+  const errors: string[] = [];
+  // 只验证身份证号不为空，其他字段都不验证
+  if (!data.idCard || data.idCard.toString().trim() === '') {
+    const requiredMessage = t ? t('form.required') : '不能为空';
+    errors.push(`ID Card${requiredMessage}`);
+  }
   
   return errors;
 };
 
-// 验证数据格式
-export const validateDataFormat = (data: any): string[] => {
-  const errors: string[] = [];
-  
-  // 验证身份证号格式
-  if (data.idCard && !/^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/.test(data.idCard)) {
-    errors.push('身份证号格式不正确');
-  }
-  
-  // 验证手机号格式
-  if (data.phone && !/^1[3-9]\d{9}$/.test(data.phone)) {
-    errors.push('手机号格式不正确');
-  }
-  
-  // 验证邮箱格式
-  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    errors.push('邮箱格式不正确');
-  }
-  
-  // 验证性别
-  if (data.gender && !Object.keys(GENDER_MAP).includes(data.gender)) {
-    errors.push('性别只能是：男/女');
-  }
-  
-  // 验证状态
-  if (data.status && !Object.keys(STATUS_MAP).includes(data.status)) {
-    errors.push('状态只能是：启用/停用');
-  }
-  
-  // 验证地区
-  if (data.region && !Object.keys(REGION_MAP).includes(data.region)) {
-    errors.push('地区只能是：中国大陆/中国香港/中国澳门/中国台湾/其他');
-  }
-  
-  return errors;
+// 验证数据格式 - 已取消所有正则匹配和验证
+export const validateDataFormat = (): string[] => {
+  // 不再进行任何格式验证，只返回空错误数组
+  return [];
+};
+
+// 检查身份证是否重复
+export const checkIdCardDuplicate = (idCard: string, existingWorkers: any[]): boolean => {
+  if (!idCard || idCard.trim() === '') return false;
+  return existingWorkers.some(worker => worker.idCard === idCard.trim());
 };
 
 // 转换Excel数据为工人对象
-export const convertExcelToWorker = (row: any, rowIndex: number): { data: CreateWorkerRequest; errors: string[] } => {
+export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: string) => string, existingWorkers: any[] = []): { data: CreateWorkerRequest | null; errors: string[] } => {
   const errors: string[] = [];
   
-  // 数据清洗和转换
+  // 调试信息
+  console.log(`第${rowIndex + 1}行原始数据:`, row);
+  console.log(`第${rowIndex + 1}行映射后的数据:`, {
+    workerId: String(row['Worker ID'] || row['工人编号'] || row.workerId || '').trim(),
+    name: String(row['Name'] || row['姓名'] || row.name || '').trim(),
+    gender: row['Gender'] || row['性别'] || row.gender,
+    idCard: String(row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
+    birthDate: String(row['Birth Date'] || row['出生日期'] || row.birthDate || '').trim(),
+    region: row['Region'] || row['地区'] || row.region,
+    distributorId: String(row['Distributor ID'] || row['分判商ID'] || row.distributorId || '').trim(),
+    siteId: String(row['Site ID'] || row['工地ID'] || row.siteId || '').trim(),
+    phone: String(row['Phone'] || row['联系电话'] || row.phone || '').trim(),
+    email: String(row['Email'] || row['邮箱'] || row.email || '').trim(),
+    whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
+    status: row['Status'] || row['状态'] || row.status
+  });
+  
+  // 获取原始值用于验证
+  const rawGender = row['Gender'] || row['性别'] || row.gender;
+  const rawStatus = row['Status'] || row['状态'] || row.status;
+  const rawRegion = row['Region'] || row['地区'] || row.region;
+  
+  // 已取消性别、状态和地区的格式验证
+  
+  // 数据清洗和转换 - 直接使用原始值，不进行格式转换
   const workerData = {
-    workerId: String(row.workerId || '').trim(),
-    name: String(row.name || '').trim(),
-    gender: GENDER_MAP[row.gender as keyof typeof GENDER_MAP] || row.gender,
-    idCard: String(row.idCard || '').trim(),
-    region: REGION_MAP[row.region as keyof typeof REGION_MAP] || row.region,
-    distributorId: String(row.distributorId || '').trim(),
-    siteId: String(row.siteId || '').trim(),
-    phone: String(row.phone || '').trim(),
-    email: String(row.email || '').trim(),
-    whatsapp: String(row.whatsapp || '').trim(),
-    status: STATUS_MAP[row.status as keyof typeof STATUS_MAP] || row.status
+    workerId: String(row['Worker ID'] || row['工人编号'] || row.workerId || '').trim(),
+    name: String(row['Name'] || row['姓名'] || row.name || '').trim(),
+    gender: String(rawGender || '').trim(),
+    idCard: String(row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
+    birthDate: String(row['Birth Date'] || row['出生日期'] || row.birthDate || '').trim(),
+    region: String(rawRegion || '').trim(),
+    distributorId: String(row['Distributor ID'] || row['分判商ID'] || row.distributorId || '').trim(),
+    siteId: String(row['Site ID'] || row['工地ID'] || row.siteId || '').trim(),
+    phone: String(row['Phone'] || row['联系电话'] || row.phone || '').trim(),
+    email: String(row['Email'] || row['邮箱'] || row.email || '').trim(),
+    whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
+    status: String(rawStatus || '').trim()
   };
   
   // 验证必填字段
-  const requiredErrors = validateRequiredFields(workerData);
+  const requiredErrors = validateRequiredFields(workerData, t);
   errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
   
-  // 验证数据格式
-  const formatErrors = validateDataFormat(workerData);
+  // 验证数据格式 - 已取消所有格式验证
+  const formatErrors = validateDataFormat();
   errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  
+  // 检查身份证是否重复 - 直接跳过，不添加错误信息
+  if (workerData.idCard && checkIdCardDuplicate(workerData.idCard, existingWorkers)) {
+    // 身份证重复时直接跳过，不添加错误信息
+    return { data: null, errors: [] };
+  }
   
   return { data: workerData, errors };
 };
 
 // 转换Excel数据为工人对象（分判商专用，支持中文列名）
-export const convertExcelToWorkerForDistributor = (row: any, rowIndex: number): { data: CreateWorkerRequest; errors: string[] } => {
+export const convertExcelToWorkerForDistributor = (row: any, rowIndex: number, t?: (key: string) => string, existingWorkers: any[] = []): { data: CreateWorkerRequest | null; errors: string[] } => {
   const errors: string[] = [];
   
-  // 将中文列名映射为英文字段名
+  // 获取原始值用于验证
+  const rawGender = row['性别'] || row['Gender'] || row.gender;
+  const rawStatus = row['状态'] || row['Status'] || row.status;
+  const rawRegion = row['地区'] || row['Region'] || row.region;
+  
+  // 已取消性别、状态和地区的格式验证
+  
+  // 将中文列名映射为英文字段名，同时支持英文列名
   const workerData = {
-    workerId: String(row['工人编号'] || row.workerId || '').trim(),
-    name: String(row['姓名'] || row.name || '').trim(),
-    gender: GENDER_MAP[(row['性别'] || row.gender) as keyof typeof GENDER_MAP] || (row['性别'] || row.gender),
-    idCard: String(row['身份证号'] || row.idCard || '').trim(),
-    birthDate: String(row['出生日期'] || row.birthDate || '').trim(),
-    region: REGION_MAP[(row['地区'] || row.region) as keyof typeof REGION_MAP] || (row['地区'] || row.region),
-    distributorId: String(row['分判商ID'] || row.distributorId || '').trim(),
-    siteId: String(row['工地ID'] || row.siteId || '').trim(),
-    phone: String(row['联系电话'] || row.phone || '').trim(),
-    email: String(row['邮箱'] || row.email || '').trim(),
+    workerId: String(row['工人编号'] || row['Worker ID'] || row.workerId || '').trim(),
+    name: String(row['姓名'] || row['Name'] || row.name || '').trim(),
+    gender: String(rawGender || '').trim(),
+    idCard: String(row['身份证号'] || row['ID Card'] || row.idCard || '').trim(),
+    birthDate: String(row['出生日期'] || row['Birth Date'] || row.birthDate || '').trim(),
+    region: String(rawRegion || '').trim(),
+    // 注意：分销商导入时不使用 distributorId 和 siteId，这些字段由后端自动设置
+    phone: String(row['联系电话'] || row['Phone'] || row.phone || '').trim(),
+    email: String(row['邮箱'] || row['Email'] || row.email || '').trim(),
     whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
-    status: STATUS_MAP[(row['状态'] || row.status) as keyof typeof STATUS_MAP] || (row['状态'] || row.status)
+    status: String(rawStatus || '').trim()
   };
   
-  // 验证必填字段（分判商导入时，某些字段可以为空）
-  const requiredFields = ['name', 'phone', 'idCard']; // 只验证核心必填字段
-  requiredFields.forEach(field => {
-    if (!workerData[field as keyof typeof workerData] || workerData[field as keyof typeof workerData].toString().trim() === '') {
-      errors.push(`${EXCEL_COLUMNS[field as keyof typeof EXCEL_COLUMNS]}不能为空`);
-    }
-  });
+  // 验证必填字段 - 只保留身份证号验证
+  if (!workerData.idCard || workerData.idCard.toString().trim() === '') {
+    const requiredMessage = t ? t('form.required') : '不能为空';
+    errors.push(`ID Card${requiredMessage}`);
+  }
   
-  // 验证数据格式
-  const formatErrors = validateDataFormat(workerData);
+  // 验证数据格式 - 已取消所有格式验证
+  const formatErrors = validateDataFormat();
   errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  
+  // 检查身份证是否重复 - 直接跳过，不添加错误信息
+  if (workerData.idCard && checkIdCardDuplicate(workerData.idCard, existingWorkers)) {
+    // 身份证重复时直接跳过，不添加错误信息
+    return { data: null, errors: [] };
+  }
   
   return { data: workerData, errors };
 };
 
 // 转换Excel数据为工人对象（管理员专用，支持分判商和工地名称映射）
-export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distributors: any[], sites: any[]): { data: CreateWorkerRequest; errors: string[] } => {
+export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distributors: any[], sites: any[], t?: (key: string) => string, existingWorkers: any[] = []): { data: CreateWorkerRequest | null; errors: string[] } => {
   const errors: string[] = [];
   
-  // 将中文列名映射为英文字段名
+  // 获取原始值用于验证
+  const rawGender = row['性别'] || row['Gender'] || row.gender;
+  const rawStatus = row['状态'] || row['Status'] || row.status;
+  const rawRegion = row['地区'] || row['Region'] || row.region;
+  
+  // 已取消性别、状态和地区的格式验证
+  
+  // 将中文列名映射为英文字段名，同时支持英文列名
   const workerData = {
-    workerId: String(row['工人编号'] || row.workerId || '').trim(),
-    name: String(row['姓名'] || row.name || '').trim(),
-    gender: GENDER_MAP[(row['性别'] || row.gender) as keyof typeof GENDER_MAP] || (row['性别'] || row.gender),
-    idCard: String(row['身份证号'] || row.idCard || '').trim(),
-    birthDate: String(row['出生日期'] || row.birthDate || '').trim(),
-    region: REGION_MAP[(row['地区'] || row.region) as keyof typeof REGION_MAP] || (row['地区'] || row.region),
-    distributorId: String(row['分判商ID'] || row.distributorId || '').trim(),
-    siteId: String(row['工地ID'] || row.siteId || '').trim(),
-    phone: String(row['联系电话'] || row.phone || '').trim(),
-    email: String(row['邮箱'] || row.email || '').trim(),
+    workerId: String(row['工人编号'] || row['Worker ID'] || row.workerId || '').trim(),
+    name: String(row['姓名'] || row['Name'] || row.name || '').trim(),
+    gender: String(rawGender || '').trim(),
+    idCard: String(row['身份证号'] || row['ID Card'] || row.idCard || '').trim(),
+    birthDate: String(row['出生日期'] || row['Birth Date'] || row.birthDate || '').trim(),
+    region: String(rawRegion || '').trim(),
+    distributorId: String(row['分判商ID'] || row['Distributor ID'] || row.distributorId || '').trim(),
+    siteId: String(row['工地ID'] || row['Site ID'] || row.siteId || '').trim(),
+    phone: String(row['联系电话'] || row['Phone'] || row.phone || '').trim(),
+    email: String(row['邮箱'] || row['Email'] || row.email || '').trim(),
     whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
-    status: STATUS_MAP[(row['状态'] || row.status) as keyof typeof STATUS_MAP] || (row['状态'] || row.status)
+    status: String(rawStatus || '').trim()
   };
   
   // 处理分判商名称映射
-  const distributorName = String(row['分判商'] || row.distributor || '').trim();
+  const distributorName = String(row['分判商'] || row['Distributor'] || row.distributor || '').trim();
   if (distributorName) {
     const distributor = distributors.find(d => d.name === distributorName);
     if (distributor) {
@@ -206,7 +273,7 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
   }
   
   // 处理工地名称映射
-  const siteName = String(row['所属工地'] || row.site || '').trim();
+  const siteName = String(row['所属工地'] || row['Site'] || row.site || '').trim();
   if (siteName) {
     const site = sites.find(s => s.name === siteName);
     if (site) {
@@ -216,23 +283,27 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
     }
   }
   
-  // 验证必填字段
-  const requiredFields = ['name', 'phone', 'idCard'];
-  requiredFields.forEach(field => {
-    if (!workerData[field as keyof typeof workerData] || workerData[field as keyof typeof workerData].toString().trim() === '') {
-      errors.push(`${EXCEL_COLUMNS[field as keyof typeof EXCEL_COLUMNS]}不能为空`);
-    }
-  });
+  // 验证必填字段 - 只保留身份证号验证
+  if (!workerData.idCard || workerData.idCard.toString().trim() === '') {
+    const requiredMessage = t ? t('form.required') : '不能为空';
+    errors.push(`ID Card${requiredMessage}`);
+  }
   
-  // 验证数据格式
-  const formatErrors = validateDataFormat(workerData);
+  // 验证数据格式 - 已取消所有格式验证
+  const formatErrors = validateDataFormat();
   errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  
+  // 检查身份证是否重复 - 直接跳过，不添加错误信息
+  if (workerData.idCard && checkIdCardDuplicate(workerData.idCard, existingWorkers)) {
+    // 身份证重复时直接跳过，不添加错误信息
+    return { data: null, errors: [] };
+  }
   
   return { data: workerData, errors };
 };
 
 // 读取Excel文件
-export const readExcelFile = (file: File): Promise<{ workers: CreateWorkerRequest[]; errors: string[] }> => {
+export const readExcelFile = (file: File, t?: (key: string) => string, existingWorkers: any[] = []): Promise<{ workers: CreateWorkerRequest[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -253,6 +324,11 @@ export const readExcelFile = (file: File): Promise<{ workers: CreateWorkerReques
         const headers = jsonData[0] as string[];
         const dataRows = jsonData.slice(1);
         
+        // 调试信息
+        console.log('Excel标题行:', headers);
+        console.log('数据行数:', dataRows.length);
+        console.log('前几行数据:', dataRows.slice(0, 3));
+        
         const workers: CreateWorkerRequest[] = [];
         const allErrors: string[] = [];
         
@@ -266,12 +342,13 @@ export const readExcelFile = (file: File): Promise<{ workers: CreateWorkerReques
               }
             });
             
-            const { data, errors } = convertExcelToWorker(rowData, index + 1);
-            if (errors.length === 0) {
+            const { data, errors } = convertExcelToWorker(rowData, index + 1, t, existingWorkers);
+            if (data && errors.length === 0) {
               workers.push(data);
-            } else {
+            } else if (errors.length > 0) {
               allErrors.push(...errors);
             }
+            // 如果 data 为 null（身份证重复），则静默跳过，不添加错误
           }
         });
         
@@ -287,9 +364,9 @@ export const readExcelFile = (file: File): Promise<{ workers: CreateWorkerReques
 };
 
 // 导出工人数据到Excel
-export const exportWorkersToExcel = (workers: Worker[], distributors: any[], sites: any[], t?: (key: string) => string) => {
-  // 使用翻译函数或默认配置
-  const columns = t ? getExcelColumns(t) : EXCEL_COLUMNS;
+export const exportWorkersToExcel = (workers: Worker[], distributors: any[], sites: any[]) => {
+  // 始终使用英文表头，与模板保持一致
+  const columns = ENGLISH_EXCEL_COLUMNS;
   
   
   // 准备导出数据
@@ -319,18 +396,16 @@ export const exportWorkersToExcel = (workers: Worker[], distributors: any[], sit
     return {
       [columns.workerId]: worker.workerId,
       [columns.name]: worker.name,
-      [columns.gender]: worker.gender === 'MALE' ? (t ? t('worker.male') : '男') : (t ? t('worker.female') : '女'),
+      [columns.gender]: worker.gender === 'MALE' ? 'Male' : 'Female',
       [columns.idCard]: worker.idCard,
       [columns.birthDate]: worker.birthDate ? new Date(worker.birthDate).toISOString().split('T')[0] : '',
-      [columns.region]: worker.region,
-      [columns.distributor]: distributor?.distributorId || (t ? t('common.unknown') : '未知分判商'),
-      [columns.site]: site?.code || (t ? t('common.unknown') : '未知工地'),
+      [columns.region]: worker.region || '',
+      [columns.distributorId]: distributor?.distributorId || '',
+      [columns.siteId]: site?.code || '',
       [columns.phone]: worker.phone,
-      [columns.email]: worker.email,
-      [columns.whatsapp]: worker.whatsapp,
-      [columns.status]: (worker.status === 'ACTIVE' || (worker.status as any) === 'active') ? 
-        (t ? t('worker.active') : '启用') : 
-        (t ? t('worker.inactive') : '停用')
+      [columns.email]: worker.email || '',
+      [columns.whatsapp]: worker.whatsapp || '',
+      [columns.status]: (worker.status === 'ACTIVE' || (worker.status as any) === 'active') ? 'Active' : 'Inactive'
     };
   });
   
@@ -365,37 +440,53 @@ export const exportWorkersToExcel = (workers: Worker[], distributors: any[], sit
   XLSX.writeFile(workbook, fileName);
 };
 
-// 生成导入模板
+// 生成导入模板 - 统一使用英语表头
 export const generateImportTemplate = () => {
+  // 统一使用英语列名
+  const columns = {
+    workerId: 'Worker ID',
+    name: 'Name',
+    gender: 'Gender',
+    idCard: 'ID Card',
+    birthDate: 'Birth Date',
+    region: 'Region',
+    distributorId: 'Distributor ID',
+    siteId: 'Site ID',
+    phone: 'Phone',
+    email: 'Email',
+    whatsapp: 'WhatsApp',
+    status: 'Status'
+  };
+  
   // 模板数据
   const templateData = [
     {
-      [EXCEL_COLUMNS.workerId]: 'WK001',
-      [EXCEL_COLUMNS.name]: '张三',
-      [EXCEL_COLUMNS.gender]: '男',
-      [EXCEL_COLUMNS.idCard]: '110101199001011234',
-      [EXCEL_COLUMNS.birthDate]: '1990-01-01',
-      [EXCEL_COLUMNS.region]: '中国大陆',
-      [EXCEL_COLUMNS.distributorId]: '分判商A',
-      [EXCEL_COLUMNS.siteId]: '工地A',
-      [EXCEL_COLUMNS.phone]: '13800138001',
-      [EXCEL_COLUMNS.email]: 'zhangsan@example.com',
-      [EXCEL_COLUMNS.whatsapp]: '+86 13800138001',
-      [EXCEL_COLUMNS.status]: '启用'
+      [columns.workerId]: 'WK001（可选，不填自动生成）',
+      [columns.name]: 'John Doe',
+      [columns.gender]: 'Male',
+      [columns.idCard]: '110101199001011234',
+      [columns.birthDate]: '1990-01-01',
+      [columns.region]: 'Mainland China',
+      [columns.distributorId]: 'DIST001',
+      [columns.siteId]: 'SITE001',
+      [columns.phone]: '13800138001',
+      [columns.email]: 'john@example.com',
+      [columns.whatsapp]: '+86 13800138001',
+      [columns.status]: 'Active'
     },
     {
-      [EXCEL_COLUMNS.workerId]: 'WK002',
-      [EXCEL_COLUMNS.name]: '李四',
-      [EXCEL_COLUMNS.gender]: '女',
-      [EXCEL_COLUMNS.idCard]: '310101199002021234',
-      [EXCEL_COLUMNS.birthDate]: '1990-02-02',
-      [EXCEL_COLUMNS.region]: '中国香港',
-      [EXCEL_COLUMNS.distributorId]: '分判商B',
-      [EXCEL_COLUMNS.siteId]: '工地B',
-      [EXCEL_COLUMNS.phone]: '13800138002',
-      [EXCEL_COLUMNS.email]: 'lisi@example.com',
-      [EXCEL_COLUMNS.whatsapp]: '+852 13800138002',
-      [EXCEL_COLUMNS.status]: '启用'
+      [columns.workerId]: '',
+      [columns.name]: 'Jane Smith',
+      [columns.gender]: 'Female',
+      [columns.idCard]: '310101199002021234',
+      [columns.birthDate]: '1990-02-02',
+      [columns.region]: 'Hong Kong',
+      [columns.distributorId]: 'DIST002',
+      [columns.siteId]: 'SITE002',
+      [columns.phone]: '13800138002',
+      [columns.email]: 'jane@example.com',
+      [columns.whatsapp]: '+852 13800138002',
+      [columns.status]: 'Active'
     }
   ];
   
@@ -421,46 +512,63 @@ export const generateImportTemplate = () => {
   worksheet['!cols'] = colWidths;
   
   // 添加工作表到工作簿
-  XLSX.utils.book_append_sheet(workbook, worksheet, '工人信息导入模板');
+  const sheetName = 'Worker Import Template';
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   
   // 生成文件名
-  const fileName = '工人信息导入模板.xlsx';
+  const fileName = 'Worker_Import_Template.xlsx';
   
   // 下载文件
   XLSX.writeFile(workbook, fileName);
 };
 
-// 生成工人导入模板（分判商专用）
+// 生成工人导入模板（分判商专用）- 统一使用英语表头
 export const generateWorkerImportTemplate = () => {
+  // 统一使用英语列名
+  const columns = {
+    workerId: 'Worker ID',
+    name: 'Name',
+    gender: 'Gender',
+    idCard: 'ID Card',
+    birthDate: 'Birth Date',
+    region: 'Region',
+    distributorId: 'Distributor ID',
+    siteId: 'Site ID',
+    phone: 'Phone',
+    email: 'Email',
+    whatsapp: 'WhatsApp',
+    status: 'Status'
+  };
+  
   // 模板数据
   const templateData = [
     {
-      [EXCEL_COLUMNS.workerId]: 'WK001',
-      [EXCEL_COLUMNS.name]: '张三',
-      [EXCEL_COLUMNS.gender]: '男',
-      [EXCEL_COLUMNS.idCard]: '110101199001011234',
-      [EXCEL_COLUMNS.birthDate]: '1990-01-01',
-      [EXCEL_COLUMNS.region]: '中国大陆',
-      [EXCEL_COLUMNS.distributorId]: '分判商A',
-      [EXCEL_COLUMNS.siteId]: '工地A',
-      [EXCEL_COLUMNS.phone]: '13800138001',
-      [EXCEL_COLUMNS.email]: 'zhangsan@example.com',
-      [EXCEL_COLUMNS.whatsapp]: '+86 13800138001',
-      [EXCEL_COLUMNS.status]: '启用'
+      [columns.workerId]: 'WK001（可选，不填自动生成）',
+      [columns.name]: 'John Doe',
+      [columns.gender]: 'Male',
+      [columns.idCard]: '110101199001011234',
+      [columns.birthDate]: '1990-01-01',
+      [columns.region]: 'Mainland China',
+      [columns.distributorId]: 'DIST001',
+      [columns.siteId]: 'SITE001',
+      [columns.phone]: '13800138001',
+      [columns.email]: 'john@example.com',
+      [columns.whatsapp]: '+86 13800138001',
+      [columns.status]: 'Active'
     },
     {
-      [EXCEL_COLUMNS.workerId]: 'WK002',
-      [EXCEL_COLUMNS.name]: '李四',
-      [EXCEL_COLUMNS.gender]: '女',
-      [EXCEL_COLUMNS.idCard]: '310101199002021234',
-      [EXCEL_COLUMNS.birthDate]: '1990-02-02',
-      [EXCEL_COLUMNS.region]: '中国大陆',
-      [EXCEL_COLUMNS.distributorId]: '分判商A',
-      [EXCEL_COLUMNS.siteId]: '工地A',
-      [EXCEL_COLUMNS.phone]: '13800138002',
-      [EXCEL_COLUMNS.email]: 'lisi@example.com',
-      [EXCEL_COLUMNS.whatsapp]: '+86 13800138002',
-      [EXCEL_COLUMNS.status]: '启用'
+      [columns.workerId]: '',
+      [columns.name]: 'Jane Smith',
+      [columns.gender]: 'Female',
+      [columns.idCard]: '310101199002021234',
+      [columns.birthDate]: '1990-02-02',
+      [columns.region]: 'Mainland China',
+      [columns.distributorId]: 'DIST001',
+      [columns.siteId]: 'SITE001',
+      [columns.phone]: '13800138002',
+      [columns.email]: 'jane@example.com',
+      [columns.whatsapp]: '+86 13800138002',
+      [columns.status]: 'Active'
     }
   ];
 
@@ -484,16 +592,17 @@ export const generateWorkerImportTemplate = () => {
 
   worksheet['!cols'] = colWidths;
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, '工人信息模板');
+  const sheetName = 'Worker Import Template';
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-  const fileName = '工人信息导入模板.xlsx';
+  const fileName = 'Worker_Import_Template.xlsx';
   
   // 下载文件
   XLSX.writeFile(workbook, fileName);
 };
 
 // 读取工人Excel文件（分判商专用）
-export const readWorkerExcelFile = (file: File, distributors?: any[], sites?: any[]): Promise<{ workers: CreateWorkerRequest[]; errors: string[] }> => {
+export const readWorkerExcelFile = (file: File, distributors?: any[], sites?: any[], t?: (key: string) => string, existingWorkers: any[] = []): Promise<{ workers: CreateWorkerRequest[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -530,13 +639,14 @@ export const readWorkerExcelFile = (file: File, distributors?: any[], sites?: an
           
           // 根据是否有distributors和sites参数选择转换函数
           const { data, errors } = distributors && sites 
-            ? convertExcelToWorkerForAdmin(rowData, index + 1, distributors, sites)
-            : convertExcelToWorkerForDistributor(rowData, index + 1);
-          if (errors.length === 0) {
+            ? convertExcelToWorkerForAdmin(rowData, index + 1, distributors, sites, t, existingWorkers)
+            : convertExcelToWorkerForDistributor(rowData, index + 1, t, existingWorkers);
+          if (data && errors.length === 0) {
             workers.push(data);
-          } else {
+          } else if (errors.length > 0) {
             allErrors.push(...errors);
           }
+          // 如果 data 为 null（身份证重复），则静默跳过，不添加错误
         });
         
         resolve({ workers, errors: allErrors });
@@ -592,13 +702,20 @@ export const DISTRIBUTOR_STATUS_MAP = {
 };
 
 // 验证工地必填字段
-export const validateSiteRequiredFields = (data: any): string[] => {
+export const validateSiteRequiredFields = (data: any, t?: (key: string) => string): string[] => {
   const errors: string[] = [];
   const requiredFields = ['name', 'address'];
+  const requiredMessage = t ? t('form.required') : '不能为空';
+  
+  // 使用英语列名
+  const englishColumns = {
+    name: 'Name',
+    address: 'Address'
+  };
   
   requiredFields.forEach(field => {
     if (!data[field] || data[field].toString().trim() === '') {
-      errors.push(`${SITE_EXCEL_COLUMNS[field as keyof typeof SITE_EXCEL_COLUMNS]}不能为空`);
+      errors.push(`${englishColumns[field as keyof typeof englishColumns]}${requiredMessage}`);
     }
   });
   
@@ -606,13 +723,20 @@ export const validateSiteRequiredFields = (data: any): string[] => {
 };
 
 // 验证分判商必填字段
-export const validateDistributorRequiredFields = (data: any): string[] => {
+export const validateDistributorRequiredFields = (data: any, t?: (key: string) => string): string[] => {
   const errors: string[] = [];
   const requiredFields = ['name', 'accountUsername'];
+  const requiredMessage = t ? t('form.required') : '不能为空';
+  
+  // 使用英语列名
+  const englishColumns = {
+    name: 'Name',
+    accountUsername: 'Account Username'
+  };
   
   requiredFields.forEach(field => {
     if (!data[field] || data[field].toString().trim() === '') {
-      errors.push(`${DISTRIBUTOR_EXCEL_COLUMNS[field as keyof typeof DISTRIBUTOR_EXCEL_COLUMNS]}不能为空`);
+      errors.push(`${englishColumns[field as keyof typeof englishColumns]}${requiredMessage}`);
     }
   });
   
@@ -620,7 +744,7 @@ export const validateDistributorRequiredFields = (data: any): string[] => {
 };
 
 // 转换Excel数据为工地对象
-export const convertExcelToSite = (row: any, rowIndex: number): { data: any; errors: string[] } => {
+export const convertExcelToSite = (row: any, rowIndex: number, t?: (key: string) => string): { data: any; errors: string[] } => {
   const errors: string[] = [];
   
   // 尝试不同的列名映射
@@ -645,14 +769,14 @@ export const convertExcelToSite = (row: any, rowIndex: number): { data: any; err
     status: SITE_STATUS_MAP[getValue('状态', ['status', '工地状态']) as keyof typeof SITE_STATUS_MAP] || 'active'
   };
   
-  const requiredErrors = validateSiteRequiredFields(siteData);
+  const requiredErrors = validateSiteRequiredFields(siteData, t);
   errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
   
   return { data: siteData, errors };
 };
 
 // 转换Excel数据为分判商对象
-export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any[] = []): { data: any; errors: string[] } => {
+export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any[] = [], t?: (key: string) => string): { data: any; errors: string[] } => {
   const errors: string[] = [];
   
   // 解析服务工地编号，支持逗号和空格分隔
@@ -700,14 +824,14 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
     accountStatus: DISTRIBUTOR_STATUS_MAP[row['账号状态'] as keyof typeof DISTRIBUTOR_STATUS_MAP] || 'active'
   };
   
-  const requiredErrors = validateDistributorRequiredFields(distributorData);
+  const requiredErrors = validateDistributorRequiredFields(distributorData, t);
   errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
   
   return { data: distributorData, errors };
 };
 
 // 读取工地Excel文件
-export const readSiteExcelFile = (file: File): Promise<{ sites: any[]; errors: string[] }> => {
+export const readSiteExcelFile = (file: File, t?: (key: string) => string): Promise<{ sites: any[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -739,7 +863,7 @@ export const readSiteExcelFile = (file: File): Promise<{ sites: any[]; errors: s
               }
             });
             
-            const { data, errors } = convertExcelToSite(rowData, index + 1);
+            const { data, errors } = convertExcelToSite(rowData, index + 1, t);
             if (errors.length === 0) {
               sites.push(data);
             } else {
@@ -760,7 +884,7 @@ export const readSiteExcelFile = (file: File): Promise<{ sites: any[]; errors: s
 };
 
 // 读取分判商Excel文件
-export const readDistributorExcelFile = (file: File, sites: any[] = []): Promise<{ distributors: any[]; errors: string[] }> => {
+export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key: string) => string): Promise<{ distributors: any[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -810,7 +934,7 @@ export const readDistributorExcelFile = (file: File, sites: any[] = []): Promise
             return;
           }
           
-          const { data, errors } = convertExcelToDistributor(rowData, index + 1, sites);
+          const { data, errors } = convertExcelToDistributor(rowData, index + 1, sites, t);
           if (errors.length === 0) {
             distributors.push(data);
           } else {
@@ -1013,14 +1137,21 @@ export const GUARD_STATUS_MAP = {
 };
 
 // 验证门卫必填字段
-export const validateGuardRequiredFields = (data: any): string[] => {
+export const validateGuardRequiredFields = (data: any, t?: (key: string) => string): string[] => {
   const errors: string[] = [];
   // 门卫导入必填字段：姓名和联系电话
   const requiredFields = ['name', 'phone'];
+  const requiredMessage = t ? t('form.required') : '不能为空';
+  
+  // 使用英语列名
+  const englishColumns = {
+    name: 'Name',
+    phone: 'Phone'
+  };
   
   requiredFields.forEach(field => {
     if (!data[field] || data[field].toString().trim() === '') {
-      errors.push(`${GUARD_EXCEL_COLUMNS[field as keyof typeof GUARD_EXCEL_COLUMNS]}不能为空`);
+      errors.push(`${englishColumns[field as keyof typeof englishColumns]}${requiredMessage}`);
     }
   });
   
@@ -1028,7 +1159,7 @@ export const validateGuardRequiredFields = (data: any): string[] => {
 };
 
 // 转换Excel数据为门卫对象
-export const convertExcelToGuard = (row: any, rowIndex: number, defaultSiteId?: string): { data: any; errors: string[] } => {
+export const convertExcelToGuard = (row: any, rowIndex: number, defaultSiteId?: string, t?: (key: string) => string): { data: any; errors: string[] } => {
   const errors: string[] = [];
   
   const guardData = {
@@ -1047,14 +1178,14 @@ export const convertExcelToGuard = (row: any, rowIndex: number, defaultSiteId?: 
   console.log('Excel行数据:', row);
   console.log('转换后的门卫数据:', guardData);
   
-  const requiredErrors = validateGuardRequiredFields(guardData);
+  const requiredErrors = validateGuardRequiredFields(guardData, t);
   errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
   
   return { data: guardData, errors };
 };
 
 // 读取门卫Excel文件
-export const readGuardExcelFile = (file: File, defaultSiteId?: string): Promise<{ guards: any[]; errors: string[] }> => {
+export const readGuardExcelFile = (file: File, defaultSiteId?: string, t?: (key: string) => string): Promise<{ guards: any[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -1086,7 +1217,7 @@ export const readGuardExcelFile = (file: File, defaultSiteId?: string): Promise<
               }
             });
             
-            const { data, errors } = convertExcelToGuard(rowData, index + 1, defaultSiteId);
+            const { data, errors } = convertExcelToGuard(rowData, index + 1, defaultSiteId, t);
             if (errors.length === 0) {
               guards.push(data);
             } else {

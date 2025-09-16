@@ -2,6 +2,7 @@ import { Injectable, ForbiddenException, BadRequestException, ConflictException,
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as bcrypt from 'bcryptjs';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class AdminService {
@@ -199,7 +200,8 @@ export class AdminService {
       throw new ForbiddenException('只有管理员可以创建工人');
     }
 
-    // 验证分判商是否存在
+    // 验证分判商是否存在（通过主键ID）
+    let actualDistributorId = null;
     if (workerData.distributorId) {
       const distributor = await this.prisma.distributor.findUnique({
         where: { id: workerData.distributorId }
@@ -207,9 +209,11 @@ export class AdminService {
       if (!distributor) {
         throw new NotFoundException('分判商不存在');
       }
+      actualDistributorId = distributor.id; // 使用主键ID
     }
 
-    // 验证工地是否存在
+    // 验证工地是否存在（通过主键ID）
+    let actualSiteId = null;
     if (workerData.siteId) {
       const site = await this.prisma.site.findUnique({
         where: { id: workerData.siteId }
@@ -217,6 +221,7 @@ export class AdminService {
       if (!site) {
         throw new NotFoundException('工地不存在');
       }
+      actualSiteId = site.id; // 使用主键ID
     }
 
     // 检查身份证号是否已存在
@@ -229,18 +234,30 @@ export class AdminService {
       }
     }
 
-    // 生成工人编号
-    const workerId = await this.generateWorkerId();
+    // 生成工人编号（如果未提供）
+    let workerId = workerData.workerId;
+    if (!workerId || workerId.trim() === '') {
+      workerId = await this.generateWorkerId();
+    } else {
+      // 检查提供的工人编号是否已存在
+      const existingWorker = await this.prisma.worker.findUnique({
+        where: { workerId: workerId.trim() }
+      });
+      if (existingWorker) {
+        throw new ConflictException('工人编号已存在');
+      }
+    }
 
-    // 处理可选字段，确保空字符串转换为null
+    // 处理可选字段，使用实际的主键ID
     const processedData = {
       ...workerData,
-      workerId,
+      workerId: workerId.trim(),
       email: workerData.email || null,
       whatsapp: workerData.whatsapp || null,
       birthDate: workerData.birthDate ? new Date(workerData.birthDate) : null,
-      physicalCardId: workerData.physicalCardId || null,
-      photo: workerData.photo || null
+      // 使用实际的主键ID
+      distributorId: actualDistributorId,
+      siteId: actualSiteId
     };
 
     try {
@@ -302,9 +319,7 @@ export class AdminService {
       ...updateData,
       email: updateData.email || null,
       whatsapp: updateData.whatsapp || null,
-      birthDate: updateData.birthDate ? new Date(updateData.birthDate) : null,
-      physicalCardId: updateData.physicalCardId || null,
-      photo: updateData.photo || null
+      birthDate: updateData.birthDate ? new Date(updateData.birthDate) : null
     };
 
     return this.prisma.worker.update({
@@ -1282,7 +1297,6 @@ export class AdminService {
         whatsapp: worker.whatsapp,
         status: worker.status,
         birthDate: worker.birthDate,
-        photo: worker.photo,
         createdAt: worker.createdAt,
         updatedAt: worker.updatedAt
       }))
@@ -1313,6 +1327,34 @@ export class AdminService {
           continue;
         }
 
+        // 验证分判商是否存在（通过distributorId字段）
+        let actualDistributorId = null;
+        if (workerData.distributorId) {
+          const distributor = await this.prisma.distributor.findUnique({
+            where: { distributorId: workerData.distributorId }
+          });
+          if (!distributor) {
+            results.errors++;
+            results.errorDetails.push(`第${i + 1}行：分判商ID "${workerData.distributorId}" 不存在`);
+            continue;
+          }
+          actualDistributorId = distributor.id; // 使用主键ID
+        }
+
+        // 验证工地是否存在（通过code字段）
+        let actualSiteId = null;
+        if (workerData.siteId) {
+          const site = await this.prisma.site.findUnique({
+            where: { code: workerData.siteId }
+          });
+          if (!site) {
+            results.errors++;
+            results.errorDetails.push(`第${i + 1}行：工地ID "${workerData.siteId}" 不存在`);
+            continue;
+          }
+          actualSiteId = site.id; // 使用主键ID
+        }
+
         // 检查身份证号是否已存在
         const existingWorker = await this.prisma.worker.findUnique({
           where: { idCard: workerData.idCard }
@@ -1323,18 +1365,45 @@ export class AdminService {
           continue;
         }
 
-        // 生成工人编号
-        const workerId = await this.generateWorkerId();
+        // 生成工人编号（如果未提供）
+        let workerId = workerData.workerId;
+        if (!workerId || workerId.trim() === '') {
+          workerId = await this.generateWorkerId();
+        } else {
+          // 检查提供的工人编号是否已存在
+          const existingWorker = await this.prisma.worker.findUnique({
+            where: { workerId: workerId.trim() }
+          });
+          if (existingWorker) {
+            results.errors++;
+            results.errorDetails.push(`第${i + 1}行：工人编号已存在`);
+            continue;
+          }
+        }
 
-        // 处理可选字段
+        // 检查必需的外键字段
+        if (!actualDistributorId) {
+          results.errors++;
+          results.errorDetails.push(`第${i + 1}行：分判商ID不能为空`);
+          continue;
+        }
+
+        if (!actualSiteId) {
+          results.errors++;
+          results.errorDetails.push(`第${i + 1}行：工地代码不能为空`);
+          continue;
+        }
+
+        // 处理可选字段，使用实际的主键ID
         const processedData = {
           ...workerData,
-          workerId,
+          workerId: workerId.trim(),
           email: workerData.email || null,
           whatsapp: workerData.whatsapp || null,
           birthDate: workerData.birthDate ? new Date(workerData.birthDate) : null,
-          physicalCardId: workerData.physicalCardId || null,
-          photo: workerData.photo || null
+          // 使用实际的主键ID
+          distributorId: actualDistributorId,
+          siteId: actualSiteId
         };
 
         await this.prisma.worker.create({
@@ -1462,5 +1531,98 @@ export class AdminService {
     });
 
     return records;
+  }
+
+  // 通过Excel文件导入工人数据
+  async importWorkersFromExcel(user: CurrentUser, file: Express.Multer.File) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以导入工人数据');
+    }
+
+    if (!file) {
+      throw new NotFoundException('未找到上传的文件');
+    }
+
+    try {
+      console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
+      
+      // 读取Excel文件
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      console.log('Excel解析结果:', jsonData.length, '行数据');
+      console.log('第一行数据示例:', jsonData[0]);
+
+      // 转换Excel数据为工人数据格式
+      const workersData = jsonData.map((row: any, index: number) => {
+        // 获取所有可能的字段名
+        const fieldNames = Object.keys(row);
+        console.log(`第${index + 1}行字段:`, fieldNames);
+        
+        return {
+          name: row['姓名'] || row['name'] || row['Name'] || '',
+          gender: this.normalizeGender(row['性别'] || row['gender'] || row['Gender'] || ''),
+          idCard: row['身份证号'] || row['idCard'] || row['ID Card'] || row['身份证'] || '',
+          phone: row['手机号'] || row['phone'] || row['Phone'] || row['手机'] || '',
+          email: row['邮箱'] || row['email'] || row['Email'] || null,
+          whatsapp: row['WhatsApp'] || row['whatsapp'] || row['WhatsApp'] || null,
+          birthDate: row['出生日期'] || row['birthDate'] || row['Birth Date'] || null,
+          region: row['地区'] || row['region'] || row['Region'] || null,
+          siteId: row['工地代码'] || row['siteCode'] || row['Site Code'] || row['工地ID'] || row['siteId'] || row['Site ID'] || null,
+          distributorId: row['分判商ID'] || row['distributorId'] || row['Distributor ID'] || null,
+          status: this.normalizeWorkerStatus(row['状态'] || row['status'] || row['Status'] || ''),
+          workerId: row['工人编号'] || row['workerId'] || row['Worker ID'] || null
+        };
+      });
+
+      console.log('转换后的工人数据示例:', workersData[0]);
+
+      // 调用现有的导入方法
+      return await this.importWorkers(user, workersData);
+
+    } catch (error) {
+      console.error('Excel文件处理失败:', error);
+      console.error('错误详情:', error.message);
+      console.error('错误堆栈:', error.stack);
+      throw new Error(`Excel文件格式错误或处理失败: ${error.message}`);
+    }
+  }
+
+  // 标准化性别字段
+  private normalizeGender(gender: string): 'MALE' | 'FEMALE' {
+    if (!gender) return 'MALE'; // 默认值
+    
+    const normalized = gender.toString().toLowerCase().trim();
+    
+    if (normalized === 'male' || normalized === 'm' || normalized === '男' || normalized === '1') {
+      return 'MALE';
+    }
+    
+    if (normalized === 'female' || normalized === 'f' || normalized === '女' || normalized === '2') {
+      return 'FEMALE';
+    }
+    
+    // 如果无法识别，默认为 MALE
+    return 'MALE';
+  }
+
+  // 标准化工人状态字段
+  private normalizeWorkerStatus(status: string): 'ACTIVE' | 'INACTIVE' {
+    if (!status) return 'ACTIVE'; // 默认值
+    
+    const normalized = status.toString().toLowerCase().trim();
+    
+    if (normalized === 'active' || normalized === '启用' || normalized === '正常' || normalized === '1') {
+      return 'ACTIVE';
+    }
+    
+    if (normalized === 'inactive' || normalized === '禁用' || normalized === '停用' || normalized === '0') {
+      return 'INACTIVE';
+    }
+    
+    // 如果无法识别，默认为 ACTIVE
+    return 'ACTIVE';
   }
 }

@@ -11,23 +11,56 @@ const DistributorAccountSettings: React.FC = () => {
   const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [form] = Form.useForm()
+  const [distributorProfile, setDistributorProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
 
+  // 获取分判商资料
   useEffect(() => {
-    const raw = localStorage.getItem('distributor_account_settings')
-    if (raw) {
-      const data = JSON.parse(raw)
-      form.setFieldsValue(data)
-    } else {
-      // 设置默认值，使用分判商信息
-      form.setFieldsValue({
-        username: user?.username || '',
-        displayName: user?.distributor?.contactName || user?.username || '',
-        company: user?.distributor?.name || '', // 使用分判商名称作为公司名称
-        phone: user?.distributor?.phone || '', // 使用分判商电话
-        email: user?.distributor?.email || '', // 使用分判商邮箱
-        whatsapp: user?.distributor?.whatsapp || '' // 使用分判商WhatsApp
-      })
+    const fetchDistributorProfile = async () => {
+      if (user?.role?.toLowerCase() === 'distributor') {
+        setLoading(true)
+        try {
+          const profile = await apiService.getDistributorProfile()
+          setDistributorProfile(profile)
+          
+          // 设置表单值
+          form.setFieldsValue({
+            username: user?.username || '',
+            displayName: profile.contactName || user?.username || '',
+            company: profile.name || '', // 使用分判商名称作为公司名称
+            distributorId: profile.distributorId || '', // 分判商ID
+            phone: profile.phone || '', // 使用分判商电话
+            email: profile.email || '', // 使用分判商邮箱
+            whatsapp: profile.whatsapp || '' // 使用分判商WhatsApp
+          })
+        } catch (error) {
+          console.error('获取分判商资料失败:', error)
+          message.error('获取分判商资料失败')
+          
+          // 如果API调用失败，使用本地存储的数据
+          const raw = localStorage.getItem('distributor_account_settings')
+          if (raw) {
+            const data = JSON.parse(raw)
+            form.setFieldsValue(data)
+          } else {
+            // 使用用户信息作为后备
+            form.setFieldsValue({
+              username: user?.username || '',
+              displayName: user?.distributor?.contactName || user?.username || '',
+              company: user?.distributor?.name || '',
+              distributorId: user?.distributor?.distributorId || '',
+              phone: user?.distributor?.phone || '',
+              email: user?.distributor?.email || '',
+              whatsapp: user?.distributor?.whatsapp || ''
+            })
+          }
+        } finally {
+          setLoading(false)
+        }
+      }
     }
+
+    fetchDistributorProfile()
   }, [form, user])
 
   const onSave = async () => {
@@ -47,6 +80,19 @@ const DistributorAccountSettings: React.FC = () => {
       
       // 刷新用户信息以更新右上角显示
       await refreshUser()
+      
+      // 重新获取分判商资料以更新 distributorId 等字段
+      try {
+        const updatedProfile = await apiService.getDistributorProfile()
+        setDistributorProfile(updatedProfile)
+        
+        // 更新表单中的 distributorId 字段
+        form.setFieldsValue({
+          distributorId: updatedProfile.distributorId || ''
+        })
+      } catch (error) {
+        console.error('刷新分判商资料失败:', error)
+      }
       
       // 保存到本地存储
       localStorage.setItem('distributor_account_settings', JSON.stringify(values))
@@ -125,7 +171,7 @@ const DistributorAccountSettings: React.FC = () => {
           <Tabs.TabPane tab={t('distributor.basicInfoSettings')} key="basic">
             <Row gutter={16}>
               <Col xs={24}>
-                <Card title={t('distributor.basicInfo')} extra={<Button type="primary" onClick={onSave}>{t('distributor.save')}</Button>}>
+                <Card title={t('distributor.basicInfo')} extra={<Button type="primary" onClick={onSave} loading={loading}>{t('distributor.save')}</Button>}>
                   <Form form={form} layout="vertical">
                     <Row gutter={16}>
                       <Col span={12}>
@@ -157,6 +203,13 @@ const DistributorAccountSettings: React.FC = () => {
                           <Input placeholder={t('distributor.companyName')} disabled />
                         </Form.Item>
                       </Col>
+                      <Col span={12}>
+                        <Form.Item name="distributorId" label={t('distributor.distributorId')}>
+                          <Input placeholder={t('distributor.distributorIdPlaceholder')} disabled />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
                       <Col span={12}>
                         <Form.Item name="whatsapp" label={t('distributor.whatsapp')}>
                           <Input placeholder={t('distributor.whatsappPlaceholder')} />

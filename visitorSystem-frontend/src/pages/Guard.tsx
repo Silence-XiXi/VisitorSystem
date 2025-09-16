@@ -20,7 +20,8 @@ import {
   Avatar,
   Dropdown,
   Checkbox,
-  Tooltip
+  Tooltip,
+  DatePicker
 } from 'antd'
 import { 
   UserAddOutlined, 
@@ -40,6 +41,7 @@ import { mockWorkers, mockSites, mockDistributors } from '../data/mockData'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
 import { useLocale } from '../contexts/LocaleContext'
+import { apiService } from '../services/api'
 import dayjs from 'dayjs'
 
 const { Title, Text } = Typography
@@ -131,19 +133,95 @@ const Guard: React.FC = () => {
   const [itemRecordsModalVisible, setItemRecordsModalVisible] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
 
-  // 计算统计数据
-  const currentOnSite = workers.filter(w => w.status === 'in').length
-  const totalExitedToday = workers.filter(w => w.status === 'out').length
-  const totalEnteredToday = attendanceRecords.filter(r => 
+  // API数据状态
+  const [guardStats, setGuardStats] = useState<{
+    totalWorkers: number;
+    activeWorkers: number;
+    inactiveWorkers: number;
+    borrowedItems: number;
+    returnedItems: number;
+    todayVisitorRecords: number;
+    todayEntered: number;
+    todayExited: number;
+    onSiteWorkers: number;
+  } | null>(null)
+  
+  // 物品类型数据
+  const [itemCategories, setItemCategories] = useState<Array<{
+    id: string;
+    code: string;
+    name: string;
+    description: string;
+    status: string;
+  }>>([])
+  const [loading, setLoading] = useState(false)
+  const [visitorRecords, setVisitorRecords] = useState<any[]>([])
+  const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(false)
+  const [dateFilter, setDateFilter] = useState<{
+    startDate?: string;
+    endDate?: string;
+  }>({})
+
+  // 计算统计数据 - 使用API数据或回退到模拟数据
+  const currentOnSite = guardStats?.onSiteWorkers ?? workers.filter(w => w.status === 'in').length
+  const totalExitedToday = guardStats?.todayExited ?? workers.filter(w => w.status === 'out').length
+  const totalEnteredToday = guardStats?.todayEntered ?? attendanceRecords.filter(r => 
     dayjs(r.entryTime).isSame(dayjs(), 'day')
   ).length
-  const totalBorrowedItems = workers.reduce((total, worker) => {
+  const totalBorrowedItems = guardStats?.borrowedItems ?? workers.reduce((total, worker) => {
     return total + (worker.borrowedItems?.length || 0)
   }, 0)
-  const totalUnreturnedItems = workers.reduce((total, worker) => {
+  const totalUnreturnedItems = guardStats?.borrowedItems ?? workers.reduce((total, worker) => {
     const unreturnedItems = worker.borrowedItems?.filter(item => !item.returnTime) || []
     return total + unreturnedItems.length
   }, 0)
+
+  // 加载门卫统计数据
+  const loadGuardStats = async () => {
+    if (!user || user.role !== 'GUARD') return
+    
+    try {
+      setLoading(true)
+      const stats = await apiService.getGuardStats()
+      setGuardStats(stats)
+    } catch (error) {
+      console.error('Failed to load guard stats:', error)
+      message.error('加载统计数据失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 加载物品类型数据
+  const loadItemCategories = async () => {
+    try {
+      const categories = await apiService.getAllItemCategories()
+      setItemCategories(categories)
+    } catch (error) {
+      console.error('加载物品类型数据失败:', error)
+    }
+  }
+
+  // 加载访客记录
+  const loadVisitorRecords = async (filters?: {
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }) => {
+    if (!user || user.role !== 'GUARD') return
+    
+    try {
+      setVisitorRecordsLoading(true)
+      const records = await apiService.getGuardSiteVisitorRecords(filters)
+      console.log('Loaded visitor records:', records) // 调试信息
+      setVisitorRecords(records)
+    } catch (error) {
+      console.error('Failed to load visitor records:', error)
+      message.error('加载访客记录失败')
+    } finally {
+      setVisitorRecordsLoading(false)
+    }
+  }
 
   // 根据语言格式化时间
   const formatTime = (time: dayjs.Dayjs) => {
@@ -164,6 +242,21 @@ const Guard: React.FC = () => {
 
     return () => clearInterval(timer)
   }, [locale])
+
+  // 加载统计数据
+  useEffect(() => {
+    if (user && user.role === 'GUARD') {
+      loadGuardStats()
+      loadItemCategories()
+      
+      // 设置自动刷新，每30秒刷新一次统计数据
+      const interval = setInterval(() => {
+        loadGuardStats()
+      }, 30000)
+      
+      return () => clearInterval(interval)
+    }
+  }, [user])
 
   // 初始化数据
   useEffect(() => {
@@ -488,29 +581,32 @@ const Guard: React.FC = () => {
     setPhoneNumber('')
   }
 
-  const handleScanWorkerId = () => {
+  const handleScanWorkerId = async () => {
     if (!scannedWorkerId.trim()) {
       message.error(t('guard.pleaseEnterWorkerId'))
       return
     }
 
-    const worker = workers.find(w => w.workerId === scannedWorkerId.trim())
-    if (!worker) {
-      message.error(t('guard.workerNotFound'))
-      return
+    try {
+      const worker = await apiService.getWorkerByWorkerId(scannedWorkerId.trim())
+      // 转换API返回的Worker类型为前端使用的Worker类型
+      const frontendWorker: Worker = {
+        ...worker,
+        status: 'out' as const, // 默认状态为未入场
+        borrowedItems: []
+      }
+      setSelectedWorker(frontendWorker)
+      setPhoneNumber(worker.phone)
+      message.success(t('guard.workerQuerySuccess'))
+    } catch (error: any) {
+      console.error('查询工人信息失败:', error)
+      // 显示后端返回的具体错误信息
+      const errorMessage = error?.message || t('guard.workerNotFound')
+      message.error(errorMessage)
     }
-
-    if (worker.status === 'in') {
-      message.error(t('guard.workerAlreadyEntered'))
-      return
-    }
-
-    setSelectedWorker(worker)
-    setPhoneNumber(worker.phone)
-    message.success(t('guard.workerQuerySuccess'))
   }
 
-  const handleCompleteEntry = () => {
+  const handleCompleteEntry = async () => {
     if (!selectedWorker) {
       message.error(t('guard.pleaseQueryWorkerFirst'))
       return
@@ -521,46 +617,39 @@ const Guard: React.FC = () => {
       return
     }
 
-    if (!phoneNumber.trim()) {
-      message.error(t('guard.pleaseEnterPhoneNumber'))
-      return
+    try {
+      // 调用后端API创建访客记录
+      const visitorRecord = await apiService.createVisitorRecord({
+        workerId: selectedWorker.workerId,
+        siteId: user?.guard?.siteId || '',
+        idType: '身份证',
+        idNumber: selectedWorker.idCard,
+        physicalCardId: physicalCardId.trim(),
+        notes: `入场登记 - ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`
+      })
+
+      console.log('创建访客记录成功:', visitorRecord)
+      message.success(t('guard.entryCompleted'))
+      
+      // 刷新统计数据
+      loadGuardStats()
+      
+      // 清空输入和查询信息，停留在当前页面
+      setScannedWorkerId('')
+      setSelectedWorker(null)
+      setPhysicalCardId('')
+      setPhoneNumber('')
+    } catch (error: any) {
+      console.error('创建访客记录失败:', error)
+      console.log('错误详情:', {
+        message: error?.message,
+        statusCode: error?.statusCode,
+        originalResponse: error?.originalResponse
+      })
+      // 显示后端返回的具体错误信息
+      const errorMessage = error?.message || '入场登记失败，请重试'
+      message.error(errorMessage)
     }
-
-    // 更新工人状态
-    const updatedWorkers = workers.map(w => 
-      w.id === selectedWorker.id 
-        ? { 
-            ...w, 
-            status: 'in' as const,
-            physicalCardId: physicalCardId.trim(),
-            entryTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-            phone: phoneNumber.trim()
-          }
-        : w
-    )
-    setWorkers(updatedWorkers)
-
-    // 添加考勤记录
-    const newRecord: AttendanceRecord = {
-      id: Date.now().toString(),
-      workerId: selectedWorker.workerId,
-      workerName: selectedWorker.name,
-      entryTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-      physicalCardId: physicalCardId.trim(),
-      phone: phoneNumber.trim(),
-      status: 'in',
-      borrowedItems: 0,
-      returnedItems: 0
-    }
-    setAttendanceRecords(prev => [newRecord, ...prev])
-
-    message.success(t('guard.entryCompleted'))
-    
-    // 清空输入和查询信息，停留在当前页面
-    setScannedWorkerId('')
-    setSelectedWorker(null)
-    setPhysicalCardId('')
-    setPhoneNumber('')
   }
 
   // 2. 借/还物品功能
@@ -570,39 +659,36 @@ const Guard: React.FC = () => {
     setSelectedWorker(null)
   }
 
-  const handleScanForBorrow = () => {
+  const handleScanForBorrow = async () => {
     if (!scannedWorkerId.trim()) {
       message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForBorrow'))
       return
     }
 
-    const worker = workers.find(w => 
-      w.workerId === scannedWorkerId.trim() || w.physicalCardId === scannedWorkerId.trim()
-    )
-    
-    if (!worker) {
-      message.error(t('guard.workerNotFound'))
-      return
+    try {
+      // 检查工人是否有有效的入场记录
+      const result = await apiService.checkWorkerEntryRecord(scannedWorkerId.trim())
+      
+      // 转换API返回的Worker类型为前端使用的Worker类型
+      const frontendWorker: Worker = {
+        ...result.worker,
+        status: 'in' as const, // 有入场记录说明工人在场
+        borrowedItems: []
+      }
+      
+      setSelectedWorker(frontendWorker)
+      
+      // 加载当前借用物品列表（暂时为空，后续可以从API获取）
+      setCurrentBorrowedItems([])
+      setSelectedReturnItems([])
+      
+      message.success(t('guard.workerQuerySuccess'))
+    } catch (error: any) {
+      console.error('查询工人入场记录失败:', error)
+      // 显示后端返回的具体错误信息
+      const errorMessage = error?.message || t('guard.workerNotFound')
+      message.error(errorMessage)
     }
-
-    if (worker.status === 'out') {
-      message.error(t('guard.workerNotOnSiteCannotBorrow'))
-      return
-    }
-
-    setSelectedWorker(worker)
-    
-    // 加载当前借用物品列表
-    const borrowedItems = worker.borrowedItems?.filter(item => !item.returnTime).map(item => ({
-      itemType: item.itemType,
-      itemId: item.itemId,
-      borrowTime: item.borrowTime,
-      remark: item.remark || ''
-    })) || []
-    setCurrentBorrowedItems(borrowedItems)
-    setSelectedReturnItems([])
-    
-    message.success(t('guard.workerQuerySuccess'))
   }
 
   const handleAddItemToList = () => {
@@ -693,7 +779,7 @@ const Guard: React.FC = () => {
     setSelectedReturnItems([])
   }
 
-  const handleCompleteBorrow = () => {
+  const handleCompleteBorrow = async () => {
     if (!selectedWorker) {
       message.error(t('guard.pleaseQueryWorkerFirst'))
       return
@@ -704,42 +790,78 @@ const Guard: React.FC = () => {
       return
     }
 
-    // 将借用列表中的物品转换为完整的借用记录
-    const borrowedItems = borrowItemsList.map(item => ({
-      itemType: item.itemType,
-      itemId: item.itemId,
-      borrowTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-      remark: item.remark
-    }))
+    try {
+      setLoading(true)
+      
+      // 为每个物品创建借用记录
+      const borrowPromises = borrowItemsList.map(async (item) => {
+        const category = itemCategories.find(cat => cat.id === item.itemType)
+        if (!category) {
+          throw new Error(`物品类型 ${item.itemType} 不存在`)
+        }
 
-    const updatedWorkers = workers.map(w => 
-      w.id === selectedWorker.id 
-        ? { 
-            ...w, 
-            borrowedItems: [...(w.borrowedItems || []), ...borrowedItems]
-          }
-        : w
-    )
-    setWorkers(updatedWorkers)
+        // 创建物品借用记录
+        const borrowRecord = {
+          workerId: selectedWorker.id,
+          categoryId: item.itemType, // 物品类型ID
+          itemCode: item.itemId, // 物品编号
+          borrowDate: new Date(),
+          borrowTime: dayjs().format('HH:mm:ss'),
+          remark: item.remark || ''
+        }
 
-    // 更新考勤记录
-    const updatedRecords = attendanceRecords.map(record => 
-      record.workerId === selectedWorker.workerId
-        ? { ...record, borrowedItems: record.borrowedItems + borrowItemsList.length }
-        : record
-    )
-    setAttendanceRecords(updatedRecords)
+        return await apiService.createBorrowRecord(borrowRecord as any)
+      })
 
-    message.success(t('guard.borrowRegistrationSuccess').replace('{count}', borrowItemsList.length.toString()))
-    
-    // 清空输入和查询信息，停留在当前页面
-    setScannedWorkerId('')
-    setSelectedWorker(null)
-    setSelectedItemType('')
-    setItemNumber('')
-    setBorrowItemsList([])
-    setCurrentBorrowedItems([])
-    setSelectedReturnItems([])
+      // 等待所有借用记录创建完成
+      await Promise.all(borrowPromises)
+
+      // 将借用列表中的物品转换为完整的借用记录
+      const borrowedItems = borrowItemsList.map(item => ({
+        itemType: item.itemType,
+        itemId: item.itemId,
+        borrowTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+        remark: item.remark
+      }))
+
+      const updatedWorkers = workers.map(w => 
+        w.id === selectedWorker.id 
+          ? { 
+              ...w, 
+              borrowedItems: [...(w.borrowedItems || []), ...borrowedItems]
+            }
+          : w
+      )
+      setWorkers(updatedWorkers)
+
+      // 更新考勤记录
+      const updatedRecords = attendanceRecords.map(record => 
+        record.workerId === selectedWorker.workerId
+          ? { ...record, borrowedItems: record.borrowedItems + borrowItemsList.length }
+          : record
+      )
+      setAttendanceRecords(updatedRecords)
+
+      message.success(t('guard.borrowRegistrationSuccess').replace('{count}', borrowItemsList.length.toString()))
+      
+      // 刷新统计数据
+      loadGuardStats()
+      
+      // 清空输入和查询信息，停留在当前页面
+      setScannedWorkerId('')
+      setSelectedWorker(null)
+      setSelectedItemType('')
+      setItemNumber('')
+      setBorrowItemsList([])
+      setCurrentBorrowedItems([])
+      setSelectedReturnItems([])
+    } catch (error: any) {
+      console.error('创建物品借用记录失败:', error)
+      const errorMessage = error?.message || '创建物品借用记录失败'
+      message.error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 3. 离场功能
@@ -828,12 +950,59 @@ const Guard: React.FC = () => {
   // 4. 报表功能
   const handleReports = () => {
     setCurrentView('reports')
+    // 加载今日访客记录
+    const today = dayjs().format('YYYY-MM-DD')
+    loadVisitorRecords({
+      startDate: today,
+      endDate: today
+    })
   }
 
   // 处理统计卡片点击事件
   const handleStatClick = (filterType: 'all' | 'in' | 'out') => {
     setStatusFilter(filterType)
     setCurrentView('reports')
+    // 加载今日访客记录
+    const today = dayjs().format('YYYY-MM-DD')
+    loadVisitorRecords({
+      startDate: today,
+      endDate: today,
+      status: filterType === 'all' ? undefined : filterType === 'in' ? 'ON_SITE' : 'LEFT'
+    })
+  }
+
+  // 处理状态筛选变化
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value)
+    // 重新加载访客记录
+    const today = dayjs().format('YYYY-MM-DD')
+    loadVisitorRecords({
+      startDate: today,
+      endDate: today,
+      status: value === 'all' ? undefined : value === 'in' ? 'ON_SITE' : 'LEFT'
+    })
+  }
+
+  // 处理日期筛选变化
+  const handleDateFilterChange = (dates: any) => {
+    if (dates && dates.length === 2) {
+      const startDate = dates[0].format('YYYY-MM-DD')
+      const endDate = dates[1].format('YYYY-MM-DD')
+      setDateFilter({ startDate, endDate })
+      loadVisitorRecords({
+        startDate,
+        endDate,
+        status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
+      })
+    } else {
+      setDateFilter({})
+      const today = dayjs().format('YYYY-MM-DD')
+      loadVisitorRecords({
+        startDate: today,
+        endDate: today,
+        status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
+      })
+    }
   }
 
   // 返回主页面
@@ -885,11 +1054,6 @@ const Guard: React.FC = () => {
     }))
   }
 
-  // 状态筛选处理函数
-  const handleStatusFilterChange = (value: string) => {
-    setStatusFilter(value)
-    setPagination(prev => ({ ...prev, current: 1 })) // 重置到第一页
-  }
 
   // 页数跳转处理函数
   const handleJumpToPage = (totalRecords: number) => {
@@ -1366,6 +1530,28 @@ const Guard: React.FC = () => {
             }
           `}
         </style>
+        
+        {/* 统计卡片标题和刷新按钮 */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '16px' 
+        }}>
+          <Title level={4} style={{ margin: 0 }}>
+            {t('guard.todayVisitorRecords')}
+          </Title>
+          <Button 
+            type="primary" 
+            icon={<BarChartOutlined />}
+            loading={loading}
+            onClick={loadGuardStats}
+            size="small"
+          >
+            {t('common.refresh')}
+          </Button>
+        </div>
+        
         <Row gutter={16} style={{ marginBottom: '24px' }}>
           <Col span={12}>
             <Card style={{ height: '140px' }}>
@@ -1625,12 +1811,20 @@ const Guard: React.FC = () => {
                   <Card size="small" style={{ marginTop: '8px' }}>
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                       <div>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>工号：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.workerId}</Text>
+                      </div>
+                      <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>姓名：</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
                       <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.idCardLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.idCard}</Text>
+                      </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>分判商：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{(selectedWorker as any).distributor?.name || '-'}</Text>
                       </div>
                       <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.contactLabel')}</Text>
@@ -1764,6 +1958,10 @@ const Guard: React.FC = () => {
                   <Card size="small" style={{ marginTop: '8px' }}>
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                       <div>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>工号：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.workerId}</Text>
+                      </div>
+                      <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>姓名：</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
@@ -1779,12 +1977,16 @@ const Guard: React.FC = () => {
                         </Text>
                       </div>
                       <div>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>分判商：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{(selectedWorker as any).distributor?.name || '-'}</Text>
+                      </div>
+                      <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.phoneNumberLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.phone || '-'}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.entryTimeLabel')}</Text>
-                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.entryTime || '-'}</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>入场状态：</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px', color: '#52c41a' }}>已入场</Text>
                       </div>
                     </Space>
                   </Card>
@@ -1900,13 +2102,13 @@ const Guard: React.FC = () => {
                       fontSize: 'clamp(18px, 3vw, 24px)'
                     }}
                     size="large"
+                    loading={itemCategories.length === 0}
                   >
-                    <Option value="safety_helmet">安全帽</Option>
-                    <Option value="safety_gloves">防护手套</Option>
-                    <Option value="tool_kit">工具包</Option>
-                    <Option value="safety_shoes">安全鞋</Option>
-                    <Option value="protective_clothing">防护服</Option>
-                    <Option value="other">其他</Option>
+                    {itemCategories.map(category => (
+                      <Option key={category.id} value={category.id}>
+                        {category.name}
+                      </Option>
+                    ))}
                   </Select>
                 </div>
 
@@ -2367,20 +2569,22 @@ const Guard: React.FC = () => {
     const columns = [
       {
         title: t('guard.workerId'),
-        dataIndex: 'workerId',
+        dataIndex: 'worker',
         key: 'workerId',
         width: 100,
+        render: (worker: any) => worker?.workerId || '-',
       },
       {
         title: t('guard.workerName'),
-        dataIndex: 'workerName',
+        dataIndex: 'worker',
         key: 'workerName',
         width: 100,
+        render: (worker: any) => worker?.name || '-',
       },
       {
         title: t('guard.idCard'),
-        dataIndex: 'idCard',
-        key: 'idCard',
+        dataIndex: 'idNumber',
+        key: 'idNumber',
         width: 140,
         render: (text: string) => {
           if (!text) return '-'
@@ -2393,39 +2597,59 @@ const Guard: React.FC = () => {
       },
       {
         title: t('guard.entryTime'),
-        dataIndex: 'entryTime',
-        key: 'entryTime',
+        dataIndex: 'checkInTime',
+        key: 'checkInTime',
         width: 150,
+        render: (text: string) => text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-',
       },
       {
         title: t('guard.exitTime'),
-        dataIndex: 'exitTime',
-        key: 'exitTime',
+        dataIndex: 'checkOutTime',
+        key: 'checkOutTime',
         width: 150,
-        render: (text: string) => text || '-',
+        render: (text: string) => text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-',
       },
       {
         title: t('guard.physicalCardId'),
         dataIndex: 'physicalCardId',
         key: 'physicalCardId',
         width: 120,
+        render: (text: string) => text || '-',
       },
       {
         title: t('guard.contactPhone'),
-        dataIndex: 'phone',
+        dataIndex: 'worker',
         key: 'phone',
         width: 120,
+        render: (worker: any) => worker?.phone || '-',
+      },
+      {
+        title: t('guard.distributor'),
+        dataIndex: 'worker',
+        key: 'distributor',
+        width: 120,
+        render: (worker: any) => worker?.distributor?.name || '-',
       },
       {
         title: t('guard.guardStatus'),
         dataIndex: 'status',
         key: 'status',
         width: 80,
-        render: (status: string) => (
-          <Tag color={status === 'in' ? 'green' : 'red'}>
-            {status === 'in' ? t('guard.onSite') : t('guard.exited')}
-          </Tag>
-        ),
+        render: (status: string) => {
+          let color = 'default'
+          let text = status
+          if (status === 'ON_SITE') {
+            color = 'green'
+            text = t('guard.onSite')
+          } else if (status === 'LEFT') {
+            color = 'red'
+            text = t('guard.exited')
+          } else if (status === 'PENDING') {
+            color = 'orange'
+            text = t('guard.pending')
+          }
+          return <Tag color={color}>{text}</Tag>
+        },
       },
       {
         title: t('guard.borrowedItems'),
@@ -2537,16 +2761,19 @@ const Guard: React.FC = () => {
       },
     ]
 
-    // 筛选当天的访客记录
-    const todayRecords = attendanceRecords.filter(record => 
-      dayjs(record.entryTime).isSame(dayjs(), 'day')
-    )
+    // 使用API数据，如果没有数据则显示空数组
+    const records = visitorRecords
+    console.log('Records for table:', records) // 调试信息
 
     // 根据状态筛选记录
-    const filteredRecords = todayRecords.filter(record => {
+    const filteredRecords = records.filter(record => {
       if (statusFilter === 'all') return true
-      return record.status === statusFilter
+      // API数据状态映射
+      if (statusFilter === 'in') return record.status === 'ON_SITE'
+      if (statusFilter === 'out') return record.status === 'LEFT'
+      return true
     })
+    console.log('Filtered records:', filteredRecords) // 调试信息
 
     // 客户端分页处理
     const startIndex = (pagination.current - 1) * pagination.pageSize
@@ -2574,7 +2801,30 @@ const Guard: React.FC = () => {
               marginBottom: '16px',
               gap: window.innerWidth < 768 ? '12px' : '0'
             }}>
-              <Title level={2} style={{ margin: 0 }}>{t('guard.todayVisitorRecords')}</Title>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Title level={2} style={{ margin: 0 }}>{t('guard.todayVisitorRecords')}</Title>
+                <Button 
+                  type="primary" 
+                  icon={<BarChartOutlined />}
+                  loading={visitorRecordsLoading}
+                  onClick={() => {
+                    const today = dayjs().format('YYYY-MM-DD')
+                    console.log('Loading visitor records with filters:', {
+                      startDate: today,
+                      endDate: today,
+                      status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
+                    })
+                    loadVisitorRecords({
+                      startDate: today,
+                      endDate: today,
+                      status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
+                    })
+                  }}
+                  size="small"
+                >
+                  {t('common.refresh')}
+                </Button>
+              </div>
               <div               style={{ 
                 display: 'flex', 
                 alignItems: window.innerWidth < 768 ? 'flex-start' : 'center', 
@@ -2588,6 +2838,20 @@ const Guard: React.FC = () => {
                     alignItems: 'center', 
                     gap: '12px'
                   }}>
+                    <Text strong style={{ fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)' }}>{t('guard.dateRange')}</Text>
+                    <DatePicker.RangePicker
+                      value={dateFilter.startDate && dateFilter.endDate ? [
+                        dayjs(dateFilter.startDate),
+                        dayjs(dateFilter.endDate)
+                      ] : undefined}
+                      onChange={handleDateFilterChange}
+                      style={{ 
+                        width: 240,
+                        fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)'
+                      }}
+                      size="small"
+                      placeholder={[t('guard.startDate'), t('guard.endDate')]}
+                    />
                     <Text strong style={{ fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)' }}>{t('guard.statusFilter')}</Text>
                     <Select
                       value={statusFilter}
@@ -2604,6 +2868,9 @@ const Guard: React.FC = () => {
                     </Select>
                     <Text type="secondary">
                       {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      (API数据: {visitorRecords.length}条)
                     </Text>
                   </div>
                 )}
@@ -2645,28 +2912,51 @@ const Guard: React.FC = () => {
               </div>
             </div>
             
-            {/* 手机端状态筛选框 */}
+            {/* 手机端筛选框 */}
             {window.innerWidth < 768 && (
               <div style={{ 
                 display: 'flex', 
-                alignItems: 'center', 
+                flexDirection: 'column',
                 gap: '12px',
                 marginBottom: '16px'
               }}>
-                <Text strong>{t('guard.statusFilter')}</Text>
-                <Select
-                  value={statusFilter}
-                  onChange={handleStatusFilterChange}
-                  style={{ width: 120 }}
-                  size="small"
-                >
-                  <Option value="all">{t('common.all')}</Option>
-                  <Option value="in">{t('guard.onSite')}</Option>
-                  <Option value="out">{t('guard.exited')}</Option>
-                </Select>
-                <Text type="secondary">
-                  {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
-                </Text>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px'
+                }}>
+                  <Text strong>{t('guard.dateRange')}</Text>
+                  <DatePicker.RangePicker
+                    value={dateFilter.startDate && dateFilter.endDate ? [
+                      dayjs(dateFilter.startDate),
+                      dayjs(dateFilter.endDate)
+                    ] : undefined}
+                    onChange={handleDateFilterChange}
+                    style={{ width: 200 }}
+                    size="small"
+                    placeholder={[t('guard.startDate'), t('guard.endDate')]}
+                  />
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px'
+                }}>
+                  <Text strong>{t('guard.statusFilter')}</Text>
+                  <Select
+                    value={statusFilter}
+                    onChange={handleStatusFilterChange}
+                    style={{ width: 120 }}
+                    size="small"
+                  >
+                    <Option value="all">{t('common.all')}</Option>
+                    <Option value="in">{t('guard.onSite')}</Option>
+                    <Option value="out">{t('guard.exited')}</Option>
+                  </Select>
+                  <Text type="secondary">
+                    {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
+                  </Text>
+                </div>
               </div>
             )}
           </div>
@@ -2690,6 +2980,10 @@ const Guard: React.FC = () => {
                 pagination={false}
                 scroll={{ x: 1000 }}
                 size="small"
+                loading={visitorRecordsLoading}
+                locale={{
+                  emptyText: visitorRecordsLoading ? '加载中...' : '暂无访客记录'
+                }}
                 style={{
                   fontSize: window.innerWidth >= 768 ? 'clamp(18px, 3vw, 24px)' : 'clamp(14px, 2vw, 18px)'
                 }}

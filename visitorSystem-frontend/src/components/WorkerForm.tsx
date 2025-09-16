@@ -70,13 +70,15 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
     loadSites();
   }, [isDistributorForm, sites]);
 
+
   useEffect(() => {
     if (worker) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { workerId, ...workerData } = worker;
       form.setFieldsValue({
         ...workerData,
-        birthDate: worker.birthDate ? dayjs(worker.birthDate) : undefined
+        birthDate: worker.birthDate ? dayjs(worker.birthDate) : undefined,
+        region: worker.region // 直接使用数据库原始值
       });
     } else if (selectedSiteId) {
       // 新增工人时，默认选择当前全局筛选的工地
@@ -84,7 +86,7 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
         siteId: selectedSiteId
       });
     }
-  }, [worker, form, selectedSiteId]);
+  }, [worker, form, selectedSiteId, t]);
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     console.log('WorkerForm handleSubmit called with values:', values);
@@ -206,11 +208,11 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
             label={t('worker.region')}
           >
             <Select placeholder={t('form.selectPlaceholder') + t('worker.region')}>
-              <Option value="中国大陆">{t('regions.mainland')}</Option>
-              <Option value="中国香港">{t('regions.hongkong')}</Option>
-              <Option value="中国澳门">{t('regions.macau')}</Option>
-              <Option value="中国台湾">{t('regions.taiwan')}</Option>
-              <Option value="其他">{t('regions.other')}</Option>
+              <Option value={t('regions.mainland')}>{t('regions.mainland')}</Option>
+              <Option value={t('regions.hongkong')}>{t('regions.hongkong')}</Option>
+              <Option value={t('regions.macau')}>{t('regions.macau')}</Option>
+              <Option value={t('regions.taiwan')}>{t('regions.taiwan')}</Option>
+              <Option value={t('regions.other')}>{t('regions.other')}</Option>
             </Select>
           </Form.Item>
         </Col>

@@ -52,8 +52,8 @@ model Site {
   updatedAt         DateTime           @updatedAt
   guards            Guard[]
   itemBorrowRecords ItemBorrowRecord[]
-  visitorRecords    VisitorRecord[]
   distributors      SiteDistributor[]
+  visitorRecords    VisitorRecord[]
   workers           Worker[]
 
   @@map("sites")
@@ -99,13 +99,10 @@ model Worker {
   gender            Gender
   idCard            String             @unique
   region            String?
-  photo             String?
   phone             String
   email             String?
   whatsapp          String?
   birthDate         DateTime?
-  age               Int?
-  physicalCardId    String?
   status            WorkerStatus       @default(ACTIVE)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -172,22 +169,22 @@ model ItemBorrowRecord {
 }
 
 model VisitorRecord {
-  id              String       @id @default(cuid())
-  workerId        String
-  siteId          String
-  checkInTime     DateTime?
-  checkOutTime    DateTime?
-  status          VisitorStatus @default(ON_SITE)
-  idType          String       // 证件类型
-  idNumber        String       // 证件号码
-  physicalCardId  String?      // 实体卡ID
-  registrarId     String?      // 登记人ID
-  notes           String?      // 备注
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  worker          Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  registrar       Guard?       @relation(fields: [registrarId], references: [id])
+  id             String        @id @default(cuid())
+  workerId       String
+  siteId         String
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  status         VisitorStatus @default(ON_SITE)
+  idType         String
+  idNumber       String
+  physicalCardId String?
+  registrarId    String?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  registrar      Guard?        @relation(fields: [registrarId], references: [id])
+  site           Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  worker         Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@map("visitor_records")
 }

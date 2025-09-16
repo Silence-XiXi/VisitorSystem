@@ -1137,7 +1137,7 @@ const AdminSites: React.FC = () => {
       }
       
       if (importedSites.length === 0) {
-        message.warning(t('admin.noValidData'))
+        message.warning('Excel文件中没有找到有效的工地数据，请检查文件格式和内容')
         return
       }
       
@@ -1272,7 +1272,7 @@ const AdminSites: React.FC = () => {
       }
       
       if (importedDistributors.length === 0) {
-        message.warning(t('admin.noValidData'))
+        message.warning('Excel文件中没有找到有效的分判商数据，请检查文件格式和内容')
         return
       }
       
@@ -1444,7 +1444,7 @@ const AdminSites: React.FC = () => {
       }
       
       if (importedGuards.length === 0) {
-        message.warning(t('admin.noValidData'))
+        message.warning('Excel文件中没有找到有效的保安数据，请检查文件格式和内容')
         return
       }
 

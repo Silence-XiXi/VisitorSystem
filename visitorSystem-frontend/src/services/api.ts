@@ -68,7 +68,6 @@ interface Worker {
   name: string;
   phone: string;
   idCard: string;
-  physicalCardId?: string;
   gender: 'MALE' | 'FEMALE';
   status: 'ACTIVE' | 'INACTIVE';
   distributorId: string;
@@ -127,11 +126,15 @@ interface CreateWorkerRequest {
   phone: string;
   idCard: string;
   physicalCardId?: string;
-  gender: 'MALE' | 'FEMALE';
+  gender: string; // 改为string类型，支持任意值
   siteId: string;
+  distributorId: string;
+  region: string;
   birthDate?: string | null;
   email?: string | null;
   whatsapp?: string | null;
+  workerId?: string;
+  status?: string;
 }
 
 interface UpdateWorkerRequest {
@@ -141,6 +144,8 @@ interface UpdateWorkerRequest {
   physicalCardId?: string;
   gender?: 'MALE' | 'FEMALE';
   siteId?: string;
+  distributorId?: string;
+  region?: string;
   status?: 'ACTIVE' | 'INACTIVE';
   birthDate?: string | null;
   email?: string | null;
@@ -171,6 +176,17 @@ class ApiService {
 
   constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
+  }
+
+  // 获取当前用户信息
+  private getCurrentUser(): any {
+    try {
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+      return null;
+    }
   }
 
   // 延迟函数
@@ -240,6 +256,7 @@ class ApiService {
         
         try {
           errorData = await response.json();
+          console.log('错误响应数据:', errorData);
           errorMessage = errorData.message || errorData.error || errorMessage;
           errorCode = errorData.statusCode || response.status;
         } catch (parseError) {
@@ -249,6 +266,9 @@ class ApiService {
 
         // 根据状态码提供更具体的错误信息
         switch (response.status) {
+          case 400:
+            errorMessage = errorData?.message || '请求参数错误';
+            break;
           case 401:
             errorMessage = '用户名或密码错误，或账户已被禁用';
             break;
@@ -256,7 +276,7 @@ class ApiService {
             errorMessage = '没有权限访问此资源';
             break;
           case 404:
-            errorMessage = '请求的资源不存在';
+            errorMessage = errorData?.message || '请求的资源不存在';
             break;
           case 409:
             errorMessage = errorData?.message || '数据冲突，请检查输入信息';
@@ -657,14 +677,22 @@ class ApiService {
     if (filters?.siteId) params.append('siteId', filters.siteId);
     if (filters?.status) params.append('status', filters.status);
     
-    const url = `/admin/workers${params.toString() ? `?${params.toString()}` : ''}`;
+    // 根据用户角色选择不同的端点
+    const user = this.getCurrentUser();
+    const baseEndpoint = user?.role?.toLowerCase() === 'distributor' ? '/distributors/workers' : '/admin/workers';
+    const url = `${baseEndpoint}${params.toString() ? `?${params.toString()}` : ''}`;
+    
     return this.requestWithRetry(url, {
       method: 'GET',
     });
   }
 
   async createWorker(workerData: CreateWorkerRequest): Promise<Worker> {
-    return this.requestWithRetry('/admin/workers', {
+    // 根据用户角色选择不同的端点
+    const user = this.getCurrentUser();
+    const endpoint = user?.role?.toLowerCase() === 'distributor' ? '/distributors/workers' : '/admin/workers';
+    
+    return this.requestWithRetry(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -674,7 +702,11 @@ class ApiService {
   }
 
   async updateWorker(workerId: string, workerData: UpdateWorkerRequest): Promise<Worker> {
-    return this.requestWithRetry(`/admin/workers/${workerId}`, {
+    // 根据用户角色选择不同的端点
+    const user = this.getCurrentUser();
+    const endpoint = user?.role?.toLowerCase() === 'distributor' ? `/distributors/workers/${workerId}` : `/admin/workers/${workerId}`;
+    
+    return this.requestWithRetry(endpoint, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -684,7 +716,11 @@ class ApiService {
   }
 
   async deleteWorker(workerId: string): Promise<void> {
-    await this.request(`/admin/workers/${workerId}`, {
+    // 根据用户角色选择不同的端点
+    const user = this.getCurrentUser();
+    const endpoint = user?.role?.toLowerCase() === 'distributor' ? `/distributors/workers/${workerId}` : `/admin/workers/${workerId}`;
+    
+    await this.request(endpoint, {
       method: 'DELETE',
     });
   }
@@ -700,7 +736,11 @@ class ApiService {
     if (filters?.distributorId) params.append('distributorId', filters.distributorId);
     if (filters?.status) params.append('status', filters.status);
     
-    const url = `/admin/workers/export${params.toString() ? `?${params.toString()}` : ''}`;
+    // 根据用户角色选择不同的端点
+    const user = this.getCurrentUser();
+    const baseEndpoint = user?.role?.toLowerCase() === 'distributor' ? '/admin/workers/export' : '/admin/workers/export';
+    const url = `${baseEndpoint}${params.toString() ? `?${params.toString()}` : ''}`;
+    
     return this.requestWithRetry(url, {
       method: 'GET',
     });
@@ -708,7 +748,11 @@ class ApiService {
 
   // 导入工人数据
   async importWorkers(workers: any[]): Promise<any> {
-    return this.requestWithRetry('/admin/workers/import', {
+    // 根据用户角色选择不同的端点
+    const user = this.getCurrentUser();
+    const endpoint = user?.role?.toLowerCase() === 'distributor' ? '/distributors/workers/import' : '/admin/workers/import';
+    
+    return this.requestWithRetry(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -717,9 +761,158 @@ class ApiService {
     });
   }
 
+  // 导入工人数据（分销商）
+  async importDistributorWorkers(workers: any[]): Promise<any> {
+    return this.requestWithRetry('/distributors/workers/import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ workers }),
+    });
+  }
+
+  // 直接上传Excel文件导入工人数据（分销商）
+  async importDistributorWorkersFromExcel(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const url = `${this.baseURL}/distributors/workers/import-excel`;
+    
+    // 添加认证头
+    const token = localStorage.getItem('access_token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        let errorCode = response.status;
+        let errorData: any = null;
+        
+        try {
+          errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          errorCode = errorData.statusCode || response.status;
+        } catch (parseError) {
+          console.warn('Failed to parse error response:', parseError);
+        }
+
+        const error = new Error(errorMessage) as Error & { statusCode: number };
+        error.statusCode = errorCode;
+        throw error;
+      }
+
+      // 尝试解析JSON响应
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        // 如果不是JSON，尝试解析文本响应
+        const textResponse = await response.text();
+        console.log('Non-JSON response:', textResponse);
+        
+        // 尝试解析为JSON
+        try {
+          return JSON.parse(textResponse);
+        } catch {
+          // 如果无法解析，返回默认结果
+          return {
+            success: 0,
+            skipped: 0,
+            errors: 1,
+            errorDetails: ['无法解析服务器响应']
+          };
+        }
+      }
+    } catch (error) {
+      console.error('File upload failed:', error);
+      throw error;
+    }
+  }
+
+  // 直接上传Excel文件导入工人数据（管理员）
+  async importAdminWorkersFromExcel(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const url = `${this.baseURL}/admin/workers/import-excel`;
+    
+    // 添加认证头
+    const token = localStorage.getItem('access_token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        let errorCode = response.status;
+        let errorData: any = null;
+        
+        try {
+          errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          errorCode = errorData.statusCode || response.status;
+        } catch (parseError) {
+          console.warn('Failed to parse error response:', parseError);
+        }
+
+        const error = new Error(errorMessage) as Error & { statusCode: number };
+        error.statusCode = errorCode;
+        throw error;
+      }
+
+      // 尝试解析JSON响应
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        // 如果不是JSON，尝试解析文本响应
+        const textResponse = await response.text();
+        console.log('Non-JSON response:', textResponse);
+        
+        // 尝试解析为JSON
+        try {
+          return JSON.parse(textResponse);
+        } catch {
+          // 如果无法解析，返回默认结果
+          return {
+            success: 0,
+            skipped: 0,
+            errors: 1,
+            errorDetails: ['无法解析服务器响应']
+          };
+        }
+      }
+    } catch (error) {
+      console.error('File upload failed:', error);
+      throw error;
+    }
+  }
+
   // 下载工人导入模板
   async downloadWorkerTemplate(): Promise<any> {
-    return this.requestWithRetry('/admin/workers/template', {
+    // 根据用户角色选择不同的端点
+    const user = this.getCurrentUser();
+    const endpoint = user?.role?.toLowerCase() === 'distributor' ? '/admin/workers/template' : '/admin/workers/template';
+    
+    return this.requestWithRetry(endpoint, {
       method: 'GET',
     });
   }
@@ -914,6 +1107,99 @@ class ApiService {
     const url = `/admin/borrow-records${params.toString() ? `?${params.toString()}` : ''}`;
     return this.requestWithRetry(url, {
       method: 'GET',
+    });
+  }
+
+  // 门卫相关API
+  async getGuardProfile(): Promise<Guard> {
+    return this.requestWithRetry('/guards/profile', {
+      method: 'GET',
+    });
+  }
+
+  async getGuardStats(): Promise<{
+    totalWorkers: number;
+    activeWorkers: number;
+    inactiveWorkers: number;
+    borrowedItems: number;
+    returnedItems: number;
+    todayVisitorRecords: number;
+    todayEntered: number;
+    todayExited: number;
+    onSiteWorkers: number;
+  }> {
+    return this.requestWithRetry('/guards/stats', {
+      method: 'GET',
+    });
+  }
+
+  async getGuardSiteBorrowRecords(filters?: {
+    status?: string;
+    workerId?: string;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.workerId) params.append('workerId', filters.workerId);
+    
+    const url = `/guards/borrow-records${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.requestWithRetry(url, {
+      method: 'GET',
+    });
+  }
+
+  async getGuardSiteVisitorRecords(filters?: {
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }): Promise<VisitorRecord[]> {
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.status) params.append('status', filters.status);
+    
+    const url = `/guards/visitor-records${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.requestWithRetry(url, {
+      method: 'GET',
+    });
+  }
+
+  // 根据工人编号查询工人信息
+  async getWorkerByWorkerId(workerId: string): Promise<Worker> {
+    return this.requestWithRetry(`/guards/workers/${workerId}`, {
+      method: 'GET',
+    });
+  }
+
+  // 根据工人编号或实体卡编号查询工人信息
+  async getWorkerByIdentifier(identifier: string): Promise<Worker> {
+    return this.requestWithRetry(`/guards/workers/identifier/${identifier}`, {
+      method: 'GET',
+    });
+  }
+
+  // 检查工人是否有有效的入场记录
+  async checkWorkerEntryRecord(workerId: string): Promise<{
+    worker: Worker;
+    entryRecord: VisitorRecord;
+  }> {
+    return this.requestWithRetry(`/guards/workers/${workerId}/entry-record`, {
+      method: 'GET',
+    });
+  }
+
+
+  // 创建物品借用记录
+  async createBorrowRecord(data: {
+    workerId: string;
+    categoryId: string;
+    itemCode: string;
+    borrowDate: Date;
+    borrowTime: string;
+    remark?: string;
+  }): Promise<any> {
+    return this.requestWithRetry('/guards/borrow-records', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

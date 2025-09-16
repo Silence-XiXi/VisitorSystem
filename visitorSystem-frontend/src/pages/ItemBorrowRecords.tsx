@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from 'react'
-import { Card, Table, Space, Button, Row, Col, message, Select, Input, DatePicker, Tag, Modal, List } from 'antd'
-import { SearchOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons'
+import React, { useMemo, useState, useEffect } from 'react'
+import { Card, Table, Space, Button, Row, Col, message, Select, Input, DatePicker, Tag, Modal, Spin } from 'antd'
+import { SearchOutlined, DownloadOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
-import { mockWorkers, mockSites, mockDistributors, mockGuards } from '../data/mockData'
+import { useAuth } from '../hooks/useAuth'
+import { apiService } from '../services/api'
 import * as XLSX from 'xlsx'
 
 interface ItemBorrowRecord {
+  id: string
   key: string
   workerId: string
   workerName: string
@@ -20,63 +22,80 @@ interface ItemBorrowRecord {
   borrowTime: string
   returnDate?: string
   returnTime?: string
-  status: 'borrowed' | 'returned'
+  status: 'BORROWED' | 'RETURNED'
   borrowDuration?: number // 借用时长（小时）
   borrowHandlerId?: string // 借用经办人ID
   borrowHandlerName?: string // 借用经办人姓名
-}
-
-// 生成物品借用记录数据
-const generateItemBorrowRecords = (): ItemBorrowRecord[] => {
-  const itemTypes = ['门禁卡', '钥匙', '梯子', '安全帽', '工具包', '防护服', '手套', '护目镜']
-  const records: ItemBorrowRecord[] = []
-  
-  mockWorkers.slice(0, 12).forEach((worker, workerIdx) => {
-    const siteIndex = workerIdx % mockSites.length
-    const distIndex = workerIdx % mockDistributors.length
-    const borrowedItems = Math.floor(Math.random() * 5) + 1 // 1-5个借用物品
-    const returnedItems = Math.floor(Math.random() * (borrowedItems + 1)) // 0到借用数量的已归还数量
-    
-    // 获取该工地对应的门卫作为经办人
-    const siteGuards = mockGuards.filter(guard => guard.siteId === mockSites[siteIndex]?.id)
-    const randomGuard = siteGuards.length > 0 ? siteGuards[Math.floor(Math.random() * siteGuards.length)] : null
-    
-    for (let i = 0; i < borrowedItems; i++) {
-      const itemType = itemTypes[i % itemTypes.length]
-      const isReturned = i < returnedItems
-      const borrowDate = dayjs().subtract(workerIdx % 7, 'day').format('YYYY-MM-DD')
-      const borrowTime = dayjs().hour(8).minute(30 + (i % 10)).format('HH:mm')
-      const returnTime = isReturned ? dayjs().hour(17 + (i % 2)).minute(10).format('HH:mm') : undefined
-      
-      records.push({
-        key: `${worker.id}-item-${i}`,
-        workerId: worker.workerId,
-        workerName: worker.name,
-        distributorName: mockDistributors[distIndex]?.name || `分判商${distIndex + 1}`,
-        siteName: mockSites[siteIndex]?.name || `工地${siteIndex + 1}`,
-        itemCode: `${itemType} #${i + 1}`,
-        itemType: itemType,
-        physicalCardId: worker.physicalCardId,
-        borrowDate: borrowDate,
-        borrowTime: borrowTime,
-        returnDate: isReturned ? borrowDate : undefined,
-        returnTime: returnTime,
-        status: isReturned ? 'returned' : 'borrowed',
-        borrowDuration: isReturned ? Math.floor(Math.random() * 8) + 1 : undefined,
-        borrowHandlerId: randomGuard?.guardId,
-        borrowHandlerName: randomGuard?.name || '未指定'
-      })
+  returnHandlerName?: string // 归还经办人姓名
+  item?: {
+    id: string
+    itemCode: string
+    name: string
+    category: {
+      id: string
+      name: string
     }
-  })
-  
-  return records
+  }
+  worker?: {
+    id: string
+    workerId: string
+    name: string
+    distributor: {
+      id: string
+      name: string
+    }
+    site: {
+      id: string
+      name: string
+    }
+  }
+  site?: {
+    id: string
+    name: string
+  }
+  borrowHandler?: {
+    id: string
+    name: string
+  }
+  returnHandler?: {
+    id: string
+    name: string
+  }
 }
 
-const mockItemBorrowRecords = generateItemBorrowRecords()
+// 转换后端数据为前端格式
+const transformBorrowRecord = (record: any): ItemBorrowRecord => {
+  return {
+    id: record.id,
+    key: record.id,
+    workerId: record.worker?.workerId || '',
+    workerName: record.worker?.name || '',
+    distributorName: record.worker?.distributor?.name || '',
+    siteName: record.site?.name || '',
+    itemCode: record.item?.itemCode || '',
+    itemType: record.item?.category?.name || '',
+    physicalCardId: record.worker?.physicalCardId,
+    borrowDate: dayjs(record.borrowDate).format('YYYY-MM-DD'),
+    borrowTime: record.borrowTime || '',
+    returnDate: record.returnDate ? dayjs(record.returnDate).format('YYYY-MM-DD') : undefined,
+    returnTime: record.returnTime || undefined,
+    status: record.status,
+    borrowDuration: record.borrowDuration,
+    borrowHandlerId: record.borrowHandler?.id,
+    borrowHandlerName: record.borrowHandler?.name,
+    returnHandlerName: record.returnHandler?.name,
+    item: record.item,
+    worker: record.worker,
+    site: record.site,
+    borrowHandler: record.borrowHandler,
+    returnHandler: record.returnHandler
+  }
+}
 
 const ItemBorrowRecords: React.FC = () => {
   const { t } = useLocale()
   const { selectedSiteId } = useSiteFilter()
+  const { user } = useAuth()
   const [searchKeyword, setSearchKeyword] = useState<string>('')
   const [selectedDistributor, setSelectedDistributor] = useState<string>('')
   const [selectedItemType, setSelectedItemType] = useState<string>('')
@@ -86,10 +105,78 @@ const ItemBorrowRecords: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<ItemBorrowRecord | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [exportModalVisible, setExportModalVisible] = useState(false)
+  
+  // 数据状态
+  const [borrowRecords, setBorrowRecords] = useState<ItemBorrowRecord[]>([])
+  const [loading, setLoading] = useState(false)
+  const [distributors, setDistributors] = useState<any[]>([])
+  const [itemCategories, setItemCategories] = useState<any[]>([])
+
+  // 加载物品借用记录
+  const loadBorrowRecords = async () => {
+    if (!user) return
+    
+    try {
+      setLoading(true)
+      const filters: any = {}
+      
+      // 根据用户角色选择不同的API
+      if (user.role === 'ADMIN') {
+        if (selectedSiteId) filters.siteId = selectedSiteId
+        if (selectedStatus) filters.status = selectedStatus
+        if (dateRange && dateRange[0] && dateRange[1]) {
+          filters.startDate = dateRange[0].format('YYYY-MM-DD')
+          filters.endDate = dateRange[1].format('YYYY-MM-DD')
+        }
+        
+        const records = await apiService.getAllBorrowRecords(filters)
+        const transformedRecords = records.map(transformBorrowRecord)
+        setBorrowRecords(transformedRecords)
+      } else if (user.role === 'GUARD') {
+        if (selectedStatus) filters.status = selectedStatus
+        
+        const records = await apiService.getGuardSiteBorrowRecords(filters)
+        const transformedRecords = records.map(transformBorrowRecord)
+        setBorrowRecords(transformedRecords)
+      }
+    } catch (error) {
+      console.error('加载物品借用记录失败:', error)
+      message.error('加载数据失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 加载分判商数据
+  const loadDistributors = async () => {
+    try {
+      const data = await apiService.getAllDistributors()
+      setDistributors(data)
+    } catch (error) {
+      console.error('加载分判商数据失败:', error)
+    }
+  }
+
+  // 加载物品类型数据
+  const loadItemCategories = async () => {
+    try {
+      const data = await apiService.getAllItemCategories()
+      setItemCategories(data)
+    } catch (error) {
+      console.error('加载物品类型数据失败:', error)
+    }
+  }
+
+  // 页面加载时获取数据
+  useEffect(() => {
+    loadBorrowRecords()
+    loadDistributors()
+    loadItemCategories()
+  }, [user, selectedSiteId, selectedStatus, dateRange])
 
   // 筛选后的数据
   const filteredData = useMemo(() => {
-    let filtered = mockItemBorrowRecords
+    let filtered = borrowRecords
 
     // 搜索关键词筛选
     if (searchKeyword.trim()) {
@@ -103,14 +190,6 @@ const ItemBorrowRecords: React.FC = () => {
       )
     }
 
-    // 工地筛选
-    if (selectedSiteId) {
-      const site = mockSites.find(s => s.id === selectedSiteId)
-      if (site) {
-        filtered = filtered.filter(record => record.siteName === site.name)
-      }
-    }
-
     // 分判商筛选
     if (selectedDistributor) {
       filtered = filtered.filter(record => record.distributorName === selectedDistributor)
@@ -121,22 +200,8 @@ const ItemBorrowRecords: React.FC = () => {
       filtered = filtered.filter(record => record.itemType === selectedItemType)
     }
 
-    // 状态筛选
-    if (selectedStatus) {
-      filtered = filtered.filter(record => record.status === selectedStatus)
-    }
-
-    // 日期范围筛选
-    if (dateRange && dateRange[0] && dateRange[1]) {
-      filtered = filtered.filter(record => {
-        const recordDate = dayjs(record.borrowDate)
-        return recordDate.isAfter(dateRange[0].subtract(1, 'day')) && 
-               recordDate.isBefore(dateRange[1].add(1, 'day'))
-      })
-    }
-
     return filtered
-  }, [searchKeyword, selectedSiteId, selectedDistributor, selectedItemType, selectedStatus, dateRange])
+  }, [borrowRecords, searchKeyword, selectedDistributor, selectedItemType])
 
 
   // 显示详情
@@ -169,7 +234,7 @@ const ItemBorrowRecords: React.FC = () => {
         [t('itemBorrowRecords.borrowTime')]: record.borrowTime,
         [t('itemBorrowRecords.returnDate')]: record.returnDate || '-',
         [t('itemBorrowRecords.returnTime')]: record.returnTime || '-',
-        [t('itemBorrowRecords.status')]: record.status === 'borrowed' ? t('itemBorrowRecords.borrowed') : t('itemBorrowRecords.returned'),
+        [t('itemBorrowRecords.status')]: record.status === 'BORROWED' ? t('itemBorrowRecords.notReturned') : t('itemBorrowRecords.returned'),
         [t('itemBorrowRecords.borrowDuration')]: record.borrowDuration ? `${record.borrowDuration}小时` : '-',
         [t('itemBorrowRecords.borrowHandler')]: record.borrowHandlerName || '-'
       }))
@@ -285,8 +350,8 @@ const ItemBorrowRecords: React.FC = () => {
       width: 100,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.status.localeCompare(b.status),
       render: (status: string) => (
-        <Tag color={status === 'returned' ? 'green' : 'orange'}>
-          {status === 'returned' ? t('itemBorrowRecords.returned') : t('itemBorrowRecords.notReturned')}
+        <Tag color={status === 'RETURNED' ? 'green' : 'orange'}>
+          {status === 'RETURNED' ? t('itemBorrowRecords.returned') : t('itemBorrowRecords.notReturned')}
         </Tag>
       )
     },
@@ -329,6 +394,40 @@ const ItemBorrowRecords: React.FC = () => {
         </div>
       </div>
 
+      {/* 统计卡片 */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={8}>
+          <Card>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1890ff' }}>
+                {borrowRecords.length}
+              </div>
+              <div style={{ color: '#666', fontSize: '14px' }}>总借用记录</div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fa8c16' }}>
+                {borrowRecords.filter(r => r.status === 'BORROWED').length}
+              </div>
+              <div style={{ color: '#666', fontSize: '14px' }}>未归还</div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#52c41a' }}>
+                {borrowRecords.filter(r => r.status === 'RETURNED').length}
+              </div>
+              <div style={{ color: '#666', fontSize: '14px' }}>已归还</div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
 
       {/* 筛选器 */}
       <Card style={{ marginBottom: 16 }}>
@@ -353,8 +452,9 @@ const ItemBorrowRecords: React.FC = () => {
               onChange={setSelectedDistributor}
               style={{ width: '100%' }}
               allowClear
+              loading={distributors.length === 0}
             >
-              {mockDistributors.map(dist => (
+              {distributors.map(dist => (
                 <Select.Option key={dist.id} value={dist.name}>
                   {dist.name}
                 </Select.Option>
@@ -369,10 +469,11 @@ const ItemBorrowRecords: React.FC = () => {
               onChange={setSelectedItemType}
               style={{ width: '100%' }}
               allowClear
+              loading={itemCategories.length === 0}
             >
-              {['门禁卡', '钥匙', '梯子', '安全帽', '工具包', '防护服', '手套', '护目镜'].map(type => (
-                <Select.Option key={type} value={type}>
-                  {type}
+              {itemCategories.map(category => (
+                <Select.Option key={category.id} value={category.name}>
+                  {category.name}
                 </Select.Option>
               ))}
             </Select>
@@ -386,15 +487,15 @@ const ItemBorrowRecords: React.FC = () => {
               style={{ width: '100%' }}
               allowClear
             >
-              <Select.Option value="borrowed">{t('itemBorrowRecords.notReturned')}</Select.Option>
-              <Select.Option value="returned">{t('itemBorrowRecords.returned')}</Select.Option>
+              <Select.Option value="BORROWED">{t('itemBorrowRecords.notReturned')}</Select.Option>
+              <Select.Option value="RETURNED">{t('itemBorrowRecords.returned')}</Select.Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={4}>
             <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.borrowDate')}</div>
             <DatePicker.RangePicker
               value={dateRange}
-              onChange={(dates) => setDateRange(dates)}
+              onChange={(dates) => setDateRange(dates as [Dayjs, Dayjs] | null)}
               style={{ width: '100%' }}
               placeholder={[t('itemBorrowRecords.startDate'), t('itemBorrowRecords.endDate')]}
             />
@@ -402,6 +503,13 @@ const ItemBorrowRecords: React.FC = () => {
           <Col xs={24} sm={12} md={4}>
             <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.actions')}</div>
             <Space>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={loadBorrowRecords}
+                loading={loading}
+              >
+                {t('common.refresh')}
+              </Button>
               <Button 
                 type="primary" 
                 icon={<DownloadOutlined />} 
@@ -416,25 +524,30 @@ const ItemBorrowRecords: React.FC = () => {
 
       {/* 数据表格 */}
       <Card>
-        <Table
-          columns={columns}
-          dataSource={filteredData}
-          rowKey="key"
-          rowSelection={{
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-            preserveSelectedRowKeys: true
-          }}
-          pagination={{
-            total: filteredData.length,
-            pageSize: 20,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => t('itemBorrowRecords.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString())
-          }}
-          scroll={{ x: 1400 }}
-          size="small"
-        />
+        <Spin spinning={loading}>
+          <Table
+            columns={columns}
+            dataSource={filteredData}
+            rowKey="key"
+            rowSelection={{
+              selectedRowKeys,
+              onChange: setSelectedRowKeys,
+              preserveSelectedRowKeys: true
+            }}
+            pagination={{
+              total: filteredData.length,
+              pageSize: 20,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) => t('itemBorrowRecords.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString())
+            }}
+            scroll={{ x: 1400 }}
+            size="small"
+            locale={{
+              emptyText: loading ? '加载中...' : '暂无数据'
+            }}
+          />
+        </Spin>
       </Card>
 
       {/* 详情弹窗 */}
@@ -497,8 +610,8 @@ const ItemBorrowRecords: React.FC = () => {
                 )}
                 <Col span={12} style={{ marginTop: 8 }}>
                   <strong>{t('itemBorrowRecords.statusLabel')}</strong>
-                  <Tag color={selectedRecord.status === 'returned' ? 'green' : 'orange'} style={{ marginLeft: 8 }}>
-                    {selectedRecord.status === 'returned' ? t('itemBorrowRecords.returned') : t('itemBorrowRecords.notReturned')}
+                  <Tag color={selectedRecord.status === 'RETURNED' ? 'green' : 'orange'} style={{ marginLeft: 8 }}>
+                    {selectedRecord.status === 'RETURNED' ? t('itemBorrowRecords.returned') : t('itemBorrowRecords.notReturned')}
                   </Tag>
                 </Col>
                 {selectedRecord.borrowDuration && (

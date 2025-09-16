@@ -7,17 +7,6 @@ import dayjs from '../utils/dayjs';
 import { useLocale } from '../contexts/LocaleContext';
 import apiService from '../services/api';
 
-// 计算年龄的函数
-const calcAgeFromBirth = (birthDate: string): number => {
-  if (!birthDate) return 0;
-  const b = dayjs(birthDate);
-  const now = dayjs();
-  let age = now.year() - b.year();
-  if (now.month() < b.month() || (now.month() === b.month() && now.date() < b.date())) {
-    age -= 1;
-  }
-  return Math.max(age, 0);
-};
 
 interface WorkerTableProps {
   workers: Worker[];
@@ -304,23 +293,6 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       },
     },
     {
-      title: t('worker.age'),
-      dataIndex: 'age',
-      key: 'age',
-      width: 80,
-      sorter: (a: Worker, b: Worker) => {
-        const ageA = a.birthDate ? calcAgeFromBirth(a.birthDate) : 0;
-        const ageB = b.birthDate ? calcAgeFromBirth(b.birthDate) : 0;
-        return ageA - ageB;
-      },
-      render: (age: number, record: Worker) => {
-        if (record.birthDate) {
-          return calcAgeFromBirth(record.birthDate);
-        }
-        return '-';
-      },
-    },
-    {
       title: t('worker.idCard'),
       dataIndex: 'idCard',
       key: 'idCard',
@@ -537,7 +509,6 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                 <p><strong>{t('worker.name')}:</strong> {selectedWorker.name}</p>
                 <p><strong>{t('worker.gender')}:</strong> {getGenderTag(selectedWorker.gender)}</p>
                 <p><strong>{t('worker.birthDate')}:</strong> {selectedWorker.birthDate ? dayjs(selectedWorker.birthDate).format('YYYY-MM-DD') : '-'}</p>
-                <p><strong>{t('worker.age')}:</strong> {selectedWorker.birthDate ? calcAgeFromBirth(selectedWorker.birthDate) : '-'}</p>
               </Col>
               <Col span={12}>
                 <p><strong>{t('worker.distributor')}:</strong> {getDistributorName(selectedWorker.distributorId)}</p>

@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -90,6 +91,32 @@ export class DistributorsController {
     @Param('id') workerId: string
   ) {
     return this.distributorsService.deleteWorker(user, workerId);
+  }
+
+  @Post('workers/import')
+  @Roles(UserRole.DISTRIBUTOR)
+  @ApiOperation({ summary: '批量导入工人数据' })
+  @ApiResponse({ status: 201, description: '导入成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async importWorkers(
+    @GetCurrentUser() user: CurrentUser,
+    @Body() importData: { workers: any[] }
+  ) {
+    return this.distributorsService.importWorkers(user, importData.workers);
+  }
+
+  @Post('workers/import-excel')
+  @Roles(UserRole.DISTRIBUTOR)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: '通过Excel文件导入工人数据' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, description: '导入成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async importWorkersFromExcel(
+    @GetCurrentUser() user: CurrentUser,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.distributorsService.importWorkersFromExcel(user, file);
   }
 
   @Get('stats')

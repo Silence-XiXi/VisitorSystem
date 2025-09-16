@@ -31,6 +31,43 @@ export class GuardsController {
     return this.guardsService.getSiteWorkers(user);
   }
 
+  @Get('workers/:workerId')
+  @Roles(UserRole.GUARD)
+  @ApiOperation({ summary: '根据工人编号查询工人信息' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  @ApiResponse({ status: 404, description: '工人不存在' })
+  async getWorkerByWorkerId(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('workerId') workerId: string
+  ) {
+    return this.guardsService.getWorkerByWorkerId(user, workerId);
+  }
+
+  @Get('workers/identifier/:identifier')
+  @Roles(UserRole.GUARD)
+  @ApiOperation({ summary: '根据工人编号或实体卡编号查询工人信息' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  @ApiResponse({ status: 404, description: '工人不存在' })
+  async getWorkerByIdentifier(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('identifier') identifier: string
+  ) {
+    return this.guardsService.getWorkerByIdentifier(user, identifier);
+  }
+
+  @Get('workers/:workerId/entry-record')
+  @Roles(UserRole.GUARD)
+  @ApiOperation({ summary: '检查工人是否有有效的入场记录' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  @ApiResponse({ status: 400, description: '工人未入场' })
+  @ApiResponse({ status: 404, description: '工人不存在' })
+  async checkWorkerEntryRecord(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('workerId') workerId: string
+  ) {
+    return this.guardsService.checkWorkerEntryRecord(user, workerId);
+  }
+
   @Get('borrow-records')
   @Roles(UserRole.GUARD)
   @ApiOperation({ summary: '获取物品借用记录' })
@@ -75,5 +112,34 @@ export class GuardsController {
   @ApiResponse({ status: 200, description: '获取成功' })
   async getGuardStats(@GetCurrentUser() user: CurrentUser) {
     return this.guardsService.getGuardStats(user);
+  }
+
+  @Get('visitor-records')
+  @Roles(UserRole.GUARD)
+  @ApiOperation({ summary: '获取门卫所在工地的访客记录' })
+  @ApiQuery({ name: 'startDate', required: false, description: '开始日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: '结束日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'status', required: false, description: '访客状态：ON_SITE/LEFT/PENDING' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  async getGuardSiteVisitorRecords(
+    @GetCurrentUser() user: CurrentUser,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('status') status?: string
+  ) {
+    return this.guardsService.getGuardSiteVisitorRecords(user, startDate, endDate, status);
+  }
+
+  @Post('visitor-records')
+  @Roles(UserRole.GUARD)
+  @ApiOperation({ summary: '创建访客记录（入场登记）' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 404, description: '工人不存在' })
+  async createVisitorRecord(
+    @GetCurrentUser() user: CurrentUser,
+    @Body() recordData: any
+  ) {
+    return this.guardsService.createVisitorRecord(user, recordData);
   }
 }
