@@ -2,7 +2,6 @@ export default {
   common: {
     save: '保存',
     cancel: '取消',
-    refresh: '刷新',
     edit: '编辑',
     delete: '删除',
     view: '查看',
@@ -324,6 +323,7 @@ export default {
     phonePlaceholder: '请输入联系电话',
     itemNumberPlaceholder: '请输入物品编号（必填）',
     itemRemarkPlaceholder: '请输入该物品的备注资料（可选）',
+    remarkFilled: '已填写备注',
     returnSelectedItems: '归还选中物品',
     returnSelectedItemsWithCount: '归还选中物品 ({count}个)',
     completeBorrowWithCount: '完成借物登记 {count}',

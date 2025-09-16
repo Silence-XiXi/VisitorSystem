@@ -1203,6 +1203,13 @@ class ApiService {
     });
   }
 
+  // 归还物品
+  async returnItem(recordId: string): Promise<any> {
+    return this.requestWithRetry(`/guards/borrow-records/${recordId}/return`, {
+      method: 'PUT',
+    });
+  }
+
 }
 
 export const apiService = new ApiService();

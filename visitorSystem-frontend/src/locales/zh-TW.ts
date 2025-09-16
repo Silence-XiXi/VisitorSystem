@@ -2,7 +2,6 @@ export default {
   common: {
     save: '儲存',
     cancel: '取消',
-    refresh: '刷新',
     edit: '編輯',
     delete: '刪除',
     view: '查看',
@@ -273,7 +272,6 @@ export default {
     // 二維碼發送相關
     sendQRCodeTitle: '發送二維碼',
     workerName: '工人姓名',
-    workerIdLabel: '工號',
     selectSendMethod: '選擇發送方式',
     sendEmail: '發送郵件',
     noContactInfo: '該工人沒有聯繫方式',
@@ -390,8 +388,6 @@ export default {
     disableDistributorSuccess: '分判商「{name}」帳號已停用',
     disableAccountWarning: '停用後該帳號將無法登入系統',
     // 字段标签
-    nameLabel: '姓名：',
-    phoneLabel: '電話：',
     emailLabel: '郵箱：',
     active: '啟用',
   },
@@ -502,7 +498,6 @@ export default {
     detailTitle: '物品借用詳情 - {itemCode}',
     close: '關閉',
     workerNameLabel: '工人姓名：',
-    workerIdLabel: '工人編號：',
     distributorLabel: '分判商：',
     siteLabel: '工地：',
     itemCodeLabel: '物品編號：',
@@ -584,6 +579,7 @@ export default {
     phonePlaceholder: '請輸入聯繫電話',
     itemNumberPlaceholder: '請輸入物品編號（必填）',
     itemRemarkPlaceholder: '請輸入該物品的備註資料（可選）',
+    remarkFilled: '已填寫備註',
     returnSelectedItems: '歸還選中物品',
     returnSelectedItemsWithCount: '歸還選中物品 ({count}個)',
     completeBorrowWithCount: '完成借物登記 {count}',
@@ -624,6 +620,13 @@ export default {
     returnTime: '歸還時間',
     borrowTimeLabel: '借用時間：',
     returnTimeLabel: '歸還時間：',
+    // 字段標籤
+    workerIdLabel: '工號：',
+    nameLabel: '姓名：',
+    phoneLabel: '電話：',
+    itemIdLabel: '編號：',
+    idCardLabel: '身份證號：',
+    phoneNumberLabel: '電話號碼：',
     // 其他常用鍵
     totalWorkers: '共 {count} 個工人',
     downloadTemplate: '下載模板',
@@ -1030,8 +1033,6 @@ export default {
     // 二维码发送相关
     sendQRCodeTitle: '發送工人二維碼',
     workerName: '工人姓名：',
-    workerIdLabel: '工人編號：',
-    phoneLabel: '聯繫電話：',
     selectSendMethod: '選擇發送方式',
     sendEmail: '發送郵件',
     sendWhatsApp: '發送WhatsApp',

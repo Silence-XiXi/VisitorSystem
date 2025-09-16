@@ -74,7 +74,7 @@ const transformBorrowRecord = (record: any): ItemBorrowRecord => {
     siteName: record.site?.name || '',
     itemCode: record.item?.itemCode || '',
     itemType: record.item?.category?.name || '',
-    physicalCardId: record.worker?.physicalCardId,
+    physicalCardId: record.worker?.visitorRecords?.[0]?.physicalCardId,
     borrowDate: dayjs(record.borrowDate).format('YYYY-MM-DD'),
     borrowTime: record.borrowTime || '',
     returnDate: record.returnDate ? dayjs(record.returnDate).format('YYYY-MM-DD') : undefined,
@@ -393,41 +393,6 @@ const ItemBorrowRecords: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={8}>
-          <Card>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1890ff' }}>
-                {borrowRecords.length}
-              </div>
-              <div style={{ color: '#666', fontSize: '14px' }}>总借用记录</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fa8c16' }}>
-                {borrowRecords.filter(r => r.status === 'BORROWED').length}
-              </div>
-              <div style={{ color: '#666', fontSize: '14px' }}>未归还</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#52c41a' }}>
-                {borrowRecords.filter(r => r.status === 'RETURNED').length}
-              </div>
-              <div style={{ color: '#666', fontSize: '14px' }}>已归还</div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
 
       {/* 筛选器 */}
       <Card style={{ marginBottom: 16 }}>

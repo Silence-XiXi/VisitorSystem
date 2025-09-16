@@ -203,9 +203,28 @@ export class GuardsService {
       throw new BadRequestException('该工人未入场，无法借用物品');
     }
 
+    // 获取工人的当前借用物品（未归还的）
+    const currentBorrowedItems = await this.prisma.itemBorrowRecord.findMany({
+      where: {
+        workerId: entryRecord.worker.id,
+        status: 'BORROWED' // 只获取未归还的物品
+      },
+      include: {
+        item: {
+          include: {
+            category: true
+          }
+        }
+      },
+      orderBy: {
+        borrowDate: 'desc'
+      }
+    });
+
     return {
       worker: entryRecord.worker,
-      entryRecord: entryRecord
+      entryRecord: entryRecord,
+      currentBorrowedItems: currentBorrowedItems
     };
   }
 
@@ -325,7 +344,8 @@ export class GuardsService {
         borrowHandlerId: guard.id,
         borrowDate: recordData.borrowDate || new Date(),
         borrowTime: recordData.borrowTime || new Date().toTimeString().split(' ')[0],
-        status: 'BORROWED'
+        status: 'BORROWED',
+        notes: recordData.notes || null
       },
       include: {
         worker: {
@@ -377,12 +397,22 @@ export class GuardsService {
       throw new NotFoundException('借用记录不存在或已归还');
     }
 
+    // 计算归还时间逻辑
+    const now = new Date();
+    const borrowDate = new Date(record.borrowDate);
+    const isSameDay = now.toDateString() === borrowDate.toDateString();
+    
+    // 如果是同一天归还，只保存时间；如果是第二天归还，保存日期和时间
+    const returnDate = isSameDay ? borrowDate : now;
+    const returnTime = now.toTimeString().split(' ')[0]; // 格式: HH:mm:ss
+    
     // 更新借用记录
     const updatedRecord = await this.prisma.itemBorrowRecord.update({
       where: { id: recordId },
       data: {
         status: 'RETURNED',
-        returnDate: new Date(),
+        returnDate: returnDate,
+        returnTime: returnTime,
         returnHandlerId: guard.id
       },
       include: {

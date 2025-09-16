@@ -1513,7 +1513,16 @@ export class AdminService {
         worker: {
           include: {
             distributor: true,
-            site: true
+            site: true,
+            visitorRecords: {
+              where: {
+                status: 'ON_SITE'
+              },
+              orderBy: {
+                checkInTime: 'desc'
+              },
+              take: 1
+            }
           }
         },
         item: {

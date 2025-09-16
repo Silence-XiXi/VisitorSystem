@@ -101,7 +101,6 @@ const Guard: React.FC = () => {
   const [selectedItemType, setSelectedItemType] = useState('')
   const [itemId, setItemId] = useState('')
   const [itemNumber, setItemNumber] = useState('')
-  const [borrowRemark, setBorrowRemark] = useState('')
   const [borrowItemsList, setBorrowItemsList] = useState<Array<{
     itemType: string
     itemId: string
@@ -110,6 +109,7 @@ const Guard: React.FC = () => {
   }>>([])
   const [selectedReturnItems, setSelectedReturnItems] = useState<string[]>([])
   const [currentBorrowedItems, setCurrentBorrowedItems] = useState<Array<{
+    recordId: string
     itemType: string
     itemId: string
     borrowTime: string
@@ -678,8 +678,16 @@ const Guard: React.FC = () => {
       
       setSelectedWorker(frontendWorker)
       
-      // 加载当前借用物品列表（暂时为空，后续可以从API获取）
-      setCurrentBorrowedItems([])
+      // 加载当前借用物品列表
+      const borrowedItems = result.currentBorrowedItems?.map((record: any) => ({
+        recordId: record.id, // 保存记录ID用于归还操作
+        itemType: record.item?.category?.id || record.item?.categoryId,
+        itemId: record.item?.itemCode || record.itemCode,
+        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+        remark: record.notes || ''
+      })) || []
+      
+      setCurrentBorrowedItems(borrowedItems)
       setSelectedReturnItems([])
       
       message.success(t('guard.workerQuerySuccess'))
@@ -715,7 +723,7 @@ const Guard: React.FC = () => {
     const newItem = {
       itemType: selectedItemType,
       itemId: itemNumber.trim(),
-      remark: '',
+      remark: '', // 初始为空，用户可以在物品列表中单独编辑
       showRemark: false
     }
 
@@ -734,49 +742,60 @@ const Guard: React.FC = () => {
     message.success(t('guard.itemRemovedFromList'))
   }
 
-  const handleBorrowReturnItems = () => {
+  const handleBorrowReturnItems = async () => {
     if (selectedReturnItems.length === 0) {
       message.error(t('guard.pleaseSelectItemsToReturn'))
       return
     }
 
-    const updatedWorkers = workers.map(w => 
-      w.id === selectedWorker?.id 
-        ? { 
-            ...w, 
-            borrowedItems: w.borrowedItems?.map(item => 
-              selectedReturnItems.includes(`${item.itemType}-${item.itemId}`)
-                ? { ...item, returnTime: dayjs().format('YYYY-MM-DD HH:mm:ss') }
-                : item
-            )
-          }
-        : w
-    )
-    setWorkers(updatedWorkers)
-
-    // 更新考勤记录
-    const updatedRecords = attendanceRecords.map(record => 
-      record.workerId === selectedWorker?.workerId
-        ? { ...record, borrowedItems: Math.max(0, record.borrowedItems - selectedReturnItems.length) }
-        : record
-    )
-    setAttendanceRecords(updatedRecords)
-
-    message.success(t('guard.returnItemsSuccess').replace('{count}', selectedReturnItems.length.toString()))
-    
-    // 重新加载当前借用物品列表
-    const updatedWorker = updatedWorkers.find(w => w.id === selectedWorker?.id)
-    if (updatedWorker) {
-      const borrowedItems = updatedWorker.borrowedItems?.filter(item => !item.returnTime).map(item => ({
-        itemType: item.itemType,
-        itemId: item.itemId,
-        borrowTime: item.borrowTime,
-        remark: item.remark || ''
-      })) || []
-      setCurrentBorrowedItems(borrowedItems)
+    if (!selectedWorker) {
+      message.error(t('guard.pleaseQueryWorkerFirst'))
+      return
     }
-    
-    setSelectedReturnItems([])
+
+    try {
+      setLoading(true)
+      
+      // 获取要归还的物品记录ID
+      const itemsToReturn = currentBorrowedItems.filter(item => 
+        selectedReturnItems.includes(`${item.itemType}-${item.itemId}`)
+      )
+      
+      // 调用后端API归还每个物品
+      const returnPromises = itemsToReturn.map(item => 
+        apiService.returnItem(item.recordId)
+      )
+      
+      // 等待所有归还操作完成
+      await Promise.all(returnPromises)
+      
+      message.success(t('guard.returnItemsSuccess').replace('{count}', selectedReturnItems.length.toString()))
+      
+      // 重新查询工人信息以获取最新的借用物品列表
+      const result = await apiService.checkWorkerEntryRecord(selectedWorker.workerId)
+      
+      // 更新当前借用物品列表
+      const borrowedItems = result.currentBorrowedItems?.map((record: any) => ({
+        recordId: record.id,
+        itemType: record.item?.category?.id || record.item?.categoryId,
+        itemId: record.item?.itemCode || record.itemCode,
+        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+        remark: record.notes || ''
+      })) || []
+      
+      setCurrentBorrowedItems(borrowedItems)
+      setSelectedReturnItems([])
+      
+      // 刷新统计数据
+      loadGuardStats()
+      
+    } catch (error: any) {
+      console.error('归还物品失败:', error)
+      const errorMessage = error?.message || '归还物品失败，请重试'
+      message.error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCompleteBorrow = async () => {
@@ -807,7 +826,7 @@ const Guard: React.FC = () => {
           itemCode: item.itemId, // 物品编号
           borrowDate: new Date(),
           borrowTime: dayjs().format('HH:mm:ss'),
-          remark: item.remark || ''
+          notes: item.remark || '' // 使用notes字段对应数据库的notes列
         }
 
         return await apiService.createBorrowRecord(borrowRecord as any)
@@ -2041,12 +2060,10 @@ const Guard: React.FC = () => {
                             <div style={{ flex: 1 }}>
                               <div style={{ marginBottom: '4px' }}>
                                 <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
-                                  {item.itemType === 'safety_helmet' ? '安全帽' :
-                                   item.itemType === 'safety_gloves' ? '防护手套' :
-                                   item.itemType === 'tool_kit' ? '工具包' :
-                                   item.itemType === 'safety_shoes' ? '安全鞋' :
-                                   item.itemType === 'protective_clothing' ? '防护服' :
-                                   item.itemType === 'other' ? '其他' : item.itemType}
+                                  {(() => {
+                                    const category = itemCategories.find(cat => cat.id === item.itemType)
+                                    return category ? category.name : item.itemType
+                                  })()}
                                 </Text>
                               </div>
                               <div style={{ marginBottom: '4px' }}>
@@ -2158,12 +2175,10 @@ const Guard: React.FC = () => {
                             <div style={{ flex: 1 }}>
                               <div style={{ marginBottom: '4px' }}>
                                 <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
-                                  {item.itemType === 'safety_helmet' ? '安全帽' :
-                                   item.itemType === 'safety_gloves' ? '防护手套' :
-                                   item.itemType === 'tool_kit' ? '工具包' :
-                                   item.itemType === 'safety_shoes' ? '安全鞋' :
-                                   item.itemType === 'protective_clothing' ? '防护服' :
-                                   item.itemType === 'other' ? '其他' : item.itemType}
+                                  {(() => {
+                                    const category = itemCategories.find(cat => cat.id === item.itemType)
+                                    return category ? category.name : item.itemType
+                                  })()}
                                 </Text>
                               </div>
                               <div>

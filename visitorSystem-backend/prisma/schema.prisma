@@ -152,6 +152,7 @@ model ItemBorrowRecord {
   returnTime      String?
   status          BorrowStatus @default(BORROWED)
   borrowDuration  Int?
+  notes           String?      // 借用备注信息
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   workerId        String
