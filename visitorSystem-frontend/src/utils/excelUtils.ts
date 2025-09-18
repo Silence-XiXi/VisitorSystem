@@ -6,7 +6,8 @@ export const getExcelColumns = (t: (key: string) => string) => ({
   workerId: t('worker.workerId'),
   name: t('worker.name'),
   gender: t('worker.gender'),
-  idCard: t('worker.idCard'),
+  idType: t('worker.idType'),
+  idNumber: t('worker.idNumber'),
   birthDate: t('worker.birthDate'),
   region: t('worker.region'),
   distributorId: t('admin.distributorId'),
@@ -22,7 +23,8 @@ export const ENGLISH_EXCEL_COLUMNS = {
   workerId: 'Worker ID',
   name: 'Name',
   gender: 'Gender',
-  idCard: 'ID Card',
+  idType: 'ID Type',
+  idNumber: 'ID Number',
   birthDate: 'Birth Date',
   region: 'Region',
   distributorId: 'Distributor ID',
@@ -38,7 +40,8 @@ export const EXCEL_COLUMNS = {
   workerId: '工人编号',
   name: '姓名',
   gender: '性别',
-  idCard: '身份证号',
+  idType: '证件类型',
+  idNumber: '证件号码',
   birthDate: '出生日期',
   region: '地区',
   distributorId: '分判商ID',
@@ -67,6 +70,22 @@ export const STATUS_MAP = {
   'inactive': 'inactive',
   'Active': 'active',
   'Inactive': 'inactive'
+};
+
+// 证件类型映射
+export const ID_TYPE_MAP = {
+  '身份证': 'ID_CARD',
+  '护照': 'PASSPORT',
+  '驾驶证': 'DRIVER_LICENSE',
+  '其他': 'OTHER',
+  'ID_CARD': 'ID_CARD',
+  'PASSPORT': 'PASSPORT',
+  'DRIVER_LICENSE': 'DRIVER_LICENSE',
+  'OTHER': 'OTHER',
+  'ID Card': 'ID_CARD',
+  'Passport': 'PASSPORT',
+  'Driver License': 'DRIVER_LICENSE',
+  'Other': 'OTHER'
 };
 
 // 地区映射 - 支持多语言和英语
@@ -104,14 +123,31 @@ export const getRegionMap = (t?: (key: string) => string) => {
   };
 };
 
-// 验证必填字段 - 只保留身份证号验证
+// 验证必填字段
 export const validateRequiredFields = (data: any, t?: (key: string) => string): string[] => {
   const errors: string[] = [];
-  // 只验证身份证号不为空，其他字段都不验证
-  if (!data.idCard || data.idCard.toString().trim() === '') {
-    const requiredMessage = t ? t('form.required') : '不能为空';
-    errors.push(`ID Card${requiredMessage}`);
-  }
+  const requiredMessage = t ? t('form.required') : '不能为空';
+  
+  // 必填字段列表
+  const requiredFields = [
+    { key: 'name', label: 'Name' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'idNumber', label: 'ID Number' },
+    { key: 'phone', label: 'Phone' }
+  ];
+  
+  // 调试信息：显示所有字段的值
+  console.log('验证必填字段 - 数据:', data);
+  
+  requiredFields.forEach(field => {
+    const value = data[field.key];
+    const isEmpty = !value || value.toString().trim() === '';
+    console.log(`${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
+    
+    if (isEmpty) {
+      errors.push(`${field.label}${requiredMessage}`);
+    }
+  });
   
   return errors;
 };
@@ -122,10 +158,10 @@ export const validateDataFormat = (): string[] => {
   return [];
 };
 
-// 检查身份证是否重复
-export const checkIdCardDuplicate = (idCard: string, existingWorkers: any[]): boolean => {
-  if (!idCard || idCard.trim() === '') return false;
-  return existingWorkers.some(worker => worker.idCard === idCard.trim());
+// 检查证件号码是否重复
+export const checkIdNumberDuplicate = (idNumber: string, existingWorkers: any[]): boolean => {
+  if (!idNumber || idNumber.trim() === '') return false;
+  return existingWorkers.some(worker => worker.idNumber === idNumber.trim());
 };
 
 // 转换Excel数据为工人对象
@@ -138,7 +174,8 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
     workerId: String(row['Worker ID'] || row['工人编号'] || row.workerId || '').trim(),
     name: String(row['Name'] || row['姓名'] || row.name || '').trim(),
     gender: row['Gender'] || row['性别'] || row.gender,
-    idCard: String(row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
+    idType: row['ID Type'] || row['证件类型'] || row.idType || 'ID_CARD',
+    idNumber: String(row['ID Number'] || row['证件号码'] || row.idNumber || row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
     birthDate: String(row['Birth Date'] || row['出生日期'] || row.birthDate || '').trim(),
     region: row['Region'] || row['地区'] || row.region,
     distributorId: String(row['Distributor ID'] || row['分判商ID'] || row.distributorId || '').trim(),
@@ -156,12 +193,13 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
   
   // 已取消性别、状态和地区的格式验证
   
-  // 数据清洗和转换 - 直接使用原始值，不进行格式转换
+  // 数据清洗和转换
   const workerData = {
     workerId: String(row['Worker ID'] || row['工人编号'] || row.workerId || '').trim(),
     name: String(row['Name'] || row['姓名'] || row.name || '').trim(),
-    gender: String(rawGender || '').trim(),
-    idCard: String(row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
+    gender: GENDER_MAP[String(rawGender || '').trim()] || String(rawGender || '').trim(),
+    idType: ID_TYPE_MAP[row['ID Type'] || row['证件类型'] || row.idType || 'ID_CARD'] || 'ID_CARD',
+    idNumber: String(row['ID Number'] || row['证件号码'] || row.idNumber || row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
     birthDate: String(row['Birth Date'] || row['出生日期'] || row.birthDate || '').trim(),
     region: String(rawRegion || '').trim(),
     distributorId: String(row['Distributor ID'] || row['分判商ID'] || row.distributorId || '').trim(),
@@ -169,7 +207,7 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
     phone: String(row['Phone'] || row['联系电话'] || row.phone || '').trim(),
     email: String(row['Email'] || row['邮箱'] || row.email || '').trim(),
     whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
-    status: String(rawStatus || '').trim()
+    status: STATUS_MAP[String(rawStatus || '').trim()] || String(rawStatus || '').trim()
   };
   
   // 验证必填字段
@@ -181,7 +219,7 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
   errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
   
   // 检查身份证是否重复 - 直接跳过，不添加错误信息
-  if (workerData.idCard && checkIdCardDuplicate(workerData.idCard, existingWorkers)) {
+  if (workerData.idNumber && checkIdNumberDuplicate(workerData.idNumber, existingWorkers)) {
     // 身份证重复时直接跳过，不添加错误信息
     return { data: null, errors: [] };
   }
@@ -204,29 +242,46 @@ export const convertExcelToWorkerForDistributor = (row: any, rowIndex: number, t
   const workerData = {
     workerId: String(row['工人编号'] || row['Worker ID'] || row.workerId || '').trim(),
     name: String(row['姓名'] || row['Name'] || row.name || '').trim(),
-    gender: String(rawGender || '').trim(),
-    idCard: String(row['身份证号'] || row['ID Card'] || row.idCard || '').trim(),
+    gender: GENDER_MAP[String(rawGender || '').trim()] || String(rawGender || '').trim(),
+    idType: ID_TYPE_MAP[row['证件类型'] || row['ID Type'] || row.idType || 'ID_CARD'] || 'ID_CARD',
+    idNumber: String(row['证件号码'] || row['ID Number'] || row.idNumber || row['身份证号'] || row['ID Card'] || row.idCard || '').trim(),
     birthDate: String(row['出生日期'] || row['Birth Date'] || row.birthDate || '').trim(),
     region: String(rawRegion || '').trim(),
     // 注意：分销商导入时不使用 distributorId 和 siteId，这些字段由后端自动设置
     phone: String(row['联系电话'] || row['Phone'] || row.phone || '').trim(),
     email: String(row['邮箱'] || row['Email'] || row.email || '').trim(),
     whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
-    status: String(rawStatus || '').trim()
+    status: STATUS_MAP[String(rawStatus || '').trim()] || String(rawStatus || '').trim()
   };
   
-  // 验证必填字段 - 只保留身份证号验证
-  if (!workerData.idCard || workerData.idCard.toString().trim() === '') {
-    const requiredMessage = t ? t('form.required') : '不能为空';
-    errors.push(`ID Card${requiredMessage}`);
-  }
+  // 验证必填字段
+  const requiredFields = [
+    { key: 'name', label: 'Name' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'idNumber', label: 'ID Number' },
+    { key: 'phone', label: 'Phone' }
+  ];
+  
+  // 调试信息：显示所有字段的值
+  console.log(`第${rowIndex + 1}行验证必填字段 - 数据:`, workerData);
+  
+  const requiredMessage = t ? t('form.required') : '不能为空';
+  requiredFields.forEach(field => {
+    const value = workerData[field.key];
+    const isEmpty = !value || value.toString().trim() === '';
+    console.log(`第${rowIndex + 1}行 ${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
+    
+    if (isEmpty) {
+      errors.push(`${field.label}${requiredMessage}`);
+    }
+  });
   
   // 验证数据格式 - 已取消所有格式验证
   const formatErrors = validateDataFormat();
   errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
   
   // 检查身份证是否重复 - 直接跳过，不添加错误信息
-  if (workerData.idCard && checkIdCardDuplicate(workerData.idCard, existingWorkers)) {
+  if (workerData.idNumber && checkIdNumberDuplicate(workerData.idNumber, existingWorkers)) {
     // 身份证重复时直接跳过，不添加错误信息
     return { data: null, errors: [] };
   }
@@ -249,8 +304,9 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
   const workerData = {
     workerId: String(row['工人编号'] || row['Worker ID'] || row.workerId || '').trim(),
     name: String(row['姓名'] || row['Name'] || row.name || '').trim(),
-    gender: String(rawGender || '').trim(),
-    idCard: String(row['身份证号'] || row['ID Card'] || row.idCard || '').trim(),
+    gender: GENDER_MAP[String(rawGender || '').trim()] || String(rawGender || '').trim(),
+    idType: ID_TYPE_MAP[row['证件类型'] || row['ID Type'] || row.idType || 'ID_CARD'] || 'ID_CARD',
+    idNumber: String(row['证件号码'] || row['ID Number'] || row.idNumber || row['身份证号'] || row['ID Card'] || row.idCard || '').trim(),
     birthDate: String(row['出生日期'] || row['Birth Date'] || row.birthDate || '').trim(),
     region: String(rawRegion || '').trim(),
     distributorId: String(row['分判商ID'] || row['Distributor ID'] || row.distributorId || '').trim(),
@@ -258,7 +314,7 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
     phone: String(row['联系电话'] || row['Phone'] || row.phone || '').trim(),
     email: String(row['邮箱'] || row['Email'] || row.email || '').trim(),
     whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
-    status: String(rawStatus || '').trim()
+    status: STATUS_MAP[String(rawStatus || '').trim()] || String(rawStatus || '').trim()
   };
   
   // 处理分判商名称映射
@@ -283,18 +339,34 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
     }
   }
   
-  // 验证必填字段 - 只保留身份证号验证
-  if (!workerData.idCard || workerData.idCard.toString().trim() === '') {
-    const requiredMessage = t ? t('form.required') : '不能为空';
-    errors.push(`ID Card${requiredMessage}`);
-  }
+  // 验证必填字段
+  const requiredFields = [
+    { key: 'name', label: 'Name' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'idNumber', label: 'ID Number' },
+    { key: 'phone', label: 'Phone' }
+  ];
+  
+  // 调试信息：显示所有字段的值
+  console.log(`第${rowIndex + 1}行验证必填字段 - 数据:`, workerData);
+  
+  const requiredMessage = t ? t('form.required') : '不能为空';
+  requiredFields.forEach(field => {
+    const value = workerData[field.key];
+    const isEmpty = !value || value.toString().trim() === '';
+    console.log(`第${rowIndex + 1}行 ${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
+    
+    if (isEmpty) {
+      errors.push(`${field.label}${requiredMessage}`);
+    }
+  });
   
   // 验证数据格式 - 已取消所有格式验证
   const formatErrors = validateDataFormat();
   errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
   
   // 检查身份证是否重复 - 直接跳过，不添加错误信息
-  if (workerData.idCard && checkIdCardDuplicate(workerData.idCard, existingWorkers)) {
+  if (workerData.idNumber && checkIdNumberDuplicate(workerData.idNumber, existingWorkers)) {
     // 身份证重复时直接跳过，不添加错误信息
     return { data: null, errors: [] };
   }
@@ -397,7 +469,8 @@ export const exportWorkersToExcel = (workers: Worker[], distributors: any[], sit
       [columns.workerId]: worker.workerId,
       [columns.name]: worker.name,
       [columns.gender]: worker.gender === 'MALE' ? 'Male' : 'Female',
-      [columns.idCard]: worker.idCard,
+      [columns.idType]: worker.idType,
+      [columns.idNumber]: worker.idNumber,
       [columns.birthDate]: worker.birthDate ? new Date(worker.birthDate).toISOString().split('T')[0] : '',
       [columns.region]: worker.region || '',
       [columns.distributorId]: distributor?.distributorId || '',
@@ -447,7 +520,8 @@ export const generateImportTemplate = () => {
     workerId: 'Worker ID',
     name: 'Name',
     gender: 'Gender',
-    idCard: 'ID Card',
+    idType: 'ID Type',
+    idNumber: 'ID Number',
     birthDate: 'Birth Date',
     region: 'Region',
     distributorId: 'Distributor ID',
@@ -464,7 +538,8 @@ export const generateImportTemplate = () => {
       [columns.workerId]: 'WK001（可选，不填自动生成）',
       [columns.name]: 'John Doe',
       [columns.gender]: 'Male',
-      [columns.idCard]: '110101199001011234',
+      [columns.idType]: 'ID Card',
+      [columns.idNumber]: '110101199001011234',
       [columns.birthDate]: '1990-01-01',
       [columns.region]: 'Mainland China',
       [columns.distributorId]: 'DIST001',
@@ -478,7 +553,8 @@ export const generateImportTemplate = () => {
       [columns.workerId]: '',
       [columns.name]: 'Jane Smith',
       [columns.gender]: 'Female',
-      [columns.idCard]: '310101199002021234',
+      [columns.idType]: 'ID Card',
+      [columns.idNumber]: '310101199002021234',
       [columns.birthDate]: '1990-02-02',
       [columns.region]: 'Hong Kong',
       [columns.distributorId]: 'DIST002',
@@ -529,7 +605,8 @@ export const generateWorkerImportTemplate = () => {
     workerId: 'Worker ID',
     name: 'Name',
     gender: 'Gender',
-    idCard: 'ID Card',
+    idType: 'ID Type',
+    idNumber: 'ID Number',
     birthDate: 'Birth Date',
     region: 'Region',
     distributorId: 'Distributor ID',
@@ -546,7 +623,8 @@ export const generateWorkerImportTemplate = () => {
       [columns.workerId]: 'WK001（可选，不填自动生成）',
       [columns.name]: 'John Doe',
       [columns.gender]: 'Male',
-      [columns.idCard]: '110101199001011234',
+      [columns.idType]: 'ID Card',
+      [columns.idNumber]: '110101199001011234',
       [columns.birthDate]: '1990-01-01',
       [columns.region]: 'Mainland China',
       [columns.distributorId]: 'DIST001',
@@ -560,7 +638,8 @@ export const generateWorkerImportTemplate = () => {
       [columns.workerId]: '',
       [columns.name]: 'Jane Smith',
       [columns.gender]: 'Female',
-      [columns.idCard]: '310101199002021234',
+      [columns.idType]: 'ID Card',
+      [columns.idNumber]: '310101199002021234',
       [columns.birthDate]: '1990-02-02',
       [columns.region]: 'Mainland China',
       [columns.distributorId]: 'DIST001',

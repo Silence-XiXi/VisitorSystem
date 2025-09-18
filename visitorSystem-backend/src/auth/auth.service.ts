@@ -18,8 +18,20 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { username },
       include: {
-        distributor: true,
-        guard: true,
+        distributor: {
+          include: {
+            sites: {
+              include: {
+                site: true
+              }
+            }
+          }
+        },
+        guard: {
+          include: {
+            site: true
+          }
+        },
       },
     });
 
@@ -92,8 +104,20 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        distributor: true,
-        guard: true,
+        distributor: {
+          include: {
+            sites: {
+              include: {
+                site: true
+              }
+            }
+          }
+        },
+        guard: {
+          include: {
+            site: true
+          }
+        },
       },
     });
 

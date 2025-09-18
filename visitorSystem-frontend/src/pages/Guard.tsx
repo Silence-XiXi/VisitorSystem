@@ -165,9 +165,7 @@ const Guard: React.FC = () => {
   // 计算统计数据 - 使用API数据或回退到模拟数据
   const currentOnSite = guardStats?.onSiteWorkers ?? workers.filter(w => w.status === 'in').length
   const totalExitedToday = guardStats?.todayExited ?? workers.filter(w => w.status === 'out').length
-  const totalEnteredToday = guardStats?.todayEntered ?? attendanceRecords.filter(r => 
-    dayjs(r.entryTime).isSame(dayjs(), 'day')
-  ).length
+  const totalEnteredToday = guardStats?.todayEntered ?? 0
   const totalBorrowedItems = guardStats?.borrowedItems ?? workers.reduce((total, worker) => {
     return total + (worker.borrowedItems?.length || 0)
   }, 0)
@@ -263,12 +261,15 @@ const Guard: React.FC = () => {
     // 模拟从API获取工人数据
     const workerData: Worker[] = mockWorkers.map(worker => ({
       ...worker,
+      idCard: (worker as any).idCard || worker.idNumber, // 确保idCard字段存在
       status: 'out' as const,
       borrowedItems: []
     }))
     setWorkers(workerData)
     
-    // 模拟从API获取考勤记录
+    // 初始化空的考勤记录数组，等待API数据
+    // 模拟数据已移除，现在使用空数组
+    /*
     const mockRecords: AttendanceRecord[] = [
       {
         id: '1',
@@ -569,7 +570,8 @@ const Guard: React.FC = () => {
         returnedItems: 2
       }
     ]
-    setAttendanceRecords(mockRecords)
+    */
+    setAttendanceRecords([])
   }, [])
 
   // 1. 入场登记功能
@@ -588,10 +590,35 @@ const Guard: React.FC = () => {
     }
 
     try {
+      // 首先查询工人基本信息
       const worker = await apiService.getWorkerByWorkerId(scannedWorkerId.trim())
+      
+      // 检查工人是否已经有有效的入场记录
+      try {
+        const entryRecord = await apiService.checkWorkerEntryRecord(worker.workerId)
+        // 如果找到入场记录，说明工人已经在场
+        message.warning(t('guard.workerAlreadyOnSite', { 
+          workerName: worker.name,
+          entryTime: dayjs(entryRecord.entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss')
+        }))
+        setSelectedWorker(null)
+        setScannedWorkerId('')
+        return
+      } catch (entryError: any) {
+        // 如果没有找到入场记录，说明工人未入场，可以继续登记
+        if (entryError?.statusCode === 400) {
+          // 工人未入场，可以继续
+          console.log('工人未入场，可以继续登记')
+        } else {
+          // 其他错误，可能是网络问题等
+          console.warn('检查入场记录时出现错误:', entryError)
+        }
+      }
+
       // 转换API返回的Worker类型为前端使用的Worker类型
       const frontendWorker: Worker = {
         ...worker,
+        idCard: worker.idNumber, // 将idNumber映射到idCard
         status: 'out' as const, // 默认状态为未入场
         borrowedItems: []
       }
@@ -603,6 +630,7 @@ const Guard: React.FC = () => {
       // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound')
       message.error(errorMessage)
+      setSelectedWorker(null)
     }
   }
 
@@ -618,13 +646,16 @@ const Guard: React.FC = () => {
     }
 
     try {
-      // 调用后端API创建访客记录
-      const visitorRecord = await apiService.createVisitorRecord({
-        workerId: selectedWorker.workerId,
+      // 调用后端API创建访客记录（使用门卫专用接口）
+      const visitorRecord = await apiService.createGuardVisitorRecord({
+        workerId: selectedWorker.workerId, // 使用工人编号而不是数据库ID
         siteId: user?.guard?.siteId || '',
-        idType: '身份证',
+        checkInTime: new Date().toISOString(), // 自动设置入场时间为当前时间
+        status: 'ON_SITE', // 自动设置状态为在场
+        idType: 'ID_CARD',
         idNumber: selectedWorker.idCard,
         physicalCardId: physicalCardId.trim(),
+        registrarId: user?.guard?.id, // 自动设置门卫ID
         notes: `入场登记 - ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`
       })
 
@@ -646,9 +677,31 @@ const Guard: React.FC = () => {
         statusCode: error?.statusCode,
         originalResponse: error?.originalResponse
       })
-      // 显示后端返回的具体错误信息
-      const errorMessage = error?.message || '入场登记失败，请重试'
+      
+      // 根据不同的错误类型显示不同的错误信息
+      let errorMessage = '入场登记失败，请重试'
+      
+      if (error?.statusCode === 400) {
+        // 400错误通常是业务逻辑错误，如工人已经在场
+        errorMessage = error?.message || '该工人已经在场，无法重复登记'
+      } else if (error?.statusCode === 404) {
+        // 404错误通常是工人不存在
+        errorMessage = error?.message || '工人不存在或不属于当前工地'
+      } else if (error?.statusCode === 409) {
+        // 409错误通常是数据冲突
+        errorMessage = error?.message || '数据冲突，请检查输入信息'
+      } else if (error?.message) {
+        // 使用后端返回的具体错误信息
+        errorMessage = error.message
+      }
+      
       message.error(errorMessage)
+      
+      // 如果是工人已经在场的错误，清空当前选择的工人
+      if (error?.statusCode === 400 && error?.message?.includes('已经在场')) {
+        setSelectedWorker(null)
+        setScannedWorkerId('')
+      }
     }
   }
 
@@ -672,6 +725,7 @@ const Guard: React.FC = () => {
       // 转换API返回的Worker类型为前端使用的Worker类型
       const frontendWorker: Worker = {
         ...result.worker,
+        idCard: result.worker.idNumber, // 将idNumber映射到idCard
         status: 'in' as const, // 有入场记录说明工人在场
         borrowedItems: []
       }
@@ -679,13 +733,16 @@ const Guard: React.FC = () => {
       setSelectedWorker(frontendWorker)
       
       // 加载当前借用物品列表
-      const borrowedItems = result.currentBorrowedItems?.map((record: any) => ({
-        recordId: record.id, // 保存记录ID用于归还操作
-        itemType: record.item?.category?.id || record.item?.categoryId,
-        itemId: record.item?.itemCode || record.itemCode,
-        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
-        remark: record.notes || ''
-      })) || []
+      const borrowRecords = await apiService.getWorkerBorrowRecords(result.worker.workerId)
+      const borrowedItems = borrowRecords
+        .filter((record: any) => record.status === 'BORROWED') // 只获取未归还的物品
+        .map((record: any) => ({
+          recordId: record.id, // 保存记录ID用于归还操作
+          itemType: record.item?.category?.id || record.item?.categoryId,
+          itemId: record.item?.itemCode || record.itemCode,
+          borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+          remark: record.notes || ''
+        }))
       
       setCurrentBorrowedItems(borrowedItems)
       setSelectedReturnItems([])
@@ -696,6 +753,7 @@ const Guard: React.FC = () => {
       // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound')
       message.error(errorMessage)
+      setSelectedWorker(null)
     }
   }
 
@@ -772,16 +830,18 @@ const Guard: React.FC = () => {
       message.success(t('guard.returnItemsSuccess').replace('{count}', selectedReturnItems.length.toString()))
       
       // 重新查询工人信息以获取最新的借用物品列表
-      const result = await apiService.checkWorkerEntryRecord(selectedWorker.workerId)
+      const borrowRecords = await apiService.getWorkerBorrowRecords(selectedWorker.workerId)
       
       // 更新当前借用物品列表
-      const borrowedItems = result.currentBorrowedItems?.map((record: any) => ({
-        recordId: record.id,
-        itemType: record.item?.category?.id || record.item?.categoryId,
-        itemId: record.item?.itemCode || record.itemCode,
-        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
-        remark: record.notes || ''
-      })) || []
+      const borrowedItems = borrowRecords
+        .filter((record: any) => record.status === 'BORROWED') // 只获取未归还的物品
+        .map((record: any) => ({
+          recordId: record.id,
+          itemType: record.item?.category?.id || record.item?.categoryId,
+          itemId: record.item?.itemCode || record.itemCode,
+          borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+          remark: record.notes || ''
+        }))
       
       setCurrentBorrowedItems(borrowedItems)
       setSelectedReturnItems([])
@@ -853,13 +913,13 @@ const Guard: React.FC = () => {
       )
       setWorkers(updatedWorkers)
 
-      // 更新考勤记录
-      const updatedRecords = attendanceRecords.map(record => 
-        record.workerId === selectedWorker.workerId
-          ? { ...record, borrowedItems: record.borrowedItems + borrowItemsList.length }
-          : record
-      )
-      setAttendanceRecords(updatedRecords)
+      // 更新考勤记录 - 已移除本地更新，现在依赖API数据
+      // const updatedRecords = attendanceRecords.map(record => 
+      //   record.workerId === selectedWorker.workerId
+      //     ? { ...record, borrowedItems: record.borrowedItems + borrowItemsList.length }
+      //     : record
+      // )
+      // setAttendanceRecords(updatedRecords)
 
       message.success(t('guard.borrowRegistrationSuccess').replace('{count}', borrowItemsList.length.toString()))
       
@@ -944,17 +1004,17 @@ const Guard: React.FC = () => {
     )
     setWorkers(updatedWorkers)
 
-    // 更新考勤记录
-    const updatedRecords = attendanceRecords.map(record => 
-      record.workerId === selectedWorker.workerId
-        ? { 
-            ...record, 
-            status: 'out' as const,
-            exitTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
-          }
-        : record
-    )
-    setAttendanceRecords(updatedRecords)
+    // 更新考勤记录 - 已移除本地更新，现在依赖API数据
+    // const updatedRecords = attendanceRecords.map(record => 
+    //   record.workerId === selectedWorker.workerId
+    //     ? { 
+    //         ...record, 
+    //         status: 'out' as const,
+    //         exitTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+    //       }
+    //     : record
+    // )
+    // setAttendanceRecords(updatedRecords)
 
     message.success(t('guard.exitCompleted'))
     
@@ -1146,13 +1206,13 @@ const Guard: React.FC = () => {
     )
     setWorkers(updatedWorkers)
 
-    // 更新考勤记录
-    const updatedRecords = attendanceRecords.map(record => 
-      record.workerId === selectedWorker.workerId
-        ? { ...record, returnedItems: record.returnedItems + selectedBorrowedItems.length }
-        : record
-    )
-    setAttendanceRecords(updatedRecords)
+    // 更新考勤记录 - 已移除本地更新，现在依赖API数据
+    // const updatedRecords = attendanceRecords.map(record => 
+    //   record.workerId === selectedWorker.workerId
+    //     ? { ...record, returnedItems: record.returnedItems + selectedBorrowedItems.length }
+    //     : record
+    // )
+    // setAttendanceRecords(updatedRecords)
 
     message.success(t('guard.returnItemsSuccessCount').replace('{count}', selectedBorrowedItems.length.toString()))
     setSelectedBorrowedItems([])
@@ -2779,6 +2839,8 @@ const Guard: React.FC = () => {
     // 使用API数据，如果没有数据则显示空数组
     const records = visitorRecords
     console.log('Records for table:', records) // 调试信息
+    console.log('visitorRecords length:', visitorRecords.length) // 调试信息
+    console.log('visitorRecords content:', JSON.stringify(visitorRecords, null, 2)) // 调试信息
 
     // 根据状态筛选记录
     const filteredRecords = records.filter(record => {

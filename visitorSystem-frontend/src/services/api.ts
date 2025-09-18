@@ -67,7 +67,8 @@ interface Worker {
   workerId: string;
   name: string;
   phone: string;
-  idCard: string;
+  idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
+  idNumber: string;
   gender: 'MALE' | 'FEMALE';
   status: 'ACTIVE' | 'INACTIVE';
   distributorId: string;
@@ -91,7 +92,7 @@ interface VisitorRecord {
   checkInTime?: string;
   checkOutTime?: string;
   status: 'ON_SITE' | 'LEFT' | 'PENDING';
-  idType: string;
+  idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
   idNumber: string;
   physicalCardId?: string;
   registrarId?: string;
@@ -124,7 +125,8 @@ interface VisitorRecord {
 interface CreateWorkerRequest {
   name: string;
   phone: string;
-  idCard: string;
+  idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
+  idNumber: string;
   physicalCardId?: string;
   gender: string; // 改为string类型，支持任意值
   siteId: string;
@@ -140,7 +142,8 @@ interface CreateWorkerRequest {
 interface UpdateWorkerRequest {
   name?: string;
   phone?: string;
-  idCard?: string;
+  idType?: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
+  idNumber?: string;
   physicalCardId?: string;
   gender?: 'MALE' | 'FEMALE';
   siteId?: string;
@@ -1032,7 +1035,7 @@ class ApiService {
     checkInTime?: string;
     checkOutTime?: string;
     status?: 'ON_SITE' | 'LEFT' | 'PENDING';
-    idType: string;
+    idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
     idNumber: string;
     physicalCardId?: string;
     registrarId?: string;
@@ -1047,13 +1050,35 @@ class ApiService {
     });
   }
 
+  // 门卫专用的创建访客记录方法
+  async createGuardVisitorRecord(data: {
+    workerId: string;
+    siteId: string;
+    checkInTime?: string;
+    checkOutTime?: string;
+    status?: 'ON_SITE' | 'LEFT' | 'PENDING';
+    idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
+    idNumber: string;
+    physicalCardId?: string;
+    registrarId?: string;
+    notes?: string;
+  }): Promise<VisitorRecord> {
+    return this.requestWithRetry('/guards/visitor-records', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
   async updateVisitorRecord(id: string, data: Partial<{
     workerId: string;
     siteId: string;
     checkInTime?: string;
     checkOutTime?: string;
     status?: 'ON_SITE' | 'LEFT' | 'PENDING';
-    idType: string;
+    idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
     idNumber: string;
     physicalCardId?: string;
     registrarId?: string;

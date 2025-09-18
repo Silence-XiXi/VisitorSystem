@@ -574,6 +574,8 @@ export default {
     borrowCompleted: '借物登記完成',
     exitCompleted: '離場登記完成',
     workerQuerySuccess: '工人資料查詢成功',
+    workerAlreadyOnSite: '工人 {workerName} 已經在場，入場時間：{entryTime}，無法重複登記',
+    workerNotOnSiteButCanBorrow: '工人未入場，但可以借物（系統將自動創建入場記錄）',
     // 新增的翻譯鍵
     query: '查詢',
     phonePlaceholder: '請輸入聯繫電話',
@@ -657,7 +659,12 @@ export default {
     gender: '性別',
     male: '男',
     female: '女',
-    idCard: '身份證號',
+    idCard: '身份證',
+    idType: '證件類型',
+    idNumber: '證件號碼',
+    passport: '護照',
+    driverLicense: '駕駛證',
+    other: '其他',
     region: '地區',
     regionPlaceholder: '請選擇地區',
     chinaMainland: '中國大陸',
@@ -1033,6 +1040,10 @@ export default {
     // 二维码发送相关
     sendQRCodeTitle: '發送工人二維碼',
     workerName: '工人姓名：',
+    workerIdLabel: '工號：',
+    phoneLabel: '電話：',
+    // 兼容舊鍵名
+    phoneLabel1: '電話：',
     selectSendMethod: '選擇發送方式',
     sendEmail: '發送郵件',
     sendWhatsApp: '發送WhatsApp',

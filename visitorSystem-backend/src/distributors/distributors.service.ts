@@ -248,8 +248,8 @@ export class DistributorsService {
       // 检查错误消息中是否包含重复信息
       const errorMessage = error?.message || '';
       if (errorMessage.includes('Unique constraint') || errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
-        if (errorMessage.includes('idCard') || errorMessage.includes('身份证')) {
-          throw new ConflictException('身份证号已存在');
+        if (errorMessage.includes('idNumber') || errorMessage.includes('证件号码') || errorMessage.includes('idCard') || errorMessage.includes('身份证')) {
+          throw new ConflictException('证件号码已存在');
         } else if (errorMessage.includes('workerId') || errorMessage.includes('工号')) {
           throw new ConflictException('工人编号已存在');
         } else if (errorMessage.includes('phone') || errorMessage.includes('手机')) {
@@ -407,11 +407,11 @@ export class DistributorsService {
         console.log(`处理第${i + 1}行数据:`, workerData);
         
         // 检查必填字段
-        if (!workerData.name || !workerData.gender || !workerData.idCard || !workerData.phone) {
+        if (!workerData.name || !workerData.gender || !workerData.idNumber || !workerData.phone) {
           const missingFields = [];
           if (!workerData.name) missingFields.push('姓名');
           if (!workerData.gender) missingFields.push('性别');
-          if (!workerData.idCard) missingFields.push('身份证号');
+          if (!workerData.idNumber) missingFields.push('证件号码');
           if (!workerData.phone) missingFields.push('手机号');
           
           results.errors++;
@@ -420,14 +420,14 @@ export class DistributorsService {
           continue;
         }
 
-        // 检查身份证号是否已存在
+        // 检查证件号码是否已存在
         const existingWorker = await this.prisma.worker.findUnique({
-          where: { idCard: workerData.idCard }
+          where: { idNumber: workerData.idNumber }
         });
 
         if (existingWorker) {
           results.skipped++;
-          console.log(`第${i + 1}行身份证号重复:`, workerData.idCard);
+          console.log(`第${i + 1}行证件号码重复:`, workerData.idNumber);
           continue;
         }
 
@@ -452,7 +452,8 @@ export class DistributorsService {
         const processedData = {
           name: workerData.name,
           phone: workerData.phone,
-          idCard: workerData.idCard,
+          idType: workerData.idType || 'ID_CARD',
+          idNumber: workerData.idNumber || workerData.idCard, // 兼容旧字段名
           gender: this.normalizeGender(workerData.gender),
           region: workerData.region || null,
           workerId: workerId.trim(),
@@ -497,31 +498,39 @@ export class DistributorsService {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      console.log('Excel解析结果:', jsonData.length, '行数据');
-      console.log('第一行数据示例:', jsonData[0]);
+      // console.log('Excel解析结果:', jsonData.length, '行数据');
+      // console.log('第一行数据示例:', jsonData[0]);
 
       // 转换Excel数据为工人数据格式
       const workersData = jsonData.map((row: any, index: number) => {
         // 获取所有可能的字段名
         const fieldNames = Object.keys(row);
-        console.log(`第${index + 1}行字段:`, fieldNames);
+        // console.log(`第${index + 1}行字段:`, fieldNames);
         
+        // 辅助函数：处理空值，将 "-" 转换为 null
+        const getValue = (value: any) => {
+          if (!value || value === '-' || value.toString().trim() === '' || value.toString().trim() === '-') {
+            return null;
+          }
+          return value.toString().trim();
+        };
+
         return {
-          name: row['姓名'] || row['name'] || row['Name'] || '',
-          gender: this.normalizeGender(row['性别'] || row['gender'] || row['Gender'] || ''),
-          idCard: row['身份证号'] || row['idCard'] || row['ID Card'] || row['身份证'] || '',
-          phone: row['手机号'] || row['phone'] || row['Phone'] || row['手机'] || '',
-          email: row['邮箱'] || row['email'] || row['Email'] || null,
-          whatsapp: row['WhatsApp'] || row['whatsapp'] || row['WhatsApp'] || null,
-          birthDate: row['出生日期'] || row['birthDate'] || row['Birth Date'] || null,
-          region: row['地区'] || row['region'] || row['Region'] || null,
-          siteId: row['工地ID'] || row['siteId'] || row['Site ID'] || null,
-          status: this.normalizeWorkerStatus(row['状态'] || row['status'] || row['Status'] || ''),
-          workerId: row['工人编号'] || row['workerId'] || row['Worker ID'] || null
+          name: getValue(row['姓名'] || row['name'] || row['Name']) || '',
+          gender: this.normalizeGender(getValue(row['性别'] || row['gender'] || row['Gender']) || ''),
+          idNumber: getValue(row['证件号码'] || row['idNumber'] || row['ID Number'] || row['身份证号'] || row['idCard'] || row['ID Card'] || row['身份证']) || '',
+          phone: getValue(row['手机号'] || row['phone'] || row['Phone'] || row['手机']) || '',
+          email: getValue(row['邮箱'] || row['email'] || row['Email']),
+          whatsapp: getValue(row['WhatsApp'] || row['whatsapp']),
+          birthDate: getValue(row['出生日期'] || row['birthDate'] || row['Birth Date']),
+          region: getValue(row['地区'] || row['region'] || row['Region']),
+          siteId: getValue(row['工地ID'] || row['siteId'] || row['Site ID']),
+          status: this.normalizeWorkerStatus(getValue(row['状态'] || row['status'] || row['Status']) || ''),
+          workerId: getValue(row['工人编号'] || row['workerId'] || row['Worker ID'])
         };
       });
 
-      console.log('转换后的工人数据示例:', workersData[0]);
+      // console.log('转换后的工人数据示例:', workersData[0]);
 
       // 调用现有的导入方法
       return await this.importWorkers(user, workersData);

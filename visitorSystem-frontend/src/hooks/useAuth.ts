@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { apiService } from '../services/api'
 import { useLocale } from '../contexts/LocaleContext'
 
@@ -33,6 +33,7 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
   const [validationInProgress, setValidationInProgress] = useState(false)
+  const hasInitialized = useRef(false)
   
   // 安全地获取翻译函数，如果不在LocaleProvider中则使用默认值
   let t: (key: string) => string
@@ -61,11 +62,12 @@ export const useAuth = () => {
 
   useEffect(() => {
     // 防止重复初始化
-    if (isInitialized || validationInProgress) {
+    if (hasInitialized.current) {
       return
     }
 
     const validateAuth = async () => {
+      hasInitialized.current = true
       setValidationInProgress(true)
       console.log('useAuth: Starting authentication validation')
       
@@ -229,6 +231,7 @@ export const useAuth = () => {
       setIsLoading(false)
       setIsInitialized(false)
       setValidationInProgress(false)
+      hasInitialized.current = false
     }
   }
 

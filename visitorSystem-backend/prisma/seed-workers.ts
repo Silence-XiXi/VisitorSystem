@@ -336,45 +336,66 @@ async function main() {
   console.log('开始插入工人数据...');
 
   try {
-    // 删除现有的工人数据（除了已存在的）
-    const existingWorkers = await prisma.worker.findMany({
-      where: {
-        id: {
-          in: mockWorkers.map(w => w.id)
-        }
-      }
-    });
+    // 获取现有的分判商和工地
+    const distributors = await prisma.distributor.findMany();
+    const sites = await prisma.site.findMany();
 
-    const existingWorkerIds = existingWorkers.map(w => w.id);
-    const newWorkers = mockWorkers.filter(w => !existingWorkerIds.includes(w.id));
+    console.log(`找到分判商: ${distributors.length} 个`);
+    console.log(`找到工地: ${sites.length} 个`);
 
+    if (distributors.length === 0 || sites.length === 0) {
+      console.log('请先运行基础种子数据脚本创建分判商和工地');
+      return;
+    }
+
+    // 使用第一个分判商和工地的ID
+    const defaultDistributorId = distributors[0].id;
+    const defaultSiteId = sites[0].id;
+
+    console.log(`使用分判商ID: ${defaultDistributorId}`);
+    console.log(`使用工地ID: ${defaultSiteId}`);
+
+    // 检查现有的工人数据
+    const existingWorkers = await prisma.worker.findMany();
     console.log(`现有工人: ${existingWorkers.length} 个`);
-    console.log(`需要插入的新工人: ${newWorkers.length} 个`);
 
-    // 插入新的工人数据
-    for (const workerData of newWorkers) {
+    // 插入新的工人数据，使用实际的ID
+    for (let i = 0; i < mockWorkers.length; i++) {
+      const workerData = mockWorkers[i];
+      const workerId = `WK${String(i + 1).padStart(3, '0')}`;
+      
+      // 检查工人编号是否已存在
+      const existingWorker = await prisma.worker.findUnique({
+        where: { workerId: workerId }
+      });
+
+      if (existingWorker) {
+        console.log(`工人 ${workerId} 已存在，跳过`);
+        continue;
+      }
+
       await prisma.worker.create({
         data: {
-          id: workerData.id,
-          workerId: workerData.workerId,
+          workerId: workerId,
           name: workerData.name,
           gender: workerData.gender.toUpperCase() as any,
-          idCard: workerData.idCard,
+          idType: 'ID_CARD',
+          idNumber: workerData.idCard,
           region: workerData.region,
-          distributorId: workerData.distributorId,
-          siteId: workerData.siteId,
+          distributorId: defaultDistributorId,
+          siteId: defaultSiteId,
           phone: workerData.phone,
           email: workerData.email,
           whatsapp: workerData.whatsapp,
           birthDate: new Date(workerData.birthDate),
-          status: workerData.status.toUpperCase() as any,
+          status: workerData.status === 'suspended' ? 'INACTIVE' : workerData.status.toUpperCase() as any,
         },
       });
+
+      console.log(`创建工人: ${workerData.name} (${workerId})`);
     }
 
     console.log('工人数据插入完成！');
-    console.log(`- 新增工人: ${newWorkers.length} 个`);
-    console.log(`- 总工人数: ${existingWorkers.length + newWorkers.length} 个`);
 
   } catch (error) {
     console.error('插入工人数据时出错:', error);

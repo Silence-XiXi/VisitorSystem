@@ -303,6 +303,18 @@ export class GuardsService {
       throw new ForbiddenException('该工人不在您管理的工地');
     }
 
+    // 检查工人是否已经有有效的入场记录
+    const visitorRecord = await this.prisma.visitorRecord.findFirst({
+      where: {
+        workerId: worker.id,
+        status: 'ON_SITE'
+      }
+    });
+
+    if (!visitorRecord) {
+      throw new ForbiddenException('该工人未入场，无法借用物品');
+    }
+
     // 验证物品类型是否存在
     const category = await this.prisma.itemCategory.findUnique({
       where: { id: recordData.categoryId }
@@ -335,7 +347,7 @@ export class GuardsService {
       throw new ForbiddenException('该物品不可借用');
     }
 
-    // 创建借用记录
+    // 创建借用记录（关联当前有效的访客记录）
     const borrowRecord = await this.prisma.itemBorrowRecord.create({
       data: {
         workerId: recordData.workerId,
@@ -345,7 +357,8 @@ export class GuardsService {
         borrowDate: recordData.borrowDate || new Date(),
         borrowTime: recordData.borrowTime || new Date().toTimeString().split(' ')[0],
         status: 'BORROWED',
-        notes: recordData.notes || null
+        notes: recordData.notes || null,
+        visitorRecordId: visitorRecord.id
       },
       include: {
         worker: {
@@ -641,8 +654,8 @@ export class GuardsService {
         siteId: guard.siteId,
         checkInTime: new Date(),
         status: 'ON_SITE',
-        idType: recordData.idType || '身份证',
-        idNumber: recordData.idNumber || worker.idCard,
+        idType: recordData.idType || 'ID_CARD',
+        idNumber: recordData.idNumber || worker.idNumber,
         physicalCardId: recordData.physicalCardId,
         registrarId: guard.id,
         notes: recordData.notes

@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
+
+const { Option } = Select
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, QrcodeOutlined, MailOutlined, MessageOutlined } from '@ant-design/icons'
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Site } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
@@ -120,10 +122,10 @@ const DistributorWorkerUpload: React.FC = () => {
   // 筛选后的工人数据
   const filteredWorkers = useMemo(() => {
     return workers.filter(worker => {
-      if (statusFilters.length > 0 && !statusFilters.includes(worker.status)) return false
+      if (statusFilters.length > 0 && !statusFilters.includes(worker.status.toLowerCase())) return false
       if (keyword.trim()) {
         const k = keyword.trim().toLowerCase()
-        const text = `${worker.name || ''} ${worker.workerId || ''} ${worker.idCard || ''}`.toLowerCase()
+        const text = `${worker.name || ''} ${worker.workerId || ''} ${worker.idNumber || ''}`.toLowerCase()
         if (!text.includes(k)) return false
       }
       return true
@@ -154,9 +156,11 @@ const DistributorWorkerUpload: React.FC = () => {
       if (editingWorker) {
         // 编辑工人
         const updateData: UpdateWorkerRequest = {
+          id: editingWorker.id,
           name: values.name,
           phone: values.phone,
-          idCard: values.idCard,
+          idType: values.idType,
+          idNumber: values.idNumber,
           gender: values.gender?.toUpperCase() as 'MALE' | 'FEMALE',
           status: values.status?.toUpperCase() as 'ACTIVE' | 'INACTIVE',
           region: values.region, // 包含地区信息
@@ -166,7 +170,19 @@ const DistributorWorkerUpload: React.FC = () => {
           whatsapp: values.whatsapp || null
         }
         
-        await apiService.updateDistributorWorker(editingWorker.id, updateData)
+        await apiService.updateDistributorWorker(editingWorker.id, {
+          name: values.name,
+          phone: values.phone,
+          idType: values.idType,
+          idNumber: values.idNumber,
+          gender: values.gender?.toUpperCase() as 'MALE' | 'FEMALE',
+          status: values.status?.toUpperCase() as 'ACTIVE' | 'INACTIVE',
+          region: values.region,
+          siteId: values.siteId,
+          birthDate: values.birthDate ? values.birthDate.toISOString() : null,
+          email: values.email || null,
+          whatsapp: values.whatsapp || null
+        })
         message.success(t('distributor.workerInfoUpdated'))
       } else {
         // 新增工人
@@ -189,7 +205,8 @@ const DistributorWorkerUpload: React.FC = () => {
         const createData: CreateWorkerRequest = {
           name: values.name,
           phone: values.phone,
-          idCard: values.idCard,
+          idType: values.idType,
+          idNumber: values.idNumber,
           gender: values.gender?.toUpperCase() as 'MALE' | 'FEMALE',
           region: values.region || t('regions.mainland'),
           siteId: selectedSiteId, // 使用表单中选择的工地
@@ -222,9 +239,9 @@ const DistributorWorkerUpload: React.FC = () => {
       if (error && typeof error === 'object' && 'message' in error) {
         const errorMsg = (error as { message: string }).message
         
-        // 检查是否是身份证重复的错误
-        if (errorMsg.includes('身份证') || errorMsg.includes('idCard') || errorMsg.includes('duplicate') || errorMsg.includes('已存在')) {
-          errorMessage = '身份证号码已存在，请检查身份证号码是否正确或使用其他身份证号码'
+        // 检查是否是证件号码重复的错误
+        if (errorMsg.includes('证件号码') || errorMsg.includes('idNumber') || errorMsg.includes('duplicate') || errorMsg.includes('已存在')) {
+          errorMessage = '证件号码已存在，请检查证件号码是否正确或使用其他证件号码'
         } else if (errorMsg.includes('手机号') || errorMsg.includes('phone') || errorMsg.includes('电话')) {
           errorMessage = '手机号码已存在，请使用其他手机号码'
         } else if (errorMsg.includes('工号') || errorMsg.includes('workerId')) {
@@ -678,7 +695,28 @@ const DistributorWorkerUpload: React.FC = () => {
         return ageA - ageB;
       }
     },
-    { title: t('distributor.idCard'), dataIndex: 'idCard', key: 'idCard', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.idCard.localeCompare(b.idCard) },
+    {
+      title: t('worker.idType'),
+      dataIndex: 'idType',
+      key: 'idType',
+      width: 120,
+      render: (idType: string) => {
+        const typeMap: Record<string, string> = {
+          'ID_CARD': t('worker.idCard'),
+          'PASSPORT': t('worker.passport'),
+          'DRIVER_LICENSE': t('worker.driverLicense'),
+          'OTHER': t('worker.other')
+        };
+        return typeMap[idType] || idType;
+      },
+    },
+    {
+      title: t('worker.idNumber'),
+      dataIndex: 'idNumber',
+      key: 'idNumber',
+      width: 180,
+      sorter: (a: Worker, b: Worker) => a.idNumber.localeCompare(b.idNumber),
+    },
     { 
       title: t('distributor.region'), 
       dataIndex: 'region', 
@@ -730,6 +768,8 @@ const DistributorWorkerUpload: React.FC = () => {
             workerForm.setFieldsValue({
               ...record,
               workerId: record.workerId, // 确保工号被设置
+              idType: record.idType, // 设置证件类型
+              idNumber: record.idNumber, // 设置证件号码
               birthDate: record.birthDate ? dayjs(record.birthDate) : undefined,
               siteId: record.siteId, // 确保工地ID被设置
               region: record.region // 直接使用数据库原始值
@@ -749,6 +789,8 @@ const DistributorWorkerUpload: React.FC = () => {
         />
         <Button 
           size="small" 
+          type="primary"
+          danger={record.status === 'active'}
           icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />} 
           onClick={() => handleToggleStatus(record)}
           title={record.status === 'active' ? t('distributor.pause') : t('distributor.enable')}
@@ -902,6 +944,7 @@ const DistributorWorkerUpload: React.FC = () => {
                   const defaultSiteId = sites.length > 0 ? sites[0].id : null
                   workerForm.setFieldsValue({
                     status: 'active',
+                    idType: 'ID_CARD', // 设置默认证件类型为身份证
                     region: t('regions.mainland'),
                     siteId: defaultSiteId, // 设置默认工地为第一个工地
                     birthDate: null, // 初始日期为空
@@ -1084,10 +1127,36 @@ const DistributorWorkerUpload: React.FC = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="idCard" label={t('distributor.idCard')} rules={[{ required: true, message: t('distributor.pleaseEnterIdCard') }]}>
-                <Input placeholder={t('distributor.idCardPlaceholder')} />
+              <Form.Item
+                name="idType"
+                label={t('worker.idType')}
+                rules={[
+                  { required: true, message: t('form.required') }
+                ]}
+                initialValue="ID_CARD"
+              >
+                <Select placeholder={t('form.selectPlaceholder') + t('worker.idType')}>
+                  <Option value="ID_CARD">{t('worker.idCard')}</Option>
+                  <Option value="PASSPORT">{t('worker.passport')}</Option>
+                  <Option value="DRIVER_LICENSE">{t('worker.driverLicense')}</Option>
+                  <Option value="OTHER">{t('worker.other')}</Option>
+                </Select>
               </Form.Item>
             </Col>
+            <Col span={12}>
+              <Form.Item
+                name="idNumber"
+                label={t('worker.idNumber')}
+                rules={[
+                  { required: true, message: t('form.required') }
+                ]}
+              >
+                <Input placeholder={t('form.inputPlaceholder') + t('worker.idNumber')} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="region" label={t('distributor.region')} rules={[{ required: true, message: t('distributor.pleaseSelectRegion') }]}>
                 <Select placeholder={t('distributor.regionPlaceholder')} options={[
@@ -1097,6 +1166,9 @@ const DistributorWorkerUpload: React.FC = () => {
                   { value: t('regions.taiwan'), label: t('regions.taiwan') }
                 ]} />
               </Form.Item>
+            </Col>
+            <Col span={12}>
+              {/* 空列，保持布局 */}
             </Col>
           </Row>
 

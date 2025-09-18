@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, message, Space, Typography, Row, Col, Dropdown } from 'antd'
 import { UserOutlined, LockOutlined, ReloadOutlined, GlobalOutlined } from '@ant-design/icons'
@@ -13,6 +13,7 @@ const Login: React.FC = () => {
   const [captchaImage, setCaptchaImage] = useState('')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [retryCount, setRetryCount] = useState(0)
+  const hasRedirected = useRef(false)
   const navigate = useNavigate()
   const { login, isAuthenticated, user, isLoading } = useAuth()
   const { t, setLocale } = useLocale()
@@ -103,8 +104,9 @@ const Login: React.FC = () => {
 
   // 如果用户已经登录，自动跳转到相应页面（仅在页面加载时检查）
   useEffect(() => {
-    if (!isLoading && isAuthenticated && user) {
+    if (!isLoading && isAuthenticated && user && !hasRedirected.current) {
       console.log('Auto redirecting user on page load:', user)
+      hasRedirected.current = true
       const userRole = user.role.toLowerCase()
       if (userRole === 'distributor') {
         navigate('/distributor/workers', { replace: true })

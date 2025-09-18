@@ -100,7 +100,7 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
       
       // 移除workerId字段，因为现在由后端自动生成
       if ('workerId' in formData) {
-        delete (formData as Record<string, unknown>).workerId;
+        delete (formData as any).workerId;
       }
       
       console.log('Processed formData:', formData);
@@ -120,10 +120,10 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
     } catch (error: unknown) {
       console.error('WorkerForm handleSubmit error:', error);
       
-      // 检查是否是身份证号重复错误
+      // 检查是否是证件号码重复错误
       if (error && typeof error === 'object' && 'message' in error && 
-          typeof error.message === 'string' && error.message.includes('身份证号已存在')) {
-        message.error('身份证号已存在');
+          typeof error.message === 'string' && error.message.includes('证件号码已存在')) {
+        message.error('证件号码已存在');
       } else if (error && typeof error === 'object' && 'message' in error && 
                  typeof error.message === 'string' && error.message.includes('工人编号已存在')) {
         message.error('工人编号已存在');
@@ -169,13 +169,33 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
         </Col>
         <Col span={12}>
           <Form.Item
-            name="idCard"
-            label={t('worker.idCard')}
+            name="idType"
+            label={t('worker.idType')}
+            rules={[
+              { required: true, message: t('form.required') }
+            ]}
+            initialValue="ID_CARD"
+          >
+            <Select placeholder={t('form.selectPlaceholder') + t('worker.idType')}>
+              <Option value="ID_CARD">{t('worker.idCard')}</Option>
+              <Option value="PASSPORT">{t('worker.passport')}</Option>
+              <Option value="DRIVER_LICENSE">{t('worker.driverLicense')}</Option>
+              <Option value="OTHER">{t('worker.other')}</Option>
+            </Select>
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item
+            name="idNumber"
+            label={t('worker.idNumber')}
             rules={[
               { required: true, message: t('form.required') }
             ]}
           >
-            <Input placeholder={t('form.inputPlaceholder') + t('worker.idCard')} prefix={<IdcardOutlined />} />
+            <Input placeholder={t('form.inputPlaceholder') + t('worker.idNumber')} prefix={<IdcardOutlined />} />
           </Form.Item>
         </Col>
       </Row>

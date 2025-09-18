@@ -1,0 +1,141 @@
+# 门卫重复入场登记问题修复
+
+## 问题描述
+
+用户反馈：当前输入已存在访客记录的工人工号，还是可以登记入场。
+
+## 问题分析
+
+经过代码分析，发现了以下问题：
+
+### 1. API调用参数错误
+- **问题**：前端在调用 `checkWorkerEntryRecord` 时传递的是数据库ID（`worker.id`），但后端期望的是工人编号（`workerId`）
+- **影响**：导致重复入场检查失效
+
+### 2. API接口使用错误
+- **问题**：前端使用通用的 `/visitor-records` 接口，而不是门卫专用的 `/guards/visitor-records` 接口
+- **影响**：门卫专用的验证逻辑无法生效
+
+### 3. 参数传递不一致
+- **问题**：前端传递数据库ID给后端，但后端的门卫服务期望工人编号
+- **影响**：后端验证逻辑无法正确执行
+
+## 修复方案
+
+### 1. 修复API调用参数
+```typescript
+// 修复前
+const entryRecord = await apiService.checkWorkerEntryRecord(worker.id)
+
+// 修复后
+const entryRecord = await apiService.checkWorkerEntryRecord(worker.workerId)
+```
+
+### 2. 创建门卫专用API方法
+```typescript
+// 新增门卫专用的创建访客记录方法
+async createGuardVisitorRecord(data: {
+  workerId: string;
+  siteId: string;
+  // ... 其他参数
+}): Promise<VisitorRecord> {
+  return this.requestWithRetry('/guards/visitor-records', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+```
+
+### 3. 更新前端调用
+```typescript
+// 修复前
+const visitorRecord = await apiService.createVisitorRecord({
+  workerId: selectedWorker.id, // 使用数据库ID
+  // ... 其他参数
+})
+
+// 修复后
+const visitorRecord = await apiService.createGuardVisitorRecord({
+  workerId: selectedWorker.workerId, // 使用工人编号
+  // ... 其他参数
+})
+```
+
+## 修复后的流程
+
+### 入场登记验证流程
+1. **输入工人编号**：门卫输入工人编号
+2. **查询工人信息**：调用 `getWorkerByWorkerId` 获取工人基本信息
+3. **检查入场记录**：调用 `checkWorkerEntryRecord(worker.workerId)` 检查是否已入场
+4. **验证结果**：
+   - 如果已入场：显示警告信息，阻止继续登记
+   - 如果未入场：显示工人信息，允许继续登记
+5. **创建入场记录**：调用 `createGuardVisitorRecord` 使用门卫专用接口
+
+### 后端验证逻辑
+门卫专用的 `createVisitorRecord` 方法包含以下验证：
+1. 验证工人是否存在且属于当前工地
+2. 检查工人是否已经在场（状态为 `ON_SITE`）
+3. 如果已在场，抛出 `BadRequestException` 异常
+
+## 技术细节
+
+### API接口对比
+| 接口 | 用途 | 验证逻辑 |
+|------|------|----------|
+| `/visitor-records` | 通用访客记录 | 基础验证 |
+| `/guards/visitor-records` | 门卫专用 | 包含重复入场检查 |
+
+### 参数类型
+- **工人编号**：`workerId`（字符串，如 "WK001"）
+- **数据库ID**：`id`（UUID字符串）
+
+### 错误处理
+- **400错误**：工人已在场，无法重复登记
+- **404错误**：工人不存在或不属于当前工地
+- **409错误**：数据冲突
+
+## 测试建议
+
+### 1. 正常流程测试
+```
+1. 输入存在的工人编号
+2. 确认工人信息显示
+3. 完成入场登记
+4. 验证记录创建成功
+```
+
+### 2. 重复入场测试
+```
+1. 对同一工人进行第一次入场登记
+2. 再次输入同一工人编号
+3. 验证系统显示"工人已在场"警告
+4. 确认无法继续登记
+```
+
+### 3. 错误处理测试
+```
+1. 输入不存在的工人编号
+2. 验证错误信息显示
+3. 输入不属于当前工地的工人编号
+4. 验证权限控制
+```
+
+## 修复文件清单
+
+1. **visitorSystem-frontend/src/pages/Guard.tsx**
+   - 修复 `handleScanWorkerId` 中的API调用参数
+   - 更新 `handleCompleteEntry` 使用门卫专用API
+
+2. **visitorSystem-frontend/src/services/api.ts**
+   - 新增 `createGuardVisitorRecord` 方法
+
+3. **国际化文件**
+   - 已包含相应的错误提示文本
+
+## 总结
+
+通过修复API调用参数错误和接口使用问题，现在门卫系统能够正确检测重复入场登记，有效防止同一工人多次入场。修复后的系统具备完整的验证机制，确保数据的完整性和准确性。

@@ -224,13 +224,13 @@ export class AdminService {
       actualSiteId = site.id; // 使用主键ID
     }
 
-    // 检查身份证号是否已存在
-    if (workerData.idCard) {
+    // 检查证件号码是否已存在
+    if (workerData.idNumber) {
       const existingWorker = await this.prisma.worker.findUnique({
-        where: { idCard: workerData.idCard }
+        where: { idNumber: workerData.idNumber }
       });
       if (existingWorker) {
-        throw new ConflictException('身份证号已存在');
+        throw new ConflictException('证件号码已存在');
       }
     }
 
@@ -270,8 +270,8 @@ export class AdminService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        if (error.meta?.target?.includes('idCard')) {
-          throw new ConflictException('身份证号已存在');
+        if (error.meta?.target?.includes('idNumber')) {
+          throw new ConflictException('证件号码已存在');
         } else if (error.meta?.target?.includes('workerId')) {
           throw new ConflictException('工人编号已存在');
         }
@@ -1286,7 +1286,8 @@ export class AdminService {
         workerId: worker.workerId,
         name: worker.name,
         gender: worker.gender,
-        idCard: worker.idCard,
+        idType: worker.idType,
+        idNumber: worker.idNumber,
         region: worker.region,
         distributorName: worker.distributor?.name || '',
         distributorId: worker.distributor?.distributorId || '',
@@ -1321,7 +1322,7 @@ export class AdminService {
       
       try {
         // 检查必填字段
-        if (!workerData.name || !workerData.gender || !workerData.idCard || !workerData.phone) {
+        if (!workerData.name || !workerData.gender || !workerData.idNumber || !workerData.phone) {
           results.errors++;
           results.errorDetails.push(`第${i + 1}行：缺少必填字段`);
           continue;
@@ -1355,9 +1356,9 @@ export class AdminService {
           actualSiteId = site.id; // 使用主键ID
         }
 
-        // 检查身份证号是否已存在
+        // 检查证件号码是否已存在
         const existingWorker = await this.prisma.worker.findUnique({
-          where: { idCard: workerData.idCard }
+          where: { idNumber: workerData.idNumber }
         });
 
         if (existingWorker) {
@@ -1561,32 +1562,44 @@ export class AdminService {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      console.log('Excel解析结果:', jsonData.length, '行数据');
-      console.log('第一行数据示例:', jsonData[0]);
+      // console.log('Excel解析结果:', jsonData.length, '行数据');
+      // console.log('第一行数据示例:', jsonData[0]);
 
       // 转换Excel数据为工人数据格式
       const workersData = jsonData.map((row: any, index: number) => {
         // 获取所有可能的字段名
         const fieldNames = Object.keys(row);
-        console.log(`第${index + 1}行字段:`, fieldNames);
+        // console.log(`第${index + 1}行原始数据:`, row);
+        // console.log(`第${index + 1}行字段名:`, fieldNames);
         
-        return {
-          name: row['姓名'] || row['name'] || row['Name'] || '',
-          gender: this.normalizeGender(row['性别'] || row['gender'] || row['Gender'] || ''),
-          idCard: row['身份证号'] || row['idCard'] || row['ID Card'] || row['身份证'] || '',
-          phone: row['手机号'] || row['phone'] || row['Phone'] || row['手机'] || '',
-          email: row['邮箱'] || row['email'] || row['Email'] || null,
-          whatsapp: row['WhatsApp'] || row['whatsapp'] || row['WhatsApp'] || null,
-          birthDate: row['出生日期'] || row['birthDate'] || row['Birth Date'] || null,
-          region: row['地区'] || row['region'] || row['Region'] || null,
-          siteId: row['工地代码'] || row['siteCode'] || row['Site Code'] || row['工地ID'] || row['siteId'] || row['Site ID'] || null,
-          distributorId: row['分判商ID'] || row['distributorId'] || row['Distributor ID'] || null,
-          status: this.normalizeWorkerStatus(row['状态'] || row['status'] || row['Status'] || ''),
-          workerId: row['工人编号'] || row['workerId'] || row['Worker ID'] || null
+        // 辅助函数：处理空值，将 "-" 转换为 null
+        const getValue = (value: any) => {
+          if (!value || value === '-' || value.toString().trim() === '' || value.toString().trim() === '-') {
+            return null;
+          }
+          return value.toString().trim();
         };
+
+        const workerData = {
+          name: getValue(row['姓名'] || row['name'] || row['Name']) || '',
+          gender: this.normalizeGender(getValue(row['性别'] || row['gender'] || row['Gender']) || ''),
+          idNumber: getValue(row['证件号码'] || row['idNumber'] || row['ID Number'] || row['身份证号'] || row['idCard'] || row['ID Card'] || row['身份证']) || '',
+          phone: getValue(row['手机号'] || row['phone'] || row['Phone'] || row['手机']) || '',
+          email: getValue(row['邮箱'] || row['email'] || row['Email']),
+          whatsapp: getValue(row['WhatsApp'] || row['whatsapp']),
+          birthDate: getValue(row['出生日期'] || row['birthDate'] || row['Birth Date']),
+          region: getValue(row['地区'] || row['region'] || row['Region']),
+          siteId: getValue(row['工地代码'] || row['siteCode'] || row['Site Code'] || row['工地ID'] || row['siteId'] || row['Site ID']),
+          distributorId: getValue(row['分判商ID'] || row['distributorId'] || row['Distributor ID']),
+          status: this.normalizeWorkerStatus(getValue(row['状态'] || row['status'] || row['Status']) || ''),
+          workerId: getValue(row['工人编号'] || row['workerId'] || row['Worker ID'])
+        };
+        
+        // console.log(`第${index + 1}行转换后数据:`, workerData);
+        return workerData;
       });
 
-      console.log('转换后的工人数据示例:', workersData[0]);
+      // console.log('转换后的工人数据示例:', workersData[0]);
 
       // 调用现有的导入方法
       return await this.importWorkers(user, workersData);

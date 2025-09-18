@@ -3,7 +3,8 @@ export interface Worker {
   workerId: string; // 工人唯一编号
   name: string; // 姓名
   gender: 'MALE' | 'FEMALE'; // 性别
-  idCard: string; // 身份证号
+  idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER'; // 证件类型
+  idNumber: string; // 证件号码
   region: string; // 地区
   distributorId: string; // 分判商ID
   siteId: string; // 所属工地ID
@@ -11,7 +12,7 @@ export interface Worker {
   email: string; // 邮箱
   whatsapp: string; // WhatsApp
   birthDate?: string; // 出生日期 ISO 字符串 YYYY-MM-DD
-  status: 'ACTIVE' | 'INACTIVE'; // 状态
+  status: 'ACTIVE' | 'INACTIVE' | 'active' | 'inactive'; // 状态
   createdAt: string;
   updatedAt: string;
   distributor?: {
@@ -29,7 +30,8 @@ export interface Worker {
 export interface CreateWorkerRequest {
   name: string;
   gender: string; // 改为string类型，支持任意值
-  idCard: string;
+  idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
+  idNumber: string;
   region: string;
   distributorId: string;
   siteId: string;
@@ -50,6 +52,9 @@ export interface Distributor {
   distributorId: string; // 分判商编号
   name: string;
   siteIds?: string[]; // 服务的工地ID列表（多对多关系）
+  sites?: Array<{
+    site: Site;
+  }>; // 关联的工地信息
   contactName?: string; // 联系人
   phone?: string; // 联系电话
   email?: string; // 邮箱

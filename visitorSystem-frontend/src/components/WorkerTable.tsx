@@ -50,6 +50,19 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     return site ? site.name : '-';
   };
 
+  // 计算年龄
+  const calculateAge = (birthDate?: string) => {
+    if (!birthDate) return '-';
+    try {
+      const birth = dayjs(birthDate);
+      const now = dayjs();
+      const age = now.diff(birth, 'year');
+      return age >= 0 ? age.toString() : '-';
+    } catch (error) {
+      return '-';
+    }
+  };
+
   // 生成今日活动时间线（整合访客记录和借用物品记录）
   const todayActivities = useMemo(() => {
     if (!selectedWorker) return [];
@@ -293,11 +306,43 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       },
     },
     {
-      title: t('worker.idCard'),
-      dataIndex: 'idCard',
-      key: 'idCard',
+      title: t('worker.age'),
+      dataIndex: 'age',
+      key: 'age',
+      width: 80,
+      sorter: (a: Worker, b: Worker) => {
+        const ageA = calculateAge(a.birthDate);
+        const ageB = calculateAge(b.birthDate);
+        if (ageA === '-' && ageB === '-') return 0;
+        if (ageA === '-') return 1;
+        if (ageB === '-') return -1;
+        const numA = parseInt(ageA);
+        const numB = parseInt(ageB);
+        return numA - numB;
+      },
+      render: (_, record: Worker) => calculateAge(record.birthDate),
+    },
+    {
+      title: t('worker.idType'),
+      dataIndex: 'idType',
+      key: 'idType',
+      width: 120,
+      render: (idType: string) => {
+        const typeMap: Record<string, string> = {
+          'ID_CARD': t('worker.idCard'),
+          'PASSPORT': t('worker.passport'),
+          'DRIVER_LICENSE': t('worker.driverLicense'),
+          'OTHER': t('worker.other')
+        };
+        return typeMap[idType] || idType;
+      },
+    },
+    {
+      title: t('worker.idNumber'),
+      dataIndex: 'idNumber',
+      key: 'idNumber',
       width: 180,
-      sorter: (a: Worker, b: Worker) => a.idCard.localeCompare(b.idCard),
+      sorter: (a: Worker, b: Worker) => a.idNumber.localeCompare(b.idNumber),
     },
     {
       title: t('worker.region'),
@@ -508,7 +553,15 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                 <p><strong>{t('worker.workerId')}:</strong> {selectedWorker.workerId}</p>
                 <p><strong>{t('worker.name')}:</strong> {selectedWorker.name}</p>
                 <p><strong>{t('worker.gender')}:</strong> {getGenderTag(selectedWorker.gender)}</p>
+                <p><strong>{t('worker.idType')}:</strong> {
+                  selectedWorker.idType === 'ID_CARD' ? t('worker.idCard') :
+                  selectedWorker.idType === 'PASSPORT' ? t('worker.passport') :
+                  selectedWorker.idType === 'DRIVER_LICENSE' ? t('worker.driverLicense') :
+                  t('worker.other')
+                }</p>
+                <p><strong>{t('worker.idNumber')}:</strong> {selectedWorker.idNumber}</p>
                 <p><strong>{t('worker.birthDate')}:</strong> {selectedWorker.birthDate ? dayjs(selectedWorker.birthDate).format('YYYY-MM-DD') : '-'}</p>
+                <p><strong>{t('worker.age')}:</strong> {calculateAge(selectedWorker.birthDate)}</p>
               </Col>
               <Col span={12}>
                 <p><strong>{t('worker.distributor')}:</strong> {getDistributorName(selectedWorker.distributorId)}</p>

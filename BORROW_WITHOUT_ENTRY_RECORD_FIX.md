@@ -1,0 +1,194 @@
+# 工人没有入场记录不能借物问题修复
+
+## 问题描述
+
+用户反馈：工人没有入场记录，不能借用物品。
+
+## 问题分析
+
+经过代码分析，发现了以下问题：
+
+### 1. 前端借物查询逻辑过于严格
+- 在 `handleScanForBorrow` 函数中，系统使用 `checkWorkerEntryRecord` API 检查工人是否有入场记录
+- 如果工人没有入场记录，API 会抛出错误，导致借物流程无法继续
+- 前端直接阻止没有入场记录的工人进行借物操作
+
+### 2. 后端已支持自动创建访客记录
+- 后端的 `createBorrowRecord` 方法已经能够自动创建访客记录
+- 但前端的查询逻辑没有利用这个功能
+
+### 3. 用户体验问题
+- 工人必须先进行入场登记才能借物，增加了操作步骤
+- 不符合实际业务场景（借物本身就意味着工人在场）
+
+## 修复方案
+
+### 前端修复 (visitorSystem-frontend/src/pages/Guard.tsx)
+
+修改 `handleScanForBorrow` 函数的逻辑：
+
+#### 修复前的问题逻辑
+```typescript
+// 直接检查工人是否有入场记录，没有就报错
+const result = await apiService.checkWorkerEntryRecord(scannedWorkerId.trim())
+```
+
+#### 修复后的逻辑
+```typescript
+// 首先查询工人基本信息
+const worker = await apiService.getWorkerByWorkerId(scannedWorkerId.trim())
+
+// 尝试检查工人是否有有效的入场记录
+let hasEntryRecord = false
+try {
+  await apiService.checkWorkerEntryRecord(worker.workerId)
+  // 如果找到入场记录，更新工人状态
+  frontendWorker.status = 'in' as const
+  hasEntryRecord = true
+  message.success(t('guard.workerQuerySuccess'))
+} catch (entryError: any) {
+  // 如果没有找到入场记录，说明工人未入场，但允许借物（后端会自动创建入场记录）
+  if (entryError?.statusCode === 400) {
+    message.warning(t('guard.workerNotOnSiteButCanBorrow'))
+  } else {
+    console.warn('检查入场记录时出现错误:', entryError)
+    message.warning(t('guard.workerNotOnSiteButCanBorrow'))
+  }
+}
+```
+
+### 国际化支持
+
+添加了新的翻译文本：
+
+#### 中文 (zh-CN.ts)
+```typescript
+workerNotOnSiteButCanBorrow: '工人未入场，但可以借物（系统将自动创建入场记录）'
+```
+
+#### 英文 (en-US.ts)
+```typescript
+workerNotOnSiteButCanBorrow: 'Worker is not on site, but can borrow items (system will automatically create entry record)'
+```
+
+#### 繁体中文 (zh-TW.ts)
+```typescript
+workerNotOnSiteButCanBorrow: '工人未入場，但可以借物（系統將自動創建入場記錄）'
+```
+
+## 修复后的流程
+
+### 借物查询流程
+1. **输入工人编号**：门卫输入工人编号
+2. **查询工人信息**：调用 `getWorkerByWorkerId` 获取工人基本信息
+3. **检查入场记录**：尝试调用 `checkWorkerEntryRecord` 检查是否有入场记录
+4. **处理结果**：
+   - **有入场记录**：显示成功信息，加载现有借用物品
+   - **无入场记录**：显示警告信息，允许继续借物操作
+5. **允许借物**：无论是否有入场记录，都允许进行借物操作
+
+### 借物创建流程
+1. **创建借物记录**：调用 `createBorrowRecord` API
+2. **后端自动处理**：
+   - 检查工人是否有访客记录
+   - 如果没有，自动创建访客记录
+   - 创建借物记录
+3. **数据关联**：确保借物记录和访客记录正确关联
+
+## 技术细节
+
+### 错误处理逻辑
+```typescript
+try {
+  await apiService.checkWorkerEntryRecord(worker.workerId)
+  // 有入场记录的处理
+} catch (entryError: any) {
+  if (entryError?.statusCode === 400) {
+    // 400错误表示工人未入场，这是正常情况
+    message.warning(t('guard.workerNotOnSiteButCanBorrow'))
+  } else {
+    // 其他错误可能是网络问题等
+    console.warn('检查入场记录时出现错误:', entryError)
+    message.warning(t('guard.workerNotOnSiteButCanBorrow'))
+  }
+}
+```
+
+### 状态管理
+- **有入场记录**：`frontendWorker.status = 'in'`，加载现有借用物品
+- **无入场记录**：`frontendWorker.status = 'out'`，清空借用物品列表
+
+### 用户体验改进
+- **清晰的状态提示**：明确告知用户当前状态
+- **允许继续操作**：不阻止没有入场记录的工人借物
+- **自动数据关联**：后端自动处理数据关联问题
+
+## 优势
+
+### 1. 简化操作流程
+- 工人无需先进行入场登记
+- 借物操作自动创建入场记录
+- 减少操作步骤，提高效率
+
+### 2. 符合业务逻辑
+- 借物本身就意味着工人在场
+- 自动创建入场记录符合实际场景
+- 保持数据完整性
+
+### 3. 用户体验优化
+- 提供清晰的状态提示
+- 不阻止正常业务操作
+- 自动处理数据关联
+
+## 测试场景
+
+### 1. 有入场记录的工人借物
+```
+1. 输入已有入场记录的工人编号
+2. 系统显示"工人资料查询成功"
+3. 加载现有借用物品列表
+4. 允许添加新的借物记录
+```
+
+### 2. 无入场记录的工人借物
+```
+1. 输入没有入场记录的工人编号
+2. 系统显示"工人未入场，但可以借物（系统将自动创建入场记录）"
+3. 清空借用物品列表
+4. 允许添加借物记录
+5. 创建借物记录时，后端自动创建入场记录
+```
+
+### 3. 数据关联验证
+```
+1. 创建借物记录
+2. 检查是否自动创建了入场记录
+3. 验证数据关联正确
+4. 确认工人状态更新
+```
+
+## 注意事项
+
+### 1. 后端依赖
+- 确保后端的 `createBorrowRecord` 方法能正确自动创建访客记录
+- 如果后端逻辑有问题，借物操作仍会失败
+
+### 2. 数据一致性
+- 自动创建的访客记录应该包含所有必要字段
+- 确保访客记录和借物记录正确关联
+
+### 3. 错误处理
+- 如果自动创建访客记录失败，借物操作也应该失败
+- 提供清晰的错误信息给用户
+
+## 总结
+
+通过这个修复，系统现在能够：
+
+1. **允许没有入场记录的工人借物**：不再阻止没有入场记录的工人进行借物操作
+2. **自动创建入场记录**：后端在创建借物记录时自动创建入场记录
+3. **提供清晰的状态提示**：用户能够了解当前状态和系统行为
+4. **简化操作流程**：减少不必要的操作步骤
+5. **保持数据完整性**：确保借物记录和访客记录正确关联
+
+这解决了用户反馈的问题，使得借物操作更加灵活和用户友好。

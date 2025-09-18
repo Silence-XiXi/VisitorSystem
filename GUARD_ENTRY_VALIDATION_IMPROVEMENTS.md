@@ -1,0 +1,131 @@
+# 门卫入场登记功能改进总结
+
+## 改进概述
+
+根据用户需求，对门卫页面的访客入场登记功能进行了以下改进：
+
+1. **根据工人编号查询该工人是否存在**
+2. **检查是否已存在入场登记且未离场**
+3. **防止重复入场登记操作**
+
+## 具体实现
+
+### 1. 前端改进 (visitorSystem-frontend/src/pages/Guard.tsx)
+
+#### 增强工人查询逻辑
+- 在 `handleScanWorkerId` 函数中添加了重复入场检查
+- 查询工人基本信息后，立即检查是否已有有效的入场记录
+- 如果工人已经在场，显示警告信息并阻止继续登记
+
+```typescript
+// 检查工人是否已经有有效的入场记录
+try {
+  const entryRecord = await apiService.checkWorkerEntryRecord(worker.id)
+  // 如果找到入场记录，说明工人已经在场
+  message.warning(t('guard.workerAlreadyOnSite', { 
+    workerName: worker.name,
+    entryTime: dayjs(entryRecord.entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss')
+  }))
+  setSelectedWorker(null)
+  setScannedWorkerId('')
+  return
+} catch (entryError: any) {
+  // 如果没有找到入场记录，说明工人未入场，可以继续登记
+}
+```
+
+#### 改进错误处理
+- 在 `handleCompleteEntry` 函数中增强了错误处理逻辑
+- 根据不同的HTTP状态码显示相应的错误信息
+- 对于工人已在场的错误，自动清空当前选择的工人信息
+
+```typescript
+// 根据不同的错误类型显示不同的错误信息
+if (error?.statusCode === 400) {
+  errorMessage = error?.message || '该工人已经在场，无法重复登记'
+} else if (error?.statusCode === 404) {
+  errorMessage = error?.message || '工人不存在或不属于当前工地'
+} else if (error?.statusCode === 409) {
+  errorMessage = error?.message || '数据冲突，请检查输入信息'
+}
+```
+
+### 2. 国际化支持
+
+添加了新的翻译文本支持多语言：
+
+#### 中文 (zh-CN.ts)
+```typescript
+workerAlreadyOnSite: '工人 {workerName} 已经在场，入场时间：{entryTime}，无法重复登记'
+```
+
+#### 英文 (en-US.ts)
+```typescript
+workerAlreadyOnSite: 'Worker {workerName} is already on site, entry time: {entryTime}, cannot register again'
+```
+
+#### 繁体中文 (zh-TW.ts)
+```typescript
+workerAlreadyOnSite: '工人 {workerName} 已經在場，入場時間：{entryTime}，無法重複登記'
+```
+
+### 3. 后端验证 (已存在)
+
+后端已经具备相应的验证逻辑：
+
+#### 门卫服务 (visitorSystem-backend/src/guards/guards.service.ts)
+- `getWorkerByWorkerId`: 验证工人是否存在且属于当前工地
+- `createVisitorRecord`: 检查工人是否已经在场（状态为 `ON_SITE`）
+- `checkWorkerEntryRecord`: 检查工人是否有有效的入场记录
+
+## 功能流程
+
+### 入场登记流程
+1. 门卫输入工人编号
+2. 系统查询工人基本信息
+3. **新增**：检查工人是否已有有效的入场记录
+4. 如果工人已在场：
+   - 显示警告信息（包含工人姓名和入场时间）
+   - 清空输入框，阻止继续登记
+5. 如果工人未入场：
+   - 显示工人信息
+   - 允许继续入场登记流程
+6. 门卫输入实体卡编号并完成登记
+
+### 错误处理
+- **工人不存在**：显示"工人不存在或不属于当前工地"
+- **工人已在场**：显示"工人 XXX 已经在场，入场时间：XXX，无法重复登记"
+- **数据冲突**：显示"数据冲突，请检查输入信息"
+- **网络错误**：显示相应的网络错误信息
+
+## 技术特点
+
+1. **双重验证**：前端预检查 + 后端最终验证
+2. **用户友好**：清晰的错误提示和状态反馈
+3. **多语言支持**：支持中文、英文、繁体中文
+4. **类型安全**：修复了TypeScript类型错误
+5. **错误恢复**：自动清空状态，便于重新操作
+
+## 测试建议
+
+1. **正常流程测试**：
+   - 输入存在的工人编号
+   - 确认工人信息显示正确
+   - 完成入场登记
+
+2. **重复入场测试**：
+   - 对同一工人进行两次入场登记
+   - 验证第二次登记被正确阻止
+   - 确认错误信息显示正确
+
+3. **不存在工人测试**：
+   - 输入不存在的工人编号
+   - 验证错误信息显示
+
+4. **跨工地测试**：
+   - 尝试登记不属于当前工地的工人
+   - 验证权限控制
+
+## 总结
+
+通过这次改进，门卫入场登记功能现在具备了完整的验证机制，能够有效防止重复入场登记，提供清晰的用户反馈，并支持多语言环境。系统在保证数据完整性的同时，也提供了良好的用户体验。

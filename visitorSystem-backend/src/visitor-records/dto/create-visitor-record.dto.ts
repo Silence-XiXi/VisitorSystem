@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsDateString } from 'class-validator'
-import { VisitorStatus } from '@prisma/client'
+import { VisitorStatus, IdType } from '@prisma/client'
 
 export class CreateVisitorRecordDto {
   @IsString()
@@ -20,8 +20,8 @@ export class CreateVisitorRecordDto {
   @IsEnum(VisitorStatus)
   status?: VisitorStatus
 
-  @IsString()
-  idType: string
+  @IsEnum(IdType)
+  idType: IdType
 
   @IsString()
   idNumber: string

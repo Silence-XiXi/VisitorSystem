@@ -345,7 +345,8 @@ const WorkerManagement: React.FC = () => {
         'Worker ID': worker.workerId,
         'Name': worker.name,
         'Gender': worker.gender === 'MALE' ? 'Male' : 'Female',
-        'ID Card': worker.idCard,
+        'ID Type': worker.idType,
+        'ID Number': worker.idNumber,
         'Birth Date': worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '',
         'Region': worker.region || '',
         'Distributor ID': worker.distributorId || '',
@@ -365,7 +366,8 @@ const WorkerManagement: React.FC = () => {
         { wch: 15 }, // 工人编号
         { wch: 10 }, // 姓名
         { wch: 8 },  // 性别
-        { wch: 20 }, // 身份证号
+        { wch: 12 }, // 证件类型
+        { wch: 20 }, // 证件号码
         { wch: 12 }, // 出生日期
         { wch: 12 }, // 地区
         { wch: 15 }, // 分判商
@@ -398,7 +400,8 @@ const WorkerManagement: React.FC = () => {
         'Worker ID': worker.workerId,
         'Name': worker.name,
         'Gender': worker.gender === 'MALE' ? 'Male' : 'Female',
-        'ID Card': worker.idCard,
+        'ID Type': worker.idType,
+        'ID Number': worker.idNumber,
         'Birth Date': worker.birthDate ? dayjs(worker.birthDate).format('YYYY-MM-DD') : '',
         'Region': worker.region || '',
         'Distributor ID': worker.distributorId || '',
@@ -418,7 +421,8 @@ const WorkerManagement: React.FC = () => {
         { wch: 15 }, // 工人编号
         { wch: 10 }, // 姓名
         { wch: 8 },  // 性别
-        { wch: 20 }, // 身份证号
+        { wch: 12 }, // 证件类型
+        { wch: 20 }, // 证件号码
         { wch: 12 }, // 出生日期
         { wch: 12 }, // 地区
         { wch: 15 }, // 分判商

@@ -108,6 +108,43 @@ export const SiteFilterProvider: React.FC<SiteFilterProviderProps> = ({ children
             }
           ]
         }
+      } else if (user?.role?.toLowerCase() === 'guard') {
+        // 门卫用户：从用户信息中获取关联的站点
+        if (user.guard?.site) {
+          transformedSites = [{
+            id: user.guard.site.id,
+            name: user.guard.site.name,
+            address: user.guard.site.address || '',
+            code: user.guard.site.code || '',
+            manager: user.guard.site.manager || '',
+            phone: user.guard.site.phone || '',
+            status: 'active'
+          }]
+        } else if (user.guard?.siteId) {
+          // 如果只有siteId，使用默认信息
+          transformedSites = [{
+            id: user.guard.siteId,
+            name: '当前工地',
+            address: '',
+            code: '',
+            manager: '',
+            phone: '',
+            status: 'active'
+          }]
+        } else {
+          // 使用模拟数据作为后备
+          transformedSites = [
+            {
+              id: 'default-site',
+              name: '默认工地',
+              address: '默认地址',
+              code: 'DEFAULT',
+              manager: '默认负责人',
+              phone: '000-0000-0000',
+              status: 'active'
+            }
+          ]
+        }
       } else {
         // 管理员用户：使用完整API
         const sitesData = await apiService.getAllSites()
