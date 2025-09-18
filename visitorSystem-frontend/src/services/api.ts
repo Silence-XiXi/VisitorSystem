@@ -1061,6 +1061,7 @@ class ApiService {
     idNumber: string;
     physicalCardId?: string;
     registrarId?: string;
+    phone?: string; // 添加电话号码字段
     notes?: string;
   }): Promise<VisitorRecord> {
     return this.requestWithRetry('/guards/visitor-records', {
@@ -1111,9 +1112,17 @@ class ApiService {
 
   // 获取工人借用物品记录
   async getWorkerBorrowRecords(workerId: string): Promise<any[]> {
-    return this.requestWithRetry(`/guards/borrow-records?workerId=${workerId}`, {
-      method: 'GET',
-    });
+    console.log(`调用 getWorkerBorrowRecords API，工人ID: ${workerId}`);
+    try {
+      const result = await this.requestWithRetry(`/guards/borrow-records?workerId=${workerId}`, {
+        method: 'GET',
+      });
+      console.log(`工人 ${workerId} 的借用记录 API 响应:`, result);
+      return result;
+    } catch (error) {
+      console.error(`获取工人 ${workerId} 的借用记录失败:`, error);
+      return [];
+    }
   }
 
   // 获取所有借用物品记录（管理员用）
@@ -1212,6 +1221,16 @@ class ApiService {
     });
   }
 
+  // 通过实体卡编号查询访客记录（使用checkWorkerEntryRecord接口，它支持工号或实体卡编号）
+  async getVisitorRecordByPhysicalCardId(physicalCardId: string): Promise<{
+    worker: Worker;
+    entryRecord: VisitorRecord;
+    currentBorrowedItems: any[];
+  }> {
+    return this.requestWithRetry(`/guards/workers/${physicalCardId}/entry-record`, {
+      method: 'GET',
+    });
+  }
 
   // 创建物品借用记录
   async createBorrowRecord(data: {
@@ -1220,8 +1239,9 @@ class ApiService {
     itemCode: string;
     borrowDate: Date;
     borrowTime: string;
-    remark?: string;
+    notes?: string; // 注意：后端使用notes字段而不是remark
   }): Promise<any> {
+    console.log('API服务：发送借用记录请求:', data);
     return this.requestWithRetry('/guards/borrow-records', {
       method: 'POST',
       body: JSON.stringify(data),

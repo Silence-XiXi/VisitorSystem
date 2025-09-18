@@ -67,6 +67,18 @@ export class GuardsController {
   ) {
     return this.guardsService.checkWorkerEntryRecord(user, workerId);
   }
+  
+  @Get('visitor-records/physical-card/:physicalCardId')
+  @Roles(UserRole.GUARD)
+  @ApiOperation({ summary: '通过实体卡编号查询访客记录' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  @ApiResponse({ status: 404, description: '未找到相关记录' })
+  async getVisitorRecordByPhysicalCardId(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('physicalCardId') physicalCardId: string
+  ) {
+    return this.guardsService.getVisitorRecordByPhysicalCardId(user, physicalCardId);
+  }
 
   @Get('borrow-records')
   @Roles(UserRole.GUARD)

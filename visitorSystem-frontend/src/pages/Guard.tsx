@@ -21,7 +21,8 @@ import {
   Dropdown,
   Checkbox,
   Tooltip,
-  DatePicker
+  DatePicker,
+  Spin
 } from 'antd'
 import { 
   UserAddOutlined, 
@@ -60,6 +61,7 @@ interface Worker {
   entryTime?: string
   exitTime?: string
   status: 'in' | 'out'
+  idType?: string
   borrowedItems?: Array<{
     itemType: string
     itemId: string
@@ -71,14 +73,21 @@ interface Worker {
 
 interface AttendanceRecord {
   id: string
-  workerId: string
-  workerName: string
-  entryTime: string
-  exitTime?: string
-  physicalCardId: string
-  phone: string
-  idCard?: string
-  status: 'in' | 'out'
+  worker?: {
+    id: string
+    workerId: string
+    name: string
+    phone?: string
+    distributor?: {
+      id: string
+      name: string
+    }
+  }
+  checkInTime: string
+  checkOutTime?: string
+  physicalCardId?: string
+  idNumber?: string
+  status: string // 'ON_SITE' | 'LEFT' | 'PENDING'
   borrowedItems: number
   returnedItems: number
 }
@@ -132,6 +141,16 @@ const Guard: React.FC = () => {
   const [jumpPage, setJumpPage] = useState<string>('')
   const [itemRecordsModalVisible, setItemRecordsModalVisible] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
+  const [itemBorrowRecords, setItemBorrowRecords] = useState<Array<{
+    id: string
+    itemName: string
+    itemId: string
+    borrowTime: string
+    returnTime: string | null
+    status: string
+    remark?: string
+  }>>([])
+  const [itemRecordsLoading, setItemRecordsLoading] = useState(false)
 
   // API数据状态
   const [guardStats, setGuardStats] = useState<{
@@ -200,6 +219,37 @@ const Guard: React.FC = () => {
     }
   }
 
+  // 在访客记录中添加借用物品和归还物品的数量信息
+  const enrichVisitorRecord = (record: any, borrowRecordsMap: Map<string, any[]>): any => {
+    // 只有当记录有工人ID时才处理
+    if (!record.worker?.workerId) {
+      console.log('记录缺少工人ID:', record);
+      return {
+        ...record,
+        borrowedItems: 0,
+        returnedItems: 0
+      };
+    }
+    
+    const workerId = record.worker.workerId;
+    console.log(`处理工人ID: ${workerId}`);
+    
+    const borrowRecords = borrowRecordsMap.get(workerId) || [];
+    console.log(`工人 ${workerId} 的借用记录:`, borrowRecords);
+    
+    const borrowedItems = borrowRecords.length;
+    const returnedItems = borrowRecords.filter(item => item.status === 'RETURNED').length;
+    
+    console.log(`工人 ${workerId} - 借用物品: ${borrowedItems}, 已归还: ${returnedItems}`);
+
+    // 保留原始记录的所有字段，只添加借用物品和已归还物品的数量
+    return {
+      ...record,
+      borrowedItems: borrowedItems,
+      returnedItems: returnedItems
+    };
+  };
+
   // 加载访客记录
   const loadVisitorRecords = async (filters?: {
     startDate?: string;
@@ -210,9 +260,58 @@ const Guard: React.FC = () => {
     
     try {
       setVisitorRecordsLoading(true)
+      
+      // 1. 获取所有访客记录
       const records = await apiService.getGuardSiteVisitorRecords(filters)
       console.log('Loaded visitor records:', records) // 调试信息
-      setVisitorRecords(records)
+      
+      // 收集所有工人ID以批量获取借用记录（去重）
+      const workerIds = Array.from(new Set(
+        records
+          .filter(record => record.worker && record.worker.workerId)
+          .map(record => record.worker!.workerId)
+      ))
+      
+      // 为了优化性能，按批次获取借用记录（每批10个工人）
+      const batchSize = 10
+      const borrowRecordsMap = new Map() // 用于存储工人ID到借用记录的映射
+      
+      for (let i = 0; i < workerIds.length; i += batchSize) {
+        const batch = workerIds.slice(i, i + batchSize)
+        const batchPromises = batch.map(async (workerId) => {
+          try {
+            const workerBorrowRecords = await apiService.getWorkerBorrowRecords(workerId)
+            borrowRecordsMap.set(workerId, workerBorrowRecords)
+          } catch (error) {
+            console.error(`Failed to get borrow records for worker ${workerId}:`, error)
+            borrowRecordsMap.set(workerId, [])
+          }
+        })
+        
+        // 等待当前批次完成
+        await Promise.all(batchPromises)
+      }
+      
+      // 打印借用记录映射的内容
+      console.log("借用记录Map内容:");
+      for (const [workerId, records] of borrowRecordsMap.entries()) {
+        console.log(`工人ID: ${workerId}, 借用记录数量: ${records.length}`);
+      }
+      
+      // 2. 在记录中添加借用物品和归还物品的数量信息
+      const enrichedRecords = records.map(record => enrichVisitorRecord(record, borrowRecordsMap));
+      
+      // 检查所有记录是否都有借用物品信息
+      let missingCount = 0;
+      enrichedRecords.forEach(record => {
+        if (record.borrowedItems === undefined) {
+          missingCount++;
+          console.error("记录缺少borrowedItems:", record);
+        }
+      });
+      console.log(`总记录数: ${enrichedRecords.length}, 缺少借用物品信息的记录数: ${missingCount}`);
+      console.log('Enriched visitor records:', enrichedRecords)
+      setVisitorRecords(enrichedRecords)
     } catch (error) {
       console.error('Failed to load visitor records:', error)
       message.error('加载访客记录失败')
@@ -646,16 +745,21 @@ const Guard: React.FC = () => {
     }
 
     try {
+      // 调试日志：记录修改前后的电话号码
+      console.log('工人原始电话号码:', selectedWorker.phone);
+      console.log('修改后的电话号码:', phoneNumber.trim());
+      
       // 调用后端API创建访客记录（使用门卫专用接口）
       const visitorRecord = await apiService.createGuardVisitorRecord({
         workerId: selectedWorker.workerId, // 使用工人编号而不是数据库ID
         siteId: user?.guard?.siteId || '',
         checkInTime: new Date().toISOString(), // 自动设置入场时间为当前时间
         status: 'ON_SITE', // 自动设置状态为在场
-        idType: 'ID_CARD',
+        idType: selectedWorker.idType || 'ID_CARD', // 直接使用工人的证件类型，默认为身份证
         idNumber: selectedWorker.idCard,
         physicalCardId: physicalCardId.trim(),
         registrarId: user?.guard?.id, // 自动设置门卫ID
+        phone: phoneNumber.trim(), // 使用修改后的电话号码
         notes: `入场登记 - ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`
       })
 
@@ -719,7 +823,7 @@ const Guard: React.FC = () => {
     }
 
     try {
-      // 检查工人是否有有效的入场记录
+      // 查询工人入场记录（后端API支持通过工号或实体卡编号查询）
       const result = await apiService.checkWorkerEntryRecord(scannedWorkerId.trim())
       
       // 转换API返回的Worker类型为前端使用的Worker类型
@@ -727,22 +831,27 @@ const Guard: React.FC = () => {
         ...result.worker,
         idCard: result.worker.idNumber, // 将idNumber映射到idCard
         status: 'in' as const, // 有入场记录说明工人在场
-        borrowedItems: []
+        borrowedItems: [],
+        entryTime: result.entryRecord?.checkInTime ? dayjs(result.entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss') : undefined
       }
       
       setSelectedWorker(frontendWorker)
       
-      // 加载当前借用物品列表
-      const borrowRecords = await apiService.getWorkerBorrowRecords(result.worker.workerId)
-      const borrowedItems = borrowRecords
-        .filter((record: any) => record.status === 'BORROWED') // 只获取未归还的物品
-        .map((record: any) => ({
-          recordId: record.id, // 保存记录ID用于归还操作
-          itemType: record.item?.category?.id || record.item?.categoryId,
-          itemId: record.item?.itemCode || record.itemCode,
-          borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
-          remark: record.notes || ''
-        }))
+      // 使用工人ID（而不是扫描的ID）获取借用物品列表
+      // 这样无论是通过工号还是实体卡ID查询，都能正确获取借用物品
+      const workerId = result.worker.workerId;
+      console.log('使用工人ID查询借用物品:', workerId);
+      
+      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
+      console.log('Worker borrow records:', borrowRecords);
+      
+      const borrowedItems = borrowRecords.map((record: any) => ({
+        recordId: record.id, // 保存记录ID用于归还操作
+        itemType: record.item?.category?.id || record.item?.categoryId,
+        itemId: record.item?.itemCode || record.itemCode,
+        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+        remark: record.notes || ''
+      }))
       
       setCurrentBorrowedItems(borrowedItems)
       setSelectedReturnItems([])
@@ -872,6 +981,21 @@ const Guard: React.FC = () => {
     try {
       setLoading(true)
       
+      // 首先检查工人是否有有效的入场记录
+      try {
+        console.log('借用物品前检查工人入场状态:', {
+          workerId: selectedWorker.workerId,
+          workerInfo: selectedWorker
+        });
+        // 这个API会验证工人是否有有效的入场记录，如果没有会抛出错误
+        await apiService.checkWorkerEntryRecord(selectedWorker.workerId)
+      } catch (error: any) {
+        console.error('工人入场验证失败:', error);
+        message.error(t('guard.workerNotOnSiteCannotBorrow'))
+        setLoading(false)
+        return
+      }
+      
       // 为每个物品创建借用记录
       const borrowPromises = borrowItemsList.map(async (item) => {
         const category = itemCategories.find(cat => cat.id === item.itemType)
@@ -880,14 +1004,29 @@ const Guard: React.FC = () => {
         }
 
         // 创建物品借用记录
+        console.log('创建借用记录，物品信息:', {
+          itemType: item.itemType,
+          itemId: item.itemId,
+          category
+        });
+        
         const borrowRecord = {
-          workerId: selectedWorker.id,
+          workerId: selectedWorker.workerId, // 使用workerId而不是id，确保后端能正确找到工人
           categoryId: item.itemType, // 物品类型ID
           itemCode: item.itemId, // 物品编号
           borrowDate: new Date(),
           borrowTime: dayjs().format('HH:mm:ss'),
-          notes: item.remark || '' // 使用notes字段对应数据库的notes列
+          notes: item.remark || '', // 使用notes字段对应数据库的notes列
+          // 添加用户和门卫信息以便调试
+          _debug: {
+            userId: user?.id,
+            guardId: user?.guard?.id,
+            siteId: user?.guard?.siteId
+          }
+          // visitorRecordId 会由后端自动关联到当前有效的访客记录
         }
+        
+        console.log('发送借用记录数据:', borrowRecord);
 
         return await apiService.createBorrowRecord(borrowRecord as any)
       })
@@ -912,14 +1051,6 @@ const Guard: React.FC = () => {
           : w
       )
       setWorkers(updatedWorkers)
-
-      // 更新考勤记录 - 已移除本地更新，现在依赖API数据
-      // const updatedRecords = attendanceRecords.map(record => 
-      //   record.workerId === selectedWorker.workerId
-      //     ? { ...record, borrowedItems: record.borrowedItems + borrowItemsList.length }
-      //     : record
-      // )
-      // setAttendanceRecords(updatedRecords)
 
       message.success(t('guard.borrowRegistrationSuccess').replace('{count}', borrowItemsList.length.toString()))
       
@@ -950,31 +1081,72 @@ const Guard: React.FC = () => {
     setSelectedWorker(null)
   }
 
-  const handleScanForExit = () => {
+  const handleScanForExit = async () => {
     if (!scannedWorkerId.trim()) {
       message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForExit'))
       return
     }
 
-    const worker = workers.find(w => 
-      w.workerId === scannedWorkerId.trim() || w.physicalCardId === scannedWorkerId.trim()
-    )
-    
-    if (!worker) {
-      message.error(t('guard.workerNotFound'))
-      return
+    try {
+      setLoading(true)
+      
+      // 查询工人入场记录（后端API支持通过工号或实体卡编号查询）
+      const result = await apiService.checkWorkerEntryRecord(scannedWorkerId.trim())
+      
+      // 转换API返回的Worker类型为前端使用的Worker类型
+      const frontendWorker: Worker = {
+        ...result.worker,
+        idCard: result.worker.idNumber, // 将idNumber映射到idCard
+        status: 'in' as const, // 有入场记录说明工人在场
+        borrowedItems: [],
+        entryTime: result.entryRecord?.checkInTime ? dayjs(result.entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss') : undefined
+      }
+      
+      setSelectedWorker(frontendWorker)
+      
+      // 使用工人ID获取借用物品列表
+      const workerId = result.worker.workerId;
+      console.log('使用工人ID查询借用物品:', workerId);
+      
+      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
+      console.log('Worker borrow records:', borrowRecords);
+      
+      const borrowedItems = borrowRecords.map((record: any) => ({
+        recordId: record.id, // 保存记录ID用于归还操作
+        itemType: record.item?.category?.id || record.item?.categoryId,
+        itemId: record.item?.itemCode || record.itemCode,
+        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+        returnTime: record.returnDate ? dayjs(record.returnDate).format('YYYY-MM-DD HH:mm:ss') : null,
+        remark: record.notes || ''
+      }))
+      
+      // 更新工人的借用物品列表
+      const borrowedItemsConverted = borrowedItems.map(item => ({
+        ...item,
+        returnTime: item.returnTime || undefined
+      }));
+      
+      const workerWithBorrowedItems = {
+        ...frontendWorker,
+        borrowedItems: borrowedItemsConverted
+      }
+      
+      setSelectedWorker(workerWithBorrowedItems)
+      setSelectedReturnItems([])
+      
+      message.success(t('guard.workerQuerySuccess'))
+    } catch (error: any) {
+      console.error('查询工人入场记录失败:', error)
+      // 显示后端返回的具体错误信息
+      const errorMessage = error?.message || t('guard.workerNotFound')
+      message.error(errorMessage)
+      setSelectedWorker(null)
+    } finally {
+      setLoading(false)
     }
-
-    if (worker.status === 'out') {
-      message.error(t('guard.workerNotOnSiteCannotExit'))
-      return
-    }
-
-    setSelectedWorker(worker)
-    message.success(t('guard.workerQuerySuccess'))
   }
 
-  const handleCompleteExit = () => {
+  const handleCompleteExit = async () => {
     if (!selectedWorker) return
 
     // 验证实体卡是否已归还
@@ -992,38 +1164,53 @@ const Guard: React.FC = () => {
       }
     }
 
-    // 更新工人状态
-    const updatedWorkers = workers.map(w => 
-      w.id === selectedWorker.id 
-        ? { 
-            ...w, 
-            status: 'out' as const,
-            exitTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
-          }
-        : w
-    )
-    setWorkers(updatedWorkers)
+    try {
+      setLoading(true)
+      
+      // 1. 首先查询当前工人的入场记录
+      const entryRecordResult = await apiService.checkWorkerEntryRecord(selectedWorker.workerId)
+      const visitorRecordId = entryRecordResult.entryRecord.id
+      
+      // 2. 对于未归还的物品，记录未归还原因
+      if (unreturnedItems.length > 0) {
+        // 这里可以添加API调用，记录未归还物品的原因
+        // 例如：apiService.updateUnreturnedItemRemarks(visitorRecordId, unreturnedItemRemarks)
+        console.log('未归还物品备注:', unreturnedItemRemarks)
+      }
+      
+      // 3. 调用离场登记API
+      const checkOutTime = new Date().toISOString()
+      await apiService.checkOutVisitor(visitorRecordId, checkOutTime)
+      
+      // 4. 更新本地状态
+      const updatedWorkers = workers.map(w => 
+        w.id === selectedWorker.id 
+          ? { 
+              ...w, 
+              status: 'out' as const,
+              exitTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+            }
+          : w
+      )
+      setWorkers(updatedWorkers)
 
-    // 更新考勤记录 - 已移除本地更新，现在依赖API数据
-    // const updatedRecords = attendanceRecords.map(record => 
-    //   record.workerId === selectedWorker.workerId
-    //     ? { 
-    //         ...record, 
-    //         status: 'out' as const,
-    //         exitTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
-    //       }
-    //     : record
-    // )
-    // setAttendanceRecords(updatedRecords)
-
-    message.success(t('guard.exitCompleted'))
-    
-    // 清空输入和查询信息，停留在当前页面
-    setScannedWorkerId('')
-    setSelectedWorker(null)
-    setSelectedBorrowedItems([])
-    setUnreturnedItemRemarks({})
-    setPhysicalCardReturned(false)
+      // 5. 刷新统计数据
+      loadGuardStats()
+      
+      message.success(t('guard.exitCompleted'))
+      
+      // 清空输入和查询信息，停留在当前页面
+      setScannedWorkerId('')
+      setSelectedWorker(null)
+      setSelectedBorrowedItems([])
+      setUnreturnedItemRemarks({})
+      setPhysicalCardReturned(false)
+    } catch (error) {
+      console.error('离场登记失败:', error)
+      message.error(t('guard.exitFailed'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 4. 报表功能
@@ -1149,9 +1336,40 @@ const Guard: React.FC = () => {
   }
 
   // 查看物品借用记录
-  const handleViewItemRecords = (record: AttendanceRecord) => {
+  const handleViewItemRecords = async (record: AttendanceRecord) => {
     setSelectedRecord(record)
     setItemRecordsModalVisible(true)
+    setItemRecordsLoading(true)
+    setItemBorrowRecords([])
+    
+    try {
+      // 获取工人的真实借用记录
+      if (!record.worker?.workerId) {
+        console.error('无法获取工人ID')
+        return
+      }
+      const workerId = record.worker.workerId
+      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId)
+      console.log(`获取工人 ${workerId} 的借用记录:`, borrowRecords)
+      
+      // 转换为前端需要的格式
+      const formattedRecords = borrowRecords.map((item: any) => ({
+        id: item.id,
+        itemName: item.item?.category?.name || '未知物品类型',
+        itemId: item.item?.itemCode || item.itemCode || '未知编号',
+        borrowTime: item.borrowDate ? dayjs(item.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '-',
+        returnTime: item.returnDate ? dayjs(item.returnDate).format('YYYY-MM-DD HH:mm:ss') : null,
+        status: item.status === 'RETURNED' ? 'returned' : 'borrowed',
+        remark: item.notes || ''
+      }))
+      
+      setItemBorrowRecords(formattedRecords)
+    } catch (error) {
+      console.error(`获取工人 ${record.workerId} 的借用记录失败:`, error)
+      message.error('获取借用记录失败')
+    } finally {
+      setItemRecordsLoading(false)
+    }
   }
 
   // 全选/取消全选当前借用物品
@@ -1186,36 +1404,66 @@ const Guard: React.FC = () => {
   }
 
   // 归还选中物品
-  const handleReturnItems = () => {
+  const handleReturnItems = async () => {
     if (!selectedWorker || selectedBorrowedItems.length === 0) {
       message.error(t('guard.pleaseSelectItemsToReturn'))
       return
     }
 
-    const updatedWorkers = workers.map(w => 
-      w.id === selectedWorker.id 
-        ? { 
-            ...w, 
-            borrowedItems: w.borrowedItems?.map(item => 
-              selectedBorrowedItems.includes(item.itemId)
-                ? { ...item, returnTime: dayjs().format('YYYY-MM-DD HH:mm:ss') }
-                : item
-            )
-          }
-        : w
-    )
-    setWorkers(updatedWorkers)
+    try {
+      setLoading(true)
+      
+      // 获取选中物品的记录ID，用于调用归还API
+      const selectedItems = selectedWorker.borrowedItems?.filter(item => 
+        selectedBorrowedItems.includes(item.itemId)
+      ) || []
+      
+      // 并行调用API归还多个物品
+      const returnPromises = selectedItems.map(item => 
+        apiService.returnItem(item.recordId)
+      )
+      
+      await Promise.all(returnPromises)
+      
+      // 更新本地状态
+      const updatedWorkers = workers.map(w => 
+        w.id === selectedWorker.id 
+          ? { 
+              ...w, 
+              borrowedItems: w.borrowedItems?.map(item => 
+                selectedBorrowedItems.includes(item.itemId)
+                  ? { ...item, returnTime: dayjs().format('YYYY-MM-DD HH:mm:ss') }
+                  : item
+              )
+            }
+          : w
+      )
+      setWorkers(updatedWorkers)
+      
+      // 如果是在离场页面，更新当前选中工人的借用物品状态
+      if (currentView === 'exit' && selectedWorker) {
+        const updatedSelectedWorker = {
+          ...selectedWorker,
+          borrowedItems: selectedWorker.borrowedItems?.map(item => 
+            selectedBorrowedItems.includes(item.itemId)
+              ? { ...item, returnTime: dayjs().format('YYYY-MM-DD HH:mm:ss') }
+              : item
+          )
+        }
+        setSelectedWorker(updatedSelectedWorker)
+      }
 
-    // 更新考勤记录 - 已移除本地更新，现在依赖API数据
-    // const updatedRecords = attendanceRecords.map(record => 
-    //   record.workerId === selectedWorker.workerId
-    //     ? { ...record, returnedItems: record.returnedItems + selectedBorrowedItems.length }
-    //     : record
-    // )
-    // setAttendanceRecords(updatedRecords)
-
-    message.success(t('guard.returnItemsSuccessCount').replace('{count}', selectedBorrowedItems.length.toString()))
-    setSelectedBorrowedItems([])
+      message.success(t('guard.returnItemsSuccessCount').replace('{count}', selectedBorrowedItems.length.toString()))
+      setSelectedBorrowedItems([])
+      
+      // 刷新统计数据
+      loadGuardStats()
+    } catch (error) {
+      console.error('归还物品失败:', error)
+      message.error(t('guard.returnItemsFailed'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 检查是否可以完成离场
@@ -1260,7 +1508,6 @@ const Guard: React.FC = () => {
     setSelectedWorker(worker)
     message.success(t('guard.workerQuerySuccess'))
   }
-
 
   // Header组件
   const renderHeader = () => (
@@ -1429,13 +1676,6 @@ const Guard: React.FC = () => {
   const renderItemRecordsModal = () => {
     if (!selectedRecord) return null
 
-    // 模拟物品借用记录数据
-    const mockItemRecords = [
-      { id: '1', itemName: '安全帽', itemId: 'ITEM001', borrowTime: '2024-01-15 08:30:00', returnTime: '2024-01-15 17:30:00', status: 'returned' },
-      { id: '2', itemName: '防护手套', itemId: 'ITEM002', borrowTime: '2024-01-15 09:00:00', returnTime: null, status: 'borrowed' },
-      { id: '3', itemName: '工具包', itemId: 'ITEM003', borrowTime: '2024-01-15 10:15:00', returnTime: '2024-01-15 16:45:00', status: 'returned' },
-    ]
-
     const itemColumns = [
       {
         title: t('guard.itemType'),
@@ -1459,7 +1699,7 @@ const Guard: React.FC = () => {
         render: (value: string | null) => value || '-',
       },
       {
-        title: t('guard.guardStatus'),
+        title: t('guard.visitorStatus'),
         dataIndex: 'status',
         key: 'status',
         render: (status: string) => (
@@ -1468,11 +1708,17 @@ const Guard: React.FC = () => {
           </Tag>
         ),
       },
+      {
+        title: t('reports.notes'),
+        dataIndex: 'remark',
+        key: 'remark',
+        render: (value: string) => value || '-',
+      },
     ]
 
     return (
       <Modal
-        title={`${selectedRecord.workerName} ${t('guard.itemBorrowRecords')}`}
+        title={`${selectedRecord.worker?.name || ''} ${t('guard.itemBorrowRecords')}`}
         open={itemRecordsModalVisible}
         onCancel={() => setItemRecordsModalVisible(false)}
         footer={null}
@@ -1484,27 +1730,37 @@ const Guard: React.FC = () => {
             <Row gutter={16}>
               <Col span={8}>
                 <Text type="secondary">{t('guard.workerIdLabel')}</Text>
-                <Text strong>{selectedRecord.workerId}</Text>
+                <Text strong>{selectedRecord.worker?.workerId || '-'}</Text>
               </Col>
               <Col span={8}>
                 <Text type="secondary">{t('guard.nameLabel')}</Text>
-                <Text strong>{selectedRecord.workerName}</Text>
+                <Text strong>{selectedRecord.worker?.name || '-'}</Text>
               </Col>
               <Col span={8}>
                 <Text type="secondary">{t('guard.phoneLabel')}</Text>
-                <Text strong>{selectedRecord.phone}</Text>
+                <Text strong>{selectedRecord.worker?.phone || '-'}</Text>
               </Col>
             </Row>
           </div>
         </div>
         
-        <Table
-          columns={itemColumns}
-          dataSource={mockItemRecords}
-          rowKey="id"
-          pagination={false}
-          size="small"
-        />
+        <Spin spinning={itemRecordsLoading} tip={t('common.loading')}>
+          <Table
+            columns={itemColumns}
+            dataSource={itemBorrowRecords}
+            rowKey="id"
+            pagination={false}
+            size="small"
+            locale={{
+              emptyText: itemRecordsLoading ? t('common.loading') : t('itemBorrowRecords.noData')
+            }}
+          />
+          {!itemRecordsLoading && itemBorrowRecords.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#999' }}>
+              {t('itemBorrowRecords.noData') || '无借用记录'}
+            </div>
+          )}
+        </Spin>
       </Modal>
     )
   }
@@ -1898,8 +2154,15 @@ const Guard: React.FC = () => {
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.idCardLabel')}</Text>
-                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.idCard}</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.iDNumberLabel')}</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
+                          {selectedWorker.idCard ? 
+                            (selectedWorker.idCard.length >= 4 ? 
+                              `${selectedWorker.idCard.slice(0, 2)}******${selectedWorker.idCard.slice(-2)}` : 
+                              selectedWorker.idCard
+                            ) : '-'
+                          }
+                        </Text>
                       </div>
                       <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>分判商：</Text>
@@ -1919,26 +2182,46 @@ const Guard: React.FC = () => {
                   </Card>
                 </div>
 
-                <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step3PhysicalCard')}</Text>
-                  <Input
-                    placeholder={t('guard.physicalCardPlaceholder')}
-                    value={physicalCardId}
-                    onChange={(e) => setPhysicalCardId(e.target.value)}
-                    prefix={<IdcardOutlined />}
-                    style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
-                  />
-                </div>
+              <div>
+                <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('worker.idType')}</Text>
+                <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
+                  {(() => {
+                    switch (selectedWorker.idType) {
+                      case 'ID_CARD':
+                        return t('worker.idCard');
+                      case 'PASSPORT':
+                        return t('worker.passport');
+                      case 'DRIVER_LICENSE':
+                        return t('worker.driverLicense');
+                      case 'OTHER':
+                        return t('worker.other');
+                      default:
+                        return t('worker.idCard');
+                    }
+                  })()}
+                </Text>
+              </div>
+              
+              <div>
+                <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step3PhysicalCard')}</Text>
+                <Input
+                  placeholder={t('guard.physicalCardPlaceholder')}
+                  value={physicalCardId}
+                  onChange={(e) => setPhysicalCardId(e.target.value)}
+                  prefix={<IdcardOutlined />}
+                  style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
+                />
+              </div>
 
 
-                <Button 
-                  type="primary" 
-                  size="large"
-                  onClick={handleCompleteEntry}
-                  style={{ width: '100%', height: '56px', fontSize: 'clamp(18px, 3vw, 24px)' }}
-                >
-                  {t('guard.completeEntry')}
-                </Button>
+              <Button 
+                type="primary" 
+                size="large"
+                onClick={handleCompleteEntry}
+                style={{ width: '100%', height: '56px', fontSize: 'clamp(18px, 3vw, 24px)' }}
+              >
+                {t('guard.completeEntry')}
+              </Button>
               </>
             )}
           </Space>
@@ -2045,11 +2328,11 @@ const Guard: React.FC = () => {
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.idCardLabel')}</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.iDNumberLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
                           {selectedWorker.idCard ? 
-                            (selectedWorker.idCard.length >= 8 ? 
-                              `${selectedWorker.idCard.slice(0, 4)}****${selectedWorker.idCard.slice(-4)}` : 
+                            (selectedWorker.idCard.length >= 4 ? 
+                              `${selectedWorker.idCard.slice(0, 2)}******${selectedWorker.idCard.slice(-2)}` : 
                               selectedWorker.idCard
                             ) : '-'
                           }
@@ -2427,11 +2710,11 @@ const Guard: React.FC = () => {
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>{selectedWorker.name}</Text>
                       </div>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.idCardLabel')}</Text>
+                        <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>{t('guard.iDNumberLabel')}</Text>
                         <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px' }}>
                           {selectedWorker.idCard ? 
-                            (selectedWorker.idCard.length >= 8 ? 
-                              `${selectedWorker.idCard.slice(0, 4)}****${selectedWorker.idCard.slice(-4)}` : 
+                            (selectedWorker.idCard.length >= 4 ? 
+                              `${selectedWorker.idCard.slice(0, 2)}******${selectedWorker.idCard.slice(-2)}` : 
                               selectedWorker.idCard
                             ) : '-'
                           }
@@ -2493,7 +2776,10 @@ const Guard: React.FC = () => {
                             }}>
                               <div>
                                 <Text strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
-                                  {item.itemType} - {item.itemId}
+                                  {(() => {
+                                    const category = itemCategories.find(cat => cat.id === item.itemType)
+                                    return category ? category.name : item.itemType
+                                  })()} - {item.itemId}
                                 </Text>
                                 {item.remark && (
                                   <div>
@@ -2664,8 +2950,8 @@ const Guard: React.FC = () => {
         render: (text: string) => {
           if (!text) return '-'
           // 显示前4位和后4位，中间用星号代替
-          if (text.length >= 8) {
-            return `${text.slice(0, 4)}****${text.slice(-4)}`
+          if (text.length >= 4) {
+            return `${text.slice(0, 2)}******${text.slice(-2)}`
           }
           return text
         },
@@ -2693,10 +2979,10 @@ const Guard: React.FC = () => {
       },
       {
         title: t('guard.contactPhone'),
-        dataIndex: 'worker',
+        dataIndex: 'phone',
         key: 'phone',
         width: 120,
-        render: (worker: any) => worker?.phone || '-',
+        render: (text: string, record: any) => text || record.worker?.phone || '-',
       },
       {
         title: t('guard.distributor'),
@@ -2706,7 +2992,7 @@ const Guard: React.FC = () => {
         render: (worker: any) => worker?.distributor?.name || '-',
       },
       {
-        title: t('guard.guardStatus'),
+        title: t('guard.visitorStatus'),
         dataIndex: 'status',
         key: 'status',
         width: 80,
@@ -2731,31 +3017,34 @@ const Guard: React.FC = () => {
         dataIndex: 'borrowedItems',
         key: 'borrowedItems',
         width: 100,
-        render: (value: number, record: AttendanceRecord) => (
-          <span 
-            style={{ 
-              color: '#1890ff', 
-              fontWeight: 'bold',
-              backgroundColor: '#e6f7ff',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              border: '1px solid #91d5ff',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-            onClick={() => handleViewItemRecords(record)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#bae7ff'
-              e.currentTarget.style.borderColor = '#69c0ff'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#e6f7ff'
-              e.currentTarget.style.borderColor = '#91d5ff'
-            }}
-          >
-            {value}
-          </span>
-        ),
+        render: (value: number, record: AttendanceRecord) => {
+          console.log("借用物品列渲染，值为:", value, "记录:", record);
+          return (
+            <span 
+              style={{ 
+                color: '#1890ff', 
+                fontWeight: 'bold',
+                backgroundColor: '#e6f7ff',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: '1px solid #91d5ff',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onClick={() => handleViewItemRecords(record)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#bae7ff'
+                e.currentTarget.style.borderColor = '#69c0ff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#e6f7ff'
+                e.currentTarget.style.borderColor = '#91d5ff'
+              }}
+            >
+              {value !== undefined ? value : '?'}
+            </span>
+          );
+        },
       },
       {
         title: (
@@ -2786,6 +3075,8 @@ const Guard: React.FC = () => {
         key: 'returnedItems',
         width: 100,
         render: (value: number, record: AttendanceRecord) => {
+          console.log("已归还列渲染，值为:", value, "记录:", record);
+          
           const isPartiallyReturned = value > 0 && value < record.borrowedItems
           const isNotReturned = value === 0
           
@@ -2829,7 +3120,7 @@ const Guard: React.FC = () => {
                 e.currentTarget.style.borderColor = borderColor
               }}
             >
-              {value}
+              {value !== undefined ? value : '?'}
             </span>
           )
         },
@@ -2945,9 +3236,6 @@ const Guard: React.FC = () => {
                     </Select>
                     <Text type="secondary">
                       {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
-                      (API数据: {visitorRecords.length}条)
                     </Text>
                   </div>
                 )}

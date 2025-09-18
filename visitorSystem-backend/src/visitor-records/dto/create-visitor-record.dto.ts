@@ -36,5 +36,9 @@ export class CreateVisitorRecordDto {
 
   @IsOptional()
   @IsString()
+  phone?: string
+
+  @IsOptional()
+  @IsString()
   notes?: string
 }

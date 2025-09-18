@@ -97,8 +97,6 @@ model Worker {
   workerId          String             @unique
   name              String
   gender            Gender
-  idType            IdType             @default(ID_CARD)
-  idNumber          String             @unique
   region            String?
   phone             String
   email             String?
@@ -109,6 +107,8 @@ model Worker {
   updatedAt         DateTime           @updatedAt
   distributorId     String
   siteId            String
+  idNumber          String             @unique
+  idType            IdType             @default(ID_CARD)
   itemBorrowRecords ItemBorrowRecord[]
   visitorRecords    VisitorRecord[]
   distributor       Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
@@ -146,50 +146,51 @@ model Item {
 }
 
 model ItemBorrowRecord {
-  id              String       @id @default(cuid())
+  id              String         @id @default(cuid())
   borrowDate      DateTime
   borrowTime      String
   returnDate      DateTime?
   returnTime      String?
-  status          BorrowStatus @default(BORROWED)
+  status          BorrowStatus   @default(BORROWED)
   borrowDuration  Int?
-  notes           String?      // 借用备注信息
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   workerId        String
   siteId          String
   itemId          String
   borrowHandlerId String?
   returnHandlerId String?
+  notes           String?
   visitorRecordId String?
-  borrowHandler   Guard?       @relation(fields: [borrowHandlerId], references: [id])
-  item            Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  returnHandler   Guard?       @relation("ReturnHandler", fields: [returnHandlerId], references: [id])
-  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  worker          Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  visitorRecord   VisitorRecord? @relation(fields: [visitorRecordId], references: [id], onDelete: SetNull)
+  borrowHandler   Guard?         @relation(fields: [borrowHandlerId], references: [id])
+  item            Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  returnHandler   Guard?         @relation("ReturnHandler", fields: [returnHandlerId], references: [id])
+  site            Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  visitorRecord   VisitorRecord? @relation(fields: [visitorRecordId], references: [id])
+  worker          Worker         @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@map("item_borrow_records")
 }
 
 model VisitorRecord {
-  id             String        @id @default(cuid())
+  id             String             @id @default(cuid())
   workerId       String
   siteId         String
   checkInTime    DateTime?
   checkOutTime   DateTime?
-  status         VisitorStatus @default(ON_SITE)
-  idType         IdType
+  status         VisitorStatus      @default(ON_SITE)
   idNumber       String
   physicalCardId String?
   registrarId    String?
+  phone          String?            // 添加电话号码字段
   notes          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  registrar      Guard?        @relation(fields: [registrarId], references: [id])
-  site           Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  worker         Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  idType         IdType
   borrowRecords  ItemBorrowRecord[]
+  registrar      Guard?             @relation(fields: [registrarId], references: [id])
+  site           Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  worker         Worker             @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@map("visitor_records")
 }

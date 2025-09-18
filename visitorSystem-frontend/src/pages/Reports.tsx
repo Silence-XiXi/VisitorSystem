@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { Card, DatePicker, Table, Space, Button, Row, Col, Statistic, message, Progress, Select, Tabs, Input, Tooltip, Modal, List, Tag, Spin } from 'antd'
-import { TeamOutlined, DownloadOutlined, SearchOutlined, QuestionCircleOutlined, ShoppingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
-import dayjs, { Dayjs } from '../utils/dayjs'
+import { TeamOutlined, DownloadOutlined, SearchOutlined, ReloadOutlined, QuestionCircleOutlined, ShoppingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import dayjs from '../utils/dayjs'
+type Dayjs = ReturnType<typeof dayjs>
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
 import apiService from '../services/api'
@@ -24,6 +25,7 @@ interface AttendanceRecord {
   returnedItems: number
   registrarId?: string // 登记人ID
   registrarName?: string // 登记人姓名
+  visitorRecordId?: string // 访客记录ID，用于关联借物记录
 }
 
 interface SiteSummary {
@@ -38,10 +40,21 @@ interface SiteSummary {
 // 将访客记录和借用记录转换为AttendanceRecord格式
 const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[]): AttendanceRecord[] => {
   const recordMap = new Map<string, AttendanceRecord>()
+  // 按工人分组的访客记录
+  const workerVisitorMap = new Map<string, any[]>()
+  
+  // 首先将访客记录按工人ID分组
+  visitorRecords.forEach(record => {
+    const workerId = record.worker.workerId
+    if (!workerVisitorMap.has(workerId)) {
+      workerVisitorMap.set(workerId, [])
+    }
+    workerVisitorMap.get(workerId)?.push(record)
+  })
   
   // 处理访客记录
   visitorRecords.forEach(record => {
-    const key = `${record.workerId}-${dayjs(record.checkInTime).format('YYYY-MM-DD')}`
+    const key = `${record.worker.workerId}-${dayjs(record.checkInTime).format('YYYY-MM-DD')}`
     const existingRecord = recordMap.get(key)
     
     if (existingRecord) {
@@ -57,7 +70,7 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
         name: record.worker.name,
         distributorName: record.worker.distributor?.name || '未知分判商',
         siteName: record.site?.name || '未知工地',
-        contact: record.worker.phone || record.worker.whatsapp || '',
+        contact: record.phone || record.worker.phone || record.worker.whatsapp || '',
         idType: record.idType,
         idNumber: record.idNumber,
         physicalCardId: record.physicalCardId,
@@ -67,41 +80,121 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
         borrowedItems: 0,
         returnedItems: 0,
         registrarId: record.registrar?.id,
-        registrarName: record.registrar?.name || '未指定'
+        registrarName: record.registrar?.name || '未指定',
+        visitorRecordId: record.id // 存储访客记录ID用于后续关联
       })
     }
   })
   
   // 处理借用记录，统计每个工人的借用物品数量
   borrowRecords.forEach(record => {
-    const key = `${record.worker.workerId}-${dayjs(record.borrowDate).format('YYYY-MM-DD')}`
-    const existingRecord = recordMap.get(key)
+    // 如果借物记录关联了访客记录ID，尝试找到对应的访客记录
+    let foundMatchingVisitorRecord = false
     
-    if (existingRecord) {
-      existingRecord.borrowedItems++
-      if (record.status === 'RETURNED') {
-        existingRecord.returnedItems++
+    if (record.visitorRecordId) {
+      // 如果已有访客记录ID，遍历已创建的记录找到匹配的
+      for (const [, attendanceRecord] of recordMap.entries()) {
+        if (attendanceRecord.visitorRecordId === record.visitorRecordId) {
+          attendanceRecord.borrowedItems++
+          if (record.status === 'RETURNED') {
+            attendanceRecord.returnedItems++
+          }
+          foundMatchingVisitorRecord = true
+          break
+        }
       }
-    } else {
-      // 如果没有对应的访客记录，创建一个新的记录
-      recordMap.set(key, {
-        key,
-        workerId: record.worker.workerId,
-        name: record.worker.name,
-        distributorName: record.worker.distributor?.name || '未知分判商',
-        siteName: record.site?.name || '未知工地',
-        contact: record.worker.phone || record.worker.whatsapp || '',
-        idType: '身份证', // 默认值
-        idNumber: record.worker.idCard || '',
-        physicalCardId: record.worker.physicalCardId,
-        date: dayjs(record.borrowDate).format('YYYY-MM-DD'),
-        checkIn: dayjs(record.borrowDate).format('HH:mm'),
-        checkOut: record.status === 'RETURNED' && record.returnDate ? dayjs(record.returnDate).format('HH:mm') : undefined,
-        borrowedItems: 1,
-        returnedItems: record.status === 'RETURNED' ? 1 : 0,
-        registrarId: record.borrowHandler?.id,
-        registrarName: record.borrowHandler?.name || '未指定'
-      })
+    }
+    
+    // 如果没有找到通过ID关联的访客记录，尝试通过日期匹配
+    if (!foundMatchingVisitorRecord) {
+      const key = `${record.worker.workerId}-${dayjs(record.borrowDate).format('YYYY-MM-DD')}`
+      const existingRecord = recordMap.get(key)
+      
+      if (existingRecord) {
+        existingRecord.borrowedItems++
+        if (record.status === 'RETURNED') {
+          existingRecord.returnedItems++
+        }
+      } else {
+        // 如果没有当天的记录，尝试找该工人最近的入场记录
+        const workerRecords = workerVisitorMap.get(record.worker.workerId) || []
+        let closestVisitorRecord = null
+        let minDayDiff = Infinity
+        
+        // 寻找日期最接近的访客记录
+        for (const visitorRecord of workerRecords) {
+          const visitorDate = dayjs(visitorRecord.checkInTime)
+          const borrowDate = dayjs(record.borrowDate)
+          const dayDiff = Math.abs(borrowDate.diff(visitorDate, 'day'))
+          
+          // 找到日期差异最小的记录
+          if (dayDiff < minDayDiff) {
+            minDayDiff = dayDiff
+            closestVisitorRecord = visitorRecord
+          }
+        }
+        
+        // 如果找到了该工人的访客记录，使用该记录的日期
+        if (closestVisitorRecord) {
+          const closestKey = `${record.worker.workerId}-${dayjs(closestVisitorRecord.checkInTime).format('YYYY-MM-DD')}`
+          const closestRecord = recordMap.get(closestKey)
+          
+          if (closestRecord) {
+            // 在最接近的记录中增加借用物品数量
+            closestRecord.borrowedItems++
+            if (record.status === 'RETURNED') {
+              closestRecord.returnedItems++
+            }
+          } else {
+            // 只有在极特殊情况下才会走到这里，例如访客记录被删除但还有借物记录
+            // 创建新记录，但使用访客记录的日期
+            recordMap.set(closestKey, {
+              key: closestKey,
+              workerId: record.worker.workerId,
+              name: record.worker.name,
+              distributorName: record.worker.distributor?.name || '未知分判商',
+              siteName: record.site?.name || '未知工地',
+              contact: record.phone || record.worker.phone || record.worker.whatsapp || '',
+              idType: closestVisitorRecord.idType || '身份证',
+              idNumber: closestVisitorRecord.idNumber || record.worker.idCard || '',
+              physicalCardId: closestVisitorRecord.physicalCardId || record.worker.physicalCardId,
+              date: dayjs(closestVisitorRecord.checkInTime).format('YYYY-MM-DD'),
+              checkIn: dayjs(closestVisitorRecord.checkInTime).format('HH:mm'),
+              checkOut: closestVisitorRecord.checkOutTime ? dayjs(closestVisitorRecord.checkOutTime).format('HH:mm') : undefined as unknown as string,
+              borrowedItems: 1,
+              returnedItems: record.status === 'RETURNED' ? 1 : 0,
+              registrarId: closestVisitorRecord.registrar?.id || record.borrowHandler?.id,
+              registrarName: closestVisitorRecord.registrar?.name || record.borrowHandler?.name || '未指定',
+              visitorRecordId: closestVisitorRecord.id
+            })
+          }
+        } else {
+          // 例外情况：如果没有该工人的任何访客记录，创建一条基于借物日期的记录
+          // 这应该是异常情况，因为后端已经限制了没有入场记录的工人不能借物
+          console.warn(`工人 ${record.worker.name}(${record.worker.workerId}) 没有访客记录但有借物记录，这可能是数据错误。`);
+          
+          // 尽量避免创建新记录，但如果真的没有访客记录，保留这个借物记录信息
+          const fallbackKey = `${record.worker.workerId}-${dayjs(record.borrowDate).format('YYYY-MM-DD')}`
+          recordMap.set(fallbackKey, {
+            key: fallbackKey,
+            workerId: record.worker.workerId,
+            name: record.worker.name,
+            distributorName: record.worker.distributor?.name || '未知分判商',
+            siteName: record.site?.name || '未知工地',
+            contact: record.phone || record.worker.phone || record.worker.whatsapp || '',
+            idType: '身份证', // 默认值
+            idNumber: record.worker.idCard || '',
+            physicalCardId: record.worker.physicalCardId,
+            date: dayjs(record.borrowDate).format('YYYY-MM-DD'),
+            checkIn: dayjs(record.borrowDate).format('HH:mm'),
+            checkOut: record.status === 'RETURNED' && record.returnDate ? dayjs(record.returnDate).format('HH:mm') : undefined as unknown as string,
+            borrowedItems: 1,
+            returnedItems: record.status === 'RETURNED' ? 1 : 0,
+            registrarId: record.borrowHandler?.id,
+            registrarName: record.borrowHandler?.name || '未指定'
+          })
+        }
+      }
     }
   })
   
@@ -136,16 +229,20 @@ const Reports: React.FC = () => {
   const loadData = async () => {
     setLoading(true)
     try {
+           // 准备日期参数，确保不会有null值
+           const startDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD');
+           const endDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD');
+           
            const [visitorData, borrowData, sitesData, distributorsData] = await Promise.all([
              apiService.getVisitorRecords({
                siteId: selectedSiteId,
-               startDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD'),
-               endDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD')
+               startDate: startDateParam,
+               endDate: endDateParam
              }),
              apiService.getAllBorrowRecords({
                siteId: selectedSiteId,
-               startDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD'),
-               endDate: dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD')
+               startDate: startDateParam,
+               endDate: endDateParam
              }),
              apiService.getAllSites(),
              apiService.getAllDistributors()
@@ -232,7 +329,8 @@ const Reports: React.FC = () => {
       returnedTime: borrowRecord.status === 'RETURNED' && borrowRecord.returnDate ? 
         dayjs(borrowRecord.returnDate).format('HH:mm') : null,
       status: borrowRecord.status === 'RETURNED' ? 'returned' : 'borrowed',
-      borrowHandler: borrowRecord.borrowHandler?.name || record.registrarName || t('reports.unspecified')
+      borrowHandler: borrowRecord.borrowHandler?.name || record.registrarName || t('reports.unspecified'),
+      notes: borrowRecord.notes || ''
     }))
   }
 
@@ -721,7 +819,7 @@ const Reports: React.FC = () => {
               title={t('reports.unreturnedItemsCount')}
               value={totalUnreturnedItems}
               prefix={<ExclamationCircleOutlined />}
-              valueStyle={{ color: totalUnreturnedItems > 0 ? '#1890ff' : '#52c41a', fontWeight: 700 }}
+              valueStyle={{ color: totalUnreturnedItems > 0 ? '#fa541c' : '#52c41a', fontWeight: 700 }}
             />
           </Card>
         </Col>
@@ -897,13 +995,22 @@ const Reports: React.FC = () => {
         activeKey={activeTab}
         onChange={setActiveTab}
         tabBarExtraContent={
-          <Button 
-            type="primary" 
-            icon={<DownloadOutlined />} 
-            onClick={() => setDownloadModalVisible(true)}
-          >
-            {t('reports.downloadExcel')}
-          </Button>
+          <Space>
+            <Button 
+              type="default" 
+              icon={<ReloadOutlined />} 
+              onClick={() => loadData()}
+            >
+              {t('common.refresh')}
+            </Button>
+            <Button 
+              type="primary" 
+              icon={<DownloadOutlined />} 
+              onClick={() => setDownloadModalVisible(true)}
+            >
+              {t('reports.downloadExcel')}
+            </Button>
+          </Space>
         }
         items={[
           {
@@ -992,31 +1099,48 @@ const Reports: React.FC = () => {
               </Row>
             </div>
             
-            <List
-              dataSource={generateItemData(selectedRecord)}
-              renderItem={(item: any) => (
-                <List.Item>
-                  <List.Item.Meta
-                    title={
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>{item.name}</span>
-                        <Tag color={item.status === 'returned' ? 'green' : 'orange'}>
-                          {item.status === 'returned' ? t('reports.returnedStatus') : t('reports.notReturnedStatus')}
-                        </Tag>
-                      </div>
-                    }
-                    description={
-                      <div>
-                        <div><strong>{t('reports.itemCategory')}：</strong>{item.category}</div>
-                        <div><strong>{t('reports.handler')}：</strong>{item.borrowHandler}</div>
-                        <div><strong>{t('reports.borrowTime')}：</strong>{item.borrowedTime}</div>
-                        <div><strong>{t('reports.returnTime')}：</strong>{item.returnedTime || '-'}</div>
-                      </div>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
+            <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '0 4px' }}>
+              <List
+                dataSource={generateItemData(selectedRecord)}
+                renderItem={(item: any) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      title={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span>{item.name}</span>
+                          <Tag color={item.status === 'returned' ? 'green' : 'orange'}>
+                            {item.status === 'returned' ? t('reports.returnedStatus') : t('reports.notReturnedStatus')}
+                          </Tag>
+                        </div>
+                      }
+                      description={
+                        <div>
+                          <div><strong>{t('reports.itemCategory')}：</strong>{item.category}</div>
+                          <div><strong>{t('reports.handler')}：</strong>{item.borrowHandler}</div>
+                          <div><strong>{t('reports.borrowTime')}：</strong>{item.borrowedTime}</div>
+                          <div><strong>{t('reports.returnTime')}：</strong>{item.returnedTime || '-'}</div>
+                          {item.notes && (
+                            <div style={{ marginTop: 4 }}>
+                              <strong>{t('reports.notes') || '备注'}：</strong>
+                              <div style={{ 
+                                backgroundColor: '#fffbe6', 
+                                padding: '4px 8px', 
+                                borderRadius: 4,
+                                borderLeft: '3px solid #faad14',
+                                marginTop: 2,
+                                wordBreak: 'break-word'
+                              }}>
+                                {item.notes}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            </div>
           </div>
         )}
       </Modal>

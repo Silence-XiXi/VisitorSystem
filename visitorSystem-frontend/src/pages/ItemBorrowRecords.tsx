@@ -27,6 +27,7 @@ interface ItemBorrowRecord {
   borrowHandlerId?: string // 借用经办人ID
   borrowHandlerName?: string // 借用经办人姓名
   returnHandlerName?: string // 归还经办人姓名
+  notes?: string // 借用备注
   item?: {
     id: string
     itemCode: string
@@ -84,6 +85,7 @@ const transformBorrowRecord = (record: any): ItemBorrowRecord => {
     borrowHandlerId: record.borrowHandler?.id,
     borrowHandlerName: record.borrowHandler?.name,
     returnHandlerName: record.returnHandler?.name,
+    notes: record.notes || '',
     item: record.item,
     worker: record.worker,
     site: record.site,
@@ -232,6 +234,7 @@ const ItemBorrowRecords: React.FC = () => {
         [t('itemBorrowRecords.itemType')]: record.itemType,
         [t('itemBorrowRecords.itemCode')]: record.itemCode,
         [t('itemBorrowRecords.borrowTime')]: record.borrowTime,
+        [t('itemBorrowRecords.notes') || '备注']: record.notes || '-',
         [t('itemBorrowRecords.returnDate')]: record.returnDate || '-',
         [t('itemBorrowRecords.returnTime')]: record.returnTime || '-',
         [t('itemBorrowRecords.status')]: record.status === 'BORROWED' ? t('itemBorrowRecords.notReturned') : t('itemBorrowRecords.returned'),
@@ -334,6 +337,18 @@ const ItemBorrowRecords: React.FC = () => {
       width: 120,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.borrowHandlerName || '').localeCompare(b.borrowHandlerName || ''),
       render: (name: string) => name || '-'
+    },
+    { 
+      title: t('itemBorrowRecords.notes') || '备注', 
+      dataIndex: 'notes', 
+      key: 'notes', 
+      width: 150,
+      ellipsis: true,
+      render: (notes: string) => notes ? (
+        <span title={notes}>
+          {notes.length > 20 ? `${notes.substring(0, 20)}...` : notes}
+        </span>
+      ) : '-'
     },
     { 
       title: t('itemBorrowRecords.returnTime'), 
@@ -582,6 +597,23 @@ const ItemBorrowRecords: React.FC = () => {
                 {selectedRecord.borrowDuration && (
                   <Col span={12} style={{ marginTop: 8 }}>
                     <strong>{t('itemBorrowRecords.borrowDurationLabel')}</strong>{selectedRecord.borrowDuration}{t('itemBorrowRecords.hours')}
+                  </Col>
+                )}
+                {selectedRecord.notes && (
+                  <Col span={24} style={{ marginTop: 12 }}>
+                    <div>
+                      <strong>{t('itemBorrowRecords.notesLabel') || '备注'}</strong>
+                    </div>
+                    <div style={{
+                      backgroundColor: '#fffbe6',
+                      padding: '8px 12px',
+                      borderRadius: '4px',
+                      borderLeft: '3px solid #faad14',
+                      marginTop: '4px',
+                      wordBreak: 'break-word'
+                    }}>
+                      {selectedRecord.notes}
+                    </div>
                   </Col>
                 )}
               </Row>

@@ -234,6 +234,8 @@ export class GuardsService {
       throw new ForbiddenException('只有门卫可以访问此接口');
     }
 
+    console.log(`获取物品借用记录 - user: ${user.username}, status: ${status}, workerId: ${workerId}`);
+
     const guard = await this.prisma.guard.findUnique({
       where: { userId: user.id }
     });
@@ -242,17 +244,39 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
+    console.log(`门卫信息: ${guard.id}, siteId: ${guard.siteId}`);
+
     const whereClause: any = {
       siteId: guard.siteId
     };
+
+    // 这里尝试修复一个潜在的bug - workerId字段可能不匹配
+    // 在Prisma模型中，可能是worker.id而不是worker.workerId
+    if (workerId) {
+      // 查找对应的工人
+      const worker = await this.prisma.worker.findFirst({
+        where: {
+          OR: [
+            { workerId },  // 尝试匹配工号
+            { id: workerId }  // 尝试匹配数据库ID
+          ]
+        }
+      });
+
+      if (worker) {
+        console.log(`找到工人: ${worker.id}, workerId: ${worker.workerId}, name: ${worker.name}`);
+        whereClause.workerId = worker.id;  // 使用工人的数据库ID
+      } else {
+        console.log(`未找到工人, 使用原始workerId: ${workerId}`);
+        whereClause.workerId = workerId;
+      }
+    }
 
     if (status) {
       whereClause.status = status.toUpperCase();
     }
 
-    if (workerId) {
-      whereClause.workerId = workerId;
-    }
+    console.log('借用记录查询条件:', whereClause);
 
     const records = await this.prisma.itemBorrowRecord.findMany({
       where: whereClause,
@@ -274,6 +298,11 @@ export class GuardsService {
       }
     });
 
+    console.log(`找到借用记录: ${records.length}条`);
+    if (records.length > 0) {
+      console.log('第一条记录示例:', JSON.stringify(records[0], null, 2).substring(0, 200) + '...');
+    }
+
     return records;
   }
 
@@ -291,13 +320,44 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
+    console.log('收到借用记录请求:', {
+      workerId: recordData.workerId,
+      categoryId: recordData.categoryId,
+      itemCode: recordData.itemCode,
+      guardId: guard.id,
+      siteId: guard.siteId
+    });
+
     // 验证工人是否在该工地
     const worker = await this.prisma.worker.findFirst({
       where: {
-        id: recordData.workerId,
+        workerId: recordData.workerId,
         siteId: guard.siteId
       }
     });
+
+    // 如果通过workerId没有找到，可能是传递了数据库ID，尝试通过id查找
+    if (!worker) {
+      const workerById = await this.prisma.worker.findFirst({
+        where: {
+          id: recordData.workerId,
+          siteId: guard.siteId
+        }
+      });
+      
+      if (!workerById) {
+        throw new ForbiddenException('该工人不在您管理的工地');
+      }
+      
+      return workerById;
+    }
+    
+    console.log('查找到的工人信息:', worker ? {
+      id: worker.id,
+      workerId: worker.workerId,
+      name: worker.name,
+      siteId: worker.siteId
+    } : '未找到工人');
 
     if (!worker) {
       throw new ForbiddenException('该工人不在您管理的工地');
@@ -311,8 +371,16 @@ export class GuardsService {
       }
     });
 
+    console.log('查找到的访客记录:', visitorRecord ? {
+      id: visitorRecord.id,
+      workerId: visitorRecord.workerId,
+      status: visitorRecord.status,
+      checkInTime: visitorRecord.checkInTime
+    } : '未找到有效的入场记录');
+
+    // 如果工人没有入场记录，禁止借物
     if (!visitorRecord) {
-      throw new ForbiddenException('该工人未入场，无法借用物品');
+      throw new ForbiddenException('该工人未入场，无法借用物品，请先进行入场登记');
     }
 
     // 验证物品类型是否存在
@@ -348,9 +416,17 @@ export class GuardsService {
     }
 
     // 创建借用记录（关联当前有效的访客记录）
+    console.log('创建借用记录，关联访客记录:', {
+      workerId: worker.id,
+      workerIdNumber: worker.workerId,
+      visitorRecordId: visitorRecord.id,
+      itemId: item.id,
+      itemCode: item.itemCode
+    });
+    
     const borrowRecord = await this.prisma.itemBorrowRecord.create({
       data: {
-        workerId: recordData.workerId,
+        workerId: worker.id, // 使用数据库中的工人ID
         itemId: item.id,
         siteId: guard.siteId,
         borrowHandlerId: guard.id,
@@ -358,7 +434,7 @@ export class GuardsService {
         borrowTime: recordData.borrowTime || new Date().toTimeString().split(' ')[0],
         status: 'BORROWED',
         notes: recordData.notes || null,
-        visitorRecordId: visitorRecord.id
+        visitorRecordId: visitorRecord.id // 关联到访客记录
       },
       include: {
         worker: {
@@ -554,6 +630,71 @@ export class GuardsService {
     };
   }
 
+  // 通过实体卡编号查询访客记录
+  async getVisitorRecordByPhysicalCardId(user: CurrentUser, physicalCardId: string) {
+    if (user.role !== 'GUARD') {
+      throw new ForbiddenException('只有门卫可以访问此接口');
+    }
+
+    const guard = await this.prisma.guard.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!guard) {
+      throw new NotFoundException('门卫信息不存在');
+    }
+
+    // 查找有效的入场记录（状态为ON_SITE）
+    const entryRecord = await this.prisma.visitorRecord.findFirst({
+      where: {
+        physicalCardId: physicalCardId,
+        siteId: guard.siteId,
+        status: 'ON_SITE'
+      },
+      include: {
+        worker: {
+          include: {
+            distributor: true,
+            site: true
+          }
+        },
+        site: true,
+        registrar: true
+      },
+      orderBy: {
+        checkInTime: 'desc'
+      }
+    });
+
+    if (!entryRecord) {
+      throw new NotFoundException('未找到该实体卡对应的有效访客记录');
+    }
+
+    // 获取工人的当前借用物品（未归还的）
+    const currentBorrowedItems = await this.prisma.itemBorrowRecord.findMany({
+      where: {
+        workerId: entryRecord.worker.id,
+        status: 'BORROWED' // 只获取未归还的物品
+      },
+      include: {
+        item: {
+          include: {
+            category: true
+          }
+        }
+      },
+      orderBy: {
+        borrowDate: 'desc'
+      }
+    });
+
+    return {
+      worker: entryRecord.worker,
+      entryRecord: entryRecord,
+      currentBorrowedItems: currentBorrowedItems
+    };
+  }
+
   // 获取门卫所在工地的访客记录
   async getGuardSiteVisitorRecords(user: CurrentUser, startDate?: string, endDate?: string, status?: string) {
     if (user.role !== 'GUARD') {
@@ -611,6 +752,8 @@ export class GuardsService {
 
   // 创建访客记录（入场登记）
   async createVisitorRecord(user: CurrentUser, recordData: any) {
+    console.log('创建访客记录，接收到的数据:', JSON.stringify(recordData, null, 2));
+    
     if (user.role !== 'GUARD') {
       throw new ForbiddenException('只有门卫可以创建访客记录');
     }
@@ -647,6 +790,9 @@ export class GuardsService {
       throw new BadRequestException('该工人已经在场，无法重复登记');
     }
 
+    console.log('工人原始电话号码:', worker.phone);
+    console.log('传入的电话号码:', recordData.phone);
+    
     // 创建访客记录
     const visitorRecord = await this.prisma.visitorRecord.create({
       data: {
@@ -658,6 +804,7 @@ export class GuardsService {
         idNumber: recordData.idNumber || worker.idNumber,
         physicalCardId: recordData.physicalCardId,
         registrarId: guard.id,
+        phone: recordData.phone || worker.phone, // 使用传入的电话号码或默认使用工人的电话号码
         notes: recordData.notes
       },
       include: {
@@ -672,6 +819,13 @@ export class GuardsService {
       }
     });
 
+    console.log('创建的访客记录:', JSON.stringify({
+      id: visitorRecord.id,
+      workerId: visitorRecord.workerId,
+      phone: visitorRecord.phone,
+      workerPhone: visitorRecord.worker?.phone
+    }, null, 2));
+    
     return visitorRecord;
   }
 }
