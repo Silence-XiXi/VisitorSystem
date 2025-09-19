@@ -20,7 +20,8 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:seed-static": "ts-node prisma/seed-static-data.ts",
-    "prisma:seed-workers": "ts-node prisma/seed-workers.ts"
+    "prisma:seed-workers": "ts-node prisma/seed-workers.ts",
+    "prisma:seed-configs": "ts-node prisma/seed-system-configs.ts"
   },
   "keywords": [],
   "author": "",

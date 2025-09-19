@@ -8,15 +8,16 @@ datasource db {
 }
 
 model User {
-  id          String       @id @default(cuid())
-  username    String       @unique
-  password    String
-  role        UserRole
-  status      UserStatus   @default(ACTIVE)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  distributor Distributor?
-  guard       Guard?
+  id            String         @id @default(cuid())
+  username      String         @unique
+  password      String
+  role          UserRole
+  status        UserStatus     @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  distributor   Distributor?
+  guard         Guard?
+  systemConfigs SystemConfig[]
 
   @@map("users")
 }
@@ -260,4 +261,17 @@ enum IdType {
   PASSPORT
   DRIVER_LICENSE
   OTHER
+}
+
+model SystemConfig {
+  id          Int      @id @default(autoincrement())
+  config_key  String   @unique
+  config_value String
+  description String?
+  is_encrypted Boolean @default(false)
+  updated_by  String
+  updated_at  DateTime @updatedAt
+  user        User     @relation(fields: [updated_by], references: [id])
+
+  @@map("system_configs")
 }
