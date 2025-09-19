@@ -1009,6 +1009,9 @@ class ApiService {
     status?: string;
     startDate?: string;
     endDate?: string;
+    checkOutStartDate?: string;
+    checkOutEndDate?: string;
+    todayRelevant?: boolean;
   }): Promise<VisitorRecord[]> {
     const params = new URLSearchParams();
     if (filters?.workerId) params.append('workerId', filters.workerId);
@@ -1016,6 +1019,9 @@ class ApiService {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.startDate) params.append('startDate', filters.startDate);
     if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.checkOutStartDate) params.append('checkOutStartDate', filters.checkOutStartDate);
+    if (filters?.checkOutEndDate) params.append('checkOutEndDate', filters.checkOutEndDate);
+    if (filters?.todayRelevant !== undefined) params.append('todayRelevant', filters.todayRelevant.toString());
     
     const url = `/visitor-records${params.toString() ? `?${params.toString()}` : ''}`;
     return this.requestWithRetry(url, {
@@ -1111,13 +1117,17 @@ class ApiService {
   }
 
   // 获取工人借用物品记录
-  async getWorkerBorrowRecords(workerId: string): Promise<any[]> {
-    console.log(`调用 getWorkerBorrowRecords API，工人ID: ${workerId}`);
+  async getWorkerBorrowRecords(workerId: string, visitorRecordId?: string): Promise<any[]> {
+    console.log(`调用 getWorkerBorrowRecords API，工人ID: ${workerId}, 访客记录ID: ${visitorRecordId || '无'}`);
     try {
-      const result = await this.requestWithRetry(`/guards/borrow-records?workerId=${workerId}`, {
+      let url = `/guards/borrow-records?workerId=${workerId}`;
+      if (visitorRecordId) {
+        url = `/guards/borrow-records?visitorRecordId=${visitorRecordId}`;
+      }
+      const result = await this.requestWithRetry(url, {
         method: 'GET',
       });
-      console.log(`工人 ${workerId} 的借用记录 API 响应:`, result);
+      console.log(`工人 ${workerId} ${visitorRecordId ? `(访客记录ID: ${visitorRecordId})` : ''} 的借用记录 API 响应:`, result);
       return result;
     } catch (error) {
       console.error(`获取工人 ${workerId} 的借用记录失败:`, error);
@@ -1185,11 +1195,17 @@ class ApiService {
     startDate?: string;
     endDate?: string;
     status?: string;
+    checkOutStartDate?: string;
+    checkOutEndDate?: string;
+    todayRelevant?: boolean;
   }): Promise<VisitorRecord[]> {
     const params = new URLSearchParams();
     if (filters?.startDate) params.append('startDate', filters.startDate);
     if (filters?.endDate) params.append('endDate', filters.endDate);
     if (filters?.status) params.append('status', filters.status);
+    if (filters?.checkOutStartDate) params.append('checkOutStartDate', filters.checkOutStartDate);
+    if (filters?.checkOutEndDate) params.append('checkOutEndDate', filters.checkOutEndDate);
+    if (filters?.todayRelevant !== undefined) params.append('todayRelevant', filters.todayRelevant.toString());
     
     const url = `/guards/visitor-records${params.toString() ? `?${params.toString()}` : ''}`;
     return this.requestWithRetry(url, {

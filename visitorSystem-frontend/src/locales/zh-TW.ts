@@ -455,6 +455,7 @@ export default {
     importTip1: '重複的分類名稱和編號將被自動跳過',
     importTip2: '未提供編號的分類將自動生成C開頭的8位編號',
     importTip3: '請檢查錯誤詳情並修正數據後重新匯入',
+    paginationInfo: '第 {start}-{end} 條，共 {total} 條記錄',
   },
   itemBorrowRecords: {
     title: '物品借用記錄管理',
@@ -586,10 +587,20 @@ export default {
     entryTimeLabel: '入場時間: ',
     unreturnedReasonRequired: '未歸還原因備註（必填）: ',
     itemReturn: '4. 物品歸還: ',
-    guardPhysicalCardReturnStep5: '5. 實體卡歸還: ', 
+    noBorrowRecords: '無借物記錄',
+    guardPhysicalCardReturnStep5: '5. 實體卡歸還: ',
+    physicalCardReturnStep3: '3. 實體卡歸還: ',
     physicalCardReturnStep5: '5. 實體卡歸還: ',
     physicalCard: '實體卡',
     pleaseConfirmPhysicalCardReturned: '請確認實體卡已收回',
+    // 更多界面文本
+    guardBorrowItemsList: '借用物品清單: ',
+    guardBorrowDetails: '3. 借物明細: ',
+    itemsPerPage: '每頁顯示: ',
+    paginationInfo: '第 {start}-{end} 條，共 {total} 條記錄',
+    guardItemsPerPage: '每頁顯示: ',
+    guardPaginationInfo: '第 {start}-{end} 條，共 {total} 條記錄',
+    // 状态标签
     guardNotReturnedTag: '未歸還',
     notReturnedTag: '未歸還',
     unreturnedReasonPlaceholder: '請填寫未歸還原因...',
@@ -687,6 +698,8 @@ export default {
     unknownSite: '未知工地',
     currentPassword: '當前密碼',
     newPassword: '新密碼',
+    pageNumber: '頁碼',
+    jumpTo: '跳轉至',
     // 消息提示
     workerAlreadyEntered: '該工人已入場，請檢查狀態',
     itemAlreadyInList: '該物品已添加到借用清單中',

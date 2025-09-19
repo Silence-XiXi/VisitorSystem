@@ -229,12 +229,12 @@ export class GuardsService {
   }
 
   // 获取门卫所在工地的物品借用记录
-  async getSiteBorrowRecords(user: CurrentUser, status?: string, workerId?: string) {
+  async getSiteBorrowRecords(user: CurrentUser, status?: string, workerId?: string, visitorRecordId?: string) {
     if (user.role !== 'GUARD') {
       throw new ForbiddenException('只有门卫可以访问此接口');
     }
 
-    console.log(`获取物品借用记录 - user: ${user.username}, status: ${status}, workerId: ${workerId}`);
+    // console.log(`获取物品借用记录 - user: ${user.username}, status: ${status}, workerId: ${workerId}, visitorRecordId: ${visitorRecordId}`);
 
     const guard = await this.prisma.guard.findUnique({
       where: { userId: user.id }
@@ -244,15 +244,19 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
-    console.log(`门卫信息: ${guard.id}, siteId: ${guard.siteId}`);
+    // console.log(`门卫信息: ${guard.id}, siteId: ${guard.siteId}`);
 
     const whereClause: any = {
       siteId: guard.siteId
     };
 
-    // 这里尝试修复一个潜在的bug - workerId字段可能不匹配
-    // 在Prisma模型中，可能是worker.id而不是worker.workerId
-    if (workerId) {
+    // 如果提供了访客记录ID，优先使用访客记录ID进行筛选
+    if (visitorRecordId) {
+      // console.log(`使用访客记录ID过滤: ${visitorRecordId}`);
+      whereClause.visitorRecordId = visitorRecordId;
+    }
+    // 如果没有提供访客记录ID，但提供了工人ID，则使用工人ID筛选
+    else if (workerId) {
       // 查找对应的工人
       const worker = await this.prisma.worker.findFirst({
         where: {
@@ -264,10 +268,10 @@ export class GuardsService {
       });
 
       if (worker) {
-        console.log(`找到工人: ${worker.id}, workerId: ${worker.workerId}, name: ${worker.name}`);
+        // console.log(`找到工人: ${worker.id}, workerId: ${worker.workerId}, name: ${worker.name}`);
         whereClause.workerId = worker.id;  // 使用工人的数据库ID
       } else {
-        console.log(`未找到工人, 使用原始workerId: ${workerId}`);
+        // console.log(`未找到工人, 使用原始workerId: ${workerId}`);
         whereClause.workerId = workerId;
       }
     }
@@ -276,7 +280,7 @@ export class GuardsService {
       whereClause.status = status.toUpperCase();
     }
 
-    console.log('借用记录查询条件:', whereClause);
+    // console.log('借用记录查询条件:', whereClause);
 
     const records = await this.prisma.itemBorrowRecord.findMany({
       where: whereClause,
@@ -291,17 +295,18 @@ export class GuardsService {
             category: true
           }
         },
-        site: true
+        site: true,
+        visitorRecord: true // 包含关联的访客记录
       },
       orderBy: {
         borrowDate: 'desc'
       }
     });
 
-    console.log(`找到借用记录: ${records.length}条`);
-    if (records.length > 0) {
-      console.log('第一条记录示例:', JSON.stringify(records[0], null, 2).substring(0, 200) + '...');
-    }
+    // console.log(`找到借用记录: ${records.length}条`);
+    // if (records.length > 0) {
+    //   console.log('第一条记录示例:', JSON.stringify(records[0], null, 2).substring(0, 200) + '...');
+    // }
 
     return records;
   }
@@ -320,13 +325,13 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
-    console.log('收到借用记录请求:', {
-      workerId: recordData.workerId,
-      categoryId: recordData.categoryId,
-      itemCode: recordData.itemCode,
-      guardId: guard.id,
-      siteId: guard.siteId
-    });
+    // console.log('收到借用记录请求:', {
+    //   workerId: recordData.workerId,
+    //   categoryId: recordData.categoryId,
+    //   itemCode: recordData.itemCode,
+    //   guardId: guard.id,
+    //   siteId: guard.siteId
+    // });
 
     // 验证工人是否在该工地
     const worker = await this.prisma.worker.findFirst({
@@ -352,12 +357,12 @@ export class GuardsService {
       return workerById;
     }
     
-    console.log('查找到的工人信息:', worker ? {
-      id: worker.id,
-      workerId: worker.workerId,
-      name: worker.name,
-      siteId: worker.siteId
-    } : '未找到工人');
+    // console.log('查找到的工人信息:', worker ? {
+    //   id: worker.id,
+    //   workerId: worker.workerId,
+    //   name: worker.name,
+    //   siteId: worker.siteId
+    // } : '未找到工人');
 
     if (!worker) {
       throw new ForbiddenException('该工人不在您管理的工地');
@@ -371,12 +376,12 @@ export class GuardsService {
       }
     });
 
-    console.log('查找到的访客记录:', visitorRecord ? {
-      id: visitorRecord.id,
-      workerId: visitorRecord.workerId,
-      status: visitorRecord.status,
-      checkInTime: visitorRecord.checkInTime
-    } : '未找到有效的入场记录');
+    // console.log('查找到的访客记录:', visitorRecord ? {
+    //   id: visitorRecord.id,
+    //   workerId: visitorRecord.workerId,
+    //   status: visitorRecord.status,
+    //   checkInTime: visitorRecord.checkInTime
+    // } : '未找到有效的入场记录');
 
     // 如果工人没有入场记录，禁止借物
     if (!visitorRecord) {
@@ -416,13 +421,13 @@ export class GuardsService {
     }
 
     // 创建借用记录（关联当前有效的访客记录）
-    console.log('创建借用记录，关联访客记录:', {
-      workerId: worker.id,
-      workerIdNumber: worker.workerId,
-      visitorRecordId: visitorRecord.id,
-      itemId: item.id,
-      itemCode: item.itemCode
-    });
+    // console.log('创建借用记录，关联访客记录:', {
+    //   workerId: worker.id,
+    //   workerIdNumber: worker.workerId,
+    //   visitorRecordId: visitorRecord.id,
+    //   itemId: item.id,
+    //   itemCode: item.itemCode
+    // });
     
     const borrowRecord = await this.prisma.itemBorrowRecord.create({
       data: {
@@ -598,10 +603,14 @@ export class GuardsService {
           }
         }
       }),
-      // 今日离场人数
+      // 今日离场人数（只统计今日入场并且今日离场的记录）
       this.prisma.visitorRecord.count({
         where: {
           siteId: guard.siteId,
+          checkInTime: {
+            gte: startOfDay,
+            lt: endOfDay
+          },
           checkOutTime: {
             gte: startOfDay,
             lt: endOfDay
@@ -696,7 +705,15 @@ export class GuardsService {
   }
 
   // 获取门卫所在工地的访客记录
-  async getGuardSiteVisitorRecords(user: CurrentUser, startDate?: string, endDate?: string, status?: string) {
+  async getGuardSiteVisitorRecords(
+    user: CurrentUser, 
+    startDate?: string, 
+    endDate?: string, 
+    status?: string,
+    checkOutStartDate?: string,
+    checkOutEndDate?: string,
+    todayRelevant?: boolean
+  ) {
     if (user.role !== 'GUARD') {
       throw new ForbiddenException('只有门卫可以访问访客记录');
     }
@@ -709,30 +726,112 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
-    const whereClause: any = {
+    // 定义筛选条件接口
+    interface WhereClause {
+      siteId: string;
+      createdAt?: { gte?: Date; lt?: Date };
+      checkOutTime?: { gte?: Date; lt?: Date };
+      status?: string;
+    }
+    
+    // 基础条件 - 门卫所在工地
+    const baseWhere: WhereClause = {
       siteId: guard.siteId
     };
-
-    // 添加日期筛选
-    if (startDate || endDate) {
-      whereClause.createdAt = {};
-      if (startDate) {
-        whereClause.createdAt.gte = new Date(startDate);
+    
+    // 使用Prisma的OR查询来实现复杂条件
+    let whereConditions = [];
+    
+    // 如果需要获取"今日相关"记录
+    if (todayRelevant) {
+      // 获取今天的日期范围
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+      const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      
+      // 构建三个OR条件
+      // 1. 今日入场的记录
+      const todayEnteredCondition = {
+        ...baseWhere,
+        checkInTime: {
+          gte: todayStart,
+          lte: todayEnd
+        }
+      };
+      
+      // 2. 今日离场的记录
+      const todayLeftCondition = {
+        ...baseWhere,
+        checkOutTime: {
+          gte: todayStart,
+          lte: todayEnd
+        }
+      };
+      
+      // 3. 所有未离场的记录
+      const allOnSiteCondition = {
+        ...baseWhere,
+        status: 'ON_SITE'
+      };
+      
+      // 合并条件
+      whereConditions = [todayEnteredCondition, todayLeftCondition, allOnSiteCondition];
+    } else {
+      // 常规筛选逻辑
+      
+      // 添加入场日期筛选（记录创建时间）
+      let createdAtFilter: any = undefined;
+      if (startDate || endDate) {
+        createdAtFilter = {};
+        if (startDate) {
+          createdAtFilter.gte = new Date(startDate);
+        }
+        if (endDate) {
+          const endDateObj = new Date(endDate);
+          endDateObj.setDate(endDateObj.getDate() + 1); // 包含结束日期当天
+          createdAtFilter.lt = endDateObj;
+        }
       }
-      if (endDate) {
-        const endDateObj = new Date(endDate);
-        endDateObj.setDate(endDateObj.getDate() + 1); // 包含结束日期当天
-        whereClause.createdAt.lt = endDateObj;
+      
+      // 添加离场日期筛选
+      let checkOutTimeFilter: any = undefined;
+      if (checkOutStartDate || checkOutEndDate) {
+        checkOutTimeFilter = {};
+        if (checkOutStartDate) {
+          checkOutTimeFilter.gte = new Date(checkOutStartDate);
+        }
+        if (checkOutEndDate) {
+          const checkOutEndDateObj = new Date(checkOutEndDate);
+          checkOutEndDateObj.setDate(checkOutEndDateObj.getDate() + 1); // 包含结束日期当天
+          checkOutTimeFilter.lt = checkOutEndDateObj;
+        }
       }
-    }
-
-    // 添加状态筛选
-    if (status) {
-      whereClause.status = status.toUpperCase();
+      
+      // 创建最终的查询条件
+      const whereClause: Record<string, any> = {
+        siteId: guard.siteId
+      };
+      
+      if (createdAtFilter) {
+        whereClause.createdAt = createdAtFilter;
+      }
+      
+      if (checkOutTimeFilter) {
+        whereClause.checkOutTime = checkOutTimeFilter;
+      }
+      
+      // 添加状态筛选
+      if (status) {
+        whereClause.status = status.toUpperCase();
+      }
+      
+      whereConditions = [whereClause];
     }
 
     const records = await this.prisma.visitorRecord.findMany({
-      where: whereClause,
+      where: {
+        OR: whereConditions
+      },
       include: {
         worker: {
           include: {
@@ -752,7 +851,7 @@ export class GuardsService {
 
   // 创建访客记录（入场登记）
   async createVisitorRecord(user: CurrentUser, recordData: any) {
-    console.log('创建访客记录，接收到的数据:', JSON.stringify(recordData, null, 2));
+    // console.log('创建访客记录，接收到的数据:', JSON.stringify(recordData, null, 2));
     
     if (user.role !== 'GUARD') {
       throw new ForbiddenException('只有门卫可以创建访客记录');
@@ -790,8 +889,8 @@ export class GuardsService {
       throw new BadRequestException('该工人已经在场，无法重复登记');
     }
 
-    console.log('工人原始电话号码:', worker.phone);
-    console.log('传入的电话号码:', recordData.phone);
+    // console.log('工人原始电话号码:', worker.phone);
+    // console.log('传入的电话号码:', recordData.phone);
     
     // 创建访客记录
     const visitorRecord = await this.prisma.visitorRecord.create({
@@ -819,12 +918,12 @@ export class GuardsService {
       }
     });
 
-    console.log('创建的访客记录:', JSON.stringify({
-      id: visitorRecord.id,
-      workerId: visitorRecord.workerId,
-      phone: visitorRecord.phone,
-      workerPhone: visitorRecord.worker?.phone
-    }, null, 2));
+    // console.log('创建的访客记录:', JSON.stringify({
+    //   id: visitorRecord.id,
+    //   workerId: visitorRecord.workerId,
+    //   phone: visitorRecord.phone,
+    //   workerPhone: visitorRecord.worker?.phone
+    // }, null, 2));
     
     return visitorRecord;
   }

@@ -85,13 +85,15 @@ export class GuardsController {
   @ApiOperation({ summary: '获取物品借用记录' })
   @ApiQuery({ name: 'status', required: false, description: '借用状态：BORROWED/RETURNED' })
   @ApiQuery({ name: 'workerId', required: false, description: '工人ID' })
+  @ApiQuery({ name: 'visitorRecordId', required: false, description: '访客记录ID' })
   @ApiResponse({ status: 200, description: '获取成功' })
   async getSiteBorrowRecords(
     @GetCurrentUser() user: CurrentUser,
     @Query('status') status?: string,
-    @Query('workerId') workerId?: string
+    @Query('workerId') workerId?: string,
+    @Query('visitorRecordId') visitorRecordId?: string
   ) {
-    return this.guardsService.getSiteBorrowRecords(user, status, workerId);
+    return this.guardsService.getSiteBorrowRecords(user, status, workerId, visitorRecordId);
   }
 
   @Post('borrow-records')
@@ -129,17 +131,31 @@ export class GuardsController {
   @Get('visitor-records')
   @Roles(UserRole.GUARD)
   @ApiOperation({ summary: '获取门卫所在工地的访客记录' })
-  @ApiQuery({ name: 'startDate', required: false, description: '开始日期 (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', required: false, description: '结束日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'startDate', required: false, description: '入场开始日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: '入场结束日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'checkOutStartDate', required: false, description: '离场开始日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'checkOutEndDate', required: false, description: '离场结束日期 (YYYY-MM-DD)' })
   @ApiQuery({ name: 'status', required: false, description: '访客状态：ON_SITE/LEFT/PENDING' })
+  @ApiQuery({ name: 'todayRelevant', required: false, description: '获取今日相关记录（今日入场、今日离场和所有未离场）' })
   @ApiResponse({ status: 200, description: '获取成功' })
   async getGuardSiteVisitorRecords(
     @GetCurrentUser() user: CurrentUser,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Query('status') status?: string
+    @Query('status') status?: string,
+    @Query('checkOutStartDate') checkOutStartDate?: string,
+    @Query('checkOutEndDate') checkOutEndDate?: string,
+    @Query('todayRelevant') todayRelevant?: string
   ) {
-    return this.guardsService.getGuardSiteVisitorRecords(user, startDate, endDate, status);
+    return this.guardsService.getGuardSiteVisitorRecords(
+      user, 
+      startDate, 
+      endDate, 
+      status,
+      checkOutStartDate,
+      checkOutEndDate,
+      todayRelevant === 'true'
+    );
   }
 
   @Post('visitor-records')

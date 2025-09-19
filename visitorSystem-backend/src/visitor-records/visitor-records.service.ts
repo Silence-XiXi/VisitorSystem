@@ -65,39 +65,108 @@ export class VisitorRecordsService {
     status?: VisitorStatus
     startDate?: string
     endDate?: string
+    checkOutStartDate?: string
+    checkOutEndDate?: string
+    todayRelevant?: boolean
   }) {
-    const where: any = {}
-
+    // 使用Prisma的OR查询来实现复杂条件
+    let whereConditions = []
+    
+    // 基础过滤条件
+    const baseWhere: any = {}
+    
+    // 工人ID和工地ID筛选
     if (filters?.workerId) {
-      where.workerId = filters.workerId
+      baseWhere.workerId = filters.workerId
     }
-
+    
     if (filters?.siteId) {
-      where.siteId = filters.siteId
+      baseWhere.siteId = filters.siteId
     }
-
-    if (filters?.status) {
-      where.status = filters.status
-    }
-
-    if (filters?.startDate || filters?.endDate) {
-      where.checkInTime = {}
-      if (filters.startDate) {
-        // 创建本地时间的开始日期（00:00:00）
-        const startDate = new Date(filters.startDate)
-        startDate.setHours(0, 0, 0, 0)
-        where.checkInTime.gte = startDate
+    
+    // 处理today相关的特殊筛选
+    if (filters?.todayRelevant) {
+      // 获取今天的日期范围
+      const today = new Date()
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0)
+      const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
+      
+      // 构建三个OR条件
+      // 1. 今日入场的记录
+      const todayEnteredCondition = {
+        ...baseWhere,
+        checkInTime: {
+          gte: todayStart,
+          lte: todayEnd
+        }
       }
-      if (filters.endDate) {
-        // 创建本地时间的结束日期（23:59:59）
-        const endDate = new Date(filters.endDate)
-        endDate.setHours(23, 59, 59, 999)
-        where.checkInTime.lte = endDate
+      
+      // 2. 今日离场的记录
+      const todayLeftCondition = {
+        ...baseWhere,
+        checkOutTime: {
+          gte: todayStart,
+          lte: todayEnd
+        }
       }
+      
+      // 3. 所有未离场的记录
+      const allOnSiteCondition = {
+        ...baseWhere,
+        status: VisitorStatus.ON_SITE
+      }
+      
+      // 合并条件
+      whereConditions = [todayEnteredCondition, todayLeftCondition, allOnSiteCondition]
+      
+    } else {
+      // 常规筛选逻辑
+      const regularWhere = { ...baseWhere }
+      
+      // 状态筛选
+      if (filters?.status) {
+        regularWhere.status = filters.status
+      }
+      
+      // 入场时间筛选
+      if (filters?.startDate || filters?.endDate) {
+        regularWhere.checkInTime = {}
+        if (filters.startDate) {
+          // 创建本地时间的开始日期（00:00:00）
+          const startDate = new Date(filters.startDate)
+          startDate.setHours(0, 0, 0, 0)
+          regularWhere.checkInTime.gte = startDate
+        }
+        if (filters.endDate) {
+          // 创建本地时间的结束日期（23:59:59）
+          const endDate = new Date(filters.endDate)
+          endDate.setHours(23, 59, 59, 999)
+          regularWhere.checkInTime.lte = endDate
+        }
+      }
+      
+      // 离场时间筛选
+      if (filters?.checkOutStartDate || filters?.checkOutEndDate) {
+        regularWhere.checkOutTime = {}
+        if (filters.checkOutStartDate) {
+          const startDate = new Date(filters.checkOutStartDate)
+          startDate.setHours(0, 0, 0, 0)
+          regularWhere.checkOutTime.gte = startDate
+        }
+        if (filters.checkOutEndDate) {
+          const endDate = new Date(filters.checkOutEndDate)
+          endDate.setHours(23, 59, 59, 999)
+          regularWhere.checkOutTime.lte = endDate
+        }
+      }
+      
+      whereConditions = [regularWhere]
     }
 
     return this.prisma.visitorRecord.findMany({
-      where,
+      where: {
+        OR: whereConditions
+      },
       include: {
         worker: {
           include: {

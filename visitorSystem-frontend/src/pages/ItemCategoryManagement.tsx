@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Row, Col, Upload, Select } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
@@ -26,6 +26,11 @@ const ItemCategoryManagement: React.FC = () => {
   const [form] = Form.useForm()
   const [searchKeyword, setSearchKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  })
 
   // 加载分类数据
   const loadCategories = async () => {
@@ -57,6 +62,22 @@ const ItemCategoryManagement: React.FC = () => {
     
     return matchesSearch && matchesStatus
   })
+  
+  // 更新分页信息中的总记录数
+  useEffect(() => {
+    setPagination(prev => ({
+      ...prev,
+      total: filteredCategories.length
+    }));
+  }, [filteredCategories.length])
+  
+  // 分页后的数据
+  const paginatedCategories = useMemo(() => {
+    const { current, pageSize } = pagination;
+    const startIndex = (current - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredCategories.slice(startIndex, endIndex);
+  }, [filteredCategories, pagination])
 
   // 显示确认删除对话框
   const showDeleteConfirm = (record: ItemCategory) => {
@@ -657,14 +678,20 @@ const ItemCategoryManagement: React.FC = () => {
               placeholder={t('itemCategory.searchPlaceholder')} 
               allowClear 
               value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
+              onChange={(e) => {
+                setSearchKeyword(e.target.value);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
             />
           </Col>
           <Col span={4}>
             <Select
               placeholder={t('itemCategory.statusFilter')}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(value) => {
+                setStatusFilter(value);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
               style={{ width: '100%' }}
               allowClear
             >
@@ -736,6 +763,7 @@ const ItemCategoryManagement: React.FC = () => {
               onClick={() => {
                 setSearchKeyword('')
                 setStatusFilter('all')
+                setPagination(prev => ({ ...prev, current: 1 }));
               }}
             >
               {t('common.clearFilters')}
@@ -761,9 +789,29 @@ const ItemCategoryManagement: React.FC = () => {
         <Table 
           rowKey="id" 
           columns={columns} 
-          dataSource={filteredCategories} 
+          dataSource={paginatedCategories} 
           loading={loading}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
+          pagination={{ 
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total, 
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: (total, range) => t('itemCategory.paginationInfo')
+              .replace('{start}', range[0].toString())
+              .replace('{end}', range[1].toString())
+              .replace('{total}', total.toString()),
+            onChange: (page, size) => {
+              console.log('Pagination changed:', page, size);
+              // 如果页面大小变化，回到第一页
+              if (size !== pagination.pageSize) {
+                setPagination({ current: 1, pageSize: size, total: pagination.total });
+              } else {
+                setPagination({ current: page, pageSize: size, total: pagination.total });
+              }
+            }
+          }}
           rowSelection={{
             selectedRowKeys: selectedCategoryIds,
             onChange: (selectedRowKeys) => setSelectedCategoryIds(selectedRowKeys as string[]),

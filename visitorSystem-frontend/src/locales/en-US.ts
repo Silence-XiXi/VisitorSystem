@@ -448,8 +448,8 @@ export default {
     guardNotReturnedTag: 'Not Returned',
     notReturnedTag: 'Not Returned',
     // Step titles
-    guardPhysicalCardReturnStep4: '4. Physical Card Return: ',
     guardPhysicalCardReturnStep5: '5. Physical Card Return: ',
+    physicalCardReturnStep3: '3. Physical Card Return: ',
     physicalCardReturnStep5: '5. Physical Card Return: ',
     // Reports page
     guardWorkerId: 'Worker ID',
@@ -657,6 +657,7 @@ export default {
     allStatus: 'All Status',
     filterResults: 'Filter Results: {count} records',
     fromTotalRecords: 'of {total} total records',
+    paginationInfo: 'Showing {start}-{end} of {total} records',
   },
   itemBorrowRecords: {
     title: 'Item Borrowing Records Management',

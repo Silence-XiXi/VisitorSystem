@@ -108,6 +108,13 @@ const ItemBorrowRecords: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [exportModalVisible, setExportModalVisible] = useState(false)
   
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  })
+  
   // 数据状态
   const [borrowRecords, setBorrowRecords] = useState<ItemBorrowRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -134,12 +141,40 @@ const ItemBorrowRecords: React.FC = () => {
         const records = await apiService.getAllBorrowRecords(filters)
         const transformedRecords = records.map(transformBorrowRecord)
         setBorrowRecords(transformedRecords)
+        
+        // 当数据更新时，重置到第一页
+        if (pagination.current !== 1) {
+          setPagination(prev => ({
+            ...prev,
+            current: 1,
+            total: transformedRecords.length
+          }))
+        } else {
+          setPagination(prev => ({
+            ...prev,
+            total: transformedRecords.length
+          }))
+        }
       } else if (user.role === 'GUARD') {
         if (selectedStatus) filters.status = selectedStatus
         
         const records = await apiService.getGuardSiteBorrowRecords(filters)
         const transformedRecords = records.map(transformBorrowRecord)
         setBorrowRecords(transformedRecords)
+        
+        // 当数据更新时，重置到第一页
+        if (pagination.current !== 1) {
+          setPagination(prev => ({
+            ...prev,
+            current: 1,
+            total: transformedRecords.length
+          }))
+        } else {
+          setPagination(prev => ({
+            ...prev,
+            total: transformedRecords.length
+          }))
+        }
       }
     } catch (error) {
       console.error('加载物品借用记录失败:', error)
@@ -201,9 +236,23 @@ const ItemBorrowRecords: React.FC = () => {
     if (selectedItemType) {
       filtered = filtered.filter(record => record.itemType === selectedItemType)
     }
+    
+    // 更新total值，但不重置current
+    setPagination(prev => ({
+      ...prev,
+      total: filtered.length
+    }));
 
     return filtered
   }, [borrowRecords, searchKeyword, selectedDistributor, selectedItemType])
+  
+  // 带分页的数据
+  const paginatedData = useMemo(() => {
+    const { current, pageSize } = pagination;
+    const startIndex = (current - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredData.slice(startIndex, endIndex);
+  }, [filteredData, pagination.current, pagination.pageSize])
 
 
   // 显示详情
@@ -417,8 +466,14 @@ const ItemBorrowRecords: React.FC = () => {
             <Input.Search
               placeholder={t('itemBorrowRecords.searchPlaceholder')}
               value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              onSearch={setSearchKeyword}
+              onChange={(e) => {
+                setSearchKeyword(e.target.value);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
+              onSearch={(value) => {
+                setSearchKeyword(value);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
               allowClear
               enterButton={<SearchOutlined />}
               style={{ width: '100%' }}
@@ -429,7 +484,10 @@ const ItemBorrowRecords: React.FC = () => {
             <Select
               placeholder={t('itemBorrowRecords.allDistributors')}
               value={selectedDistributor}
-              onChange={setSelectedDistributor}
+              onChange={(value) => {
+                setSelectedDistributor(value);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
               style={{ width: '100%' }}
               allowClear
               loading={distributors.length === 0}
@@ -446,7 +504,10 @@ const ItemBorrowRecords: React.FC = () => {
             <Select
               placeholder={t('itemBorrowRecords.allTypes')}
               value={selectedItemType}
-              onChange={setSelectedItemType}
+              onChange={(value) => {
+                setSelectedItemType(value);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
               style={{ width: '100%' }}
               allowClear
               loading={itemCategories.length === 0}
@@ -463,7 +524,10 @@ const ItemBorrowRecords: React.FC = () => {
             <Select
               placeholder={t('itemBorrowRecords.allStatus')}
               value={selectedStatus}
-              onChange={setSelectedStatus}
+              onChange={(value) => {
+                setSelectedStatus(value);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
               style={{ width: '100%' }}
               allowClear
             >
@@ -475,7 +539,10 @@ const ItemBorrowRecords: React.FC = () => {
             <div style={{ marginBottom: 8 }}>{t('itemBorrowRecords.borrowDate')}</div>
             <DatePicker.RangePicker
               value={dateRange}
-              onChange={(dates) => setDateRange(dates as [Dayjs, Dayjs] | null)}
+              onChange={(dates) => {
+                setDateRange(dates as [Dayjs, Dayjs] | null);
+                setPagination(prev => ({ ...prev, current: 1 }));
+              }}
               style={{ width: '100%' }}
               placeholder={[t('itemBorrowRecords.startDate'), t('itemBorrowRecords.endDate')]}
             />
@@ -507,7 +574,7 @@ const ItemBorrowRecords: React.FC = () => {
         <Spin spinning={loading}>
           <Table
             columns={columns}
-            dataSource={filteredData}
+            dataSource={paginatedData}
             rowKey="key"
             rowSelection={{
               selectedRowKeys,
@@ -515,11 +582,20 @@ const ItemBorrowRecords: React.FC = () => {
               preserveSelectedRowKeys: true
             }}
             pagination={{
-              total: filteredData.length,
-              pageSize: 20,
+              ...pagination,
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (total, range) => t('itemBorrowRecords.paginationInfo').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString())
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showTotal: (total, range) => t('itemBorrowRecords.paginationInfo')
+                .replace('{start}', range[0].toString())
+                .replace('{end}', range[1].toString())
+                .replace('{total}', total.toString()),
+              onChange: (page, pageSize) => {
+                setPagination({ ...pagination, current: page, pageSize });
+              },
+              onShowSizeChange: (current, size) => {
+                setPagination({ ...pagination, current: 1, pageSize: size });
+              }
             }}
             scroll={{ x: 1400 }}
             size="small"

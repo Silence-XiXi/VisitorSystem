@@ -449,8 +449,8 @@ export default {
     guardNotReturnedTag: '未归还',
     notReturnedTag: '未归还',
     // 步骤标题
-    guardPhysicalCardReturnStep4: '4. 实体卡归还: ',
     guardPhysicalCardReturnStep5: '5. 实体卡归还: ',
+    physicalCardReturnStep3: '3. 实体卡归还: ',
     physicalCardReturnStep5: '5. 实体卡归还: ',
     // 报表页面
     guardWorkerId: '工号',
@@ -956,6 +956,7 @@ export default {
     allStatus: '全部状态',
     filterResults: '筛选结果: {count} 条记录',
     fromTotalRecords: '共 {total} 条记录',
+    paginationInfo: '第 {start}-{end} 条，共 {total} 条记录',
   },
   itemBorrowRecords: {
     title: '物品借用记录管理',

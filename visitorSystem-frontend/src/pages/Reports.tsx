@@ -18,9 +18,10 @@ interface AttendanceRecord {
   idType: string
   idNumber: string
   physicalCardId?: string
-  date: string
-  checkIn?: string
-  checkOut?: string
+  date: string // 入场日期
+  checkIn?: string // 入场时间
+  checkOut?: string // 离场时间
+  checkOutDate?: string // 离场日期
   borrowedItems: number
   returnedItems: number
   registrarId?: string // 登记人ID
@@ -59,7 +60,10 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
     
     if (existingRecord) {
       // 如果已存在记录，更新离场信息
-      existingRecord.checkOut = record.checkOutTime ? dayjs(record.checkOutTime).format('HH:mm') : undefined
+      if (record.checkOutTime) {
+        existingRecord.checkOut = dayjs(record.checkOutTime).format('HH:mm')
+        existingRecord.checkOutDate = dayjs(record.checkOutTime).format('YYYY-MM-DD') // 保存离场日期
+      }
       existingRecord.registrarId = record.registrar?.id
       existingRecord.registrarName = record.registrar?.name || '未指定'
     } else {
@@ -77,6 +81,7 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
         date: dayjs(record.checkInTime).format('YYYY-MM-DD'),
         checkIn: dayjs(record.checkInTime).format('HH:mm'),
         checkOut: record.checkOutTime ? dayjs(record.checkOutTime).format('HH:mm') : undefined,
+        checkOutDate: record.checkOutTime ? dayjs(record.checkOutTime).format('YYYY-MM-DD') : undefined, // 保存离场日期
         borrowedItems: 0,
         returnedItems: 0,
         registrarId: record.registrar?.id,
@@ -161,6 +166,7 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
               date: dayjs(closestVisitorRecord.checkInTime).format('YYYY-MM-DD'),
               checkIn: dayjs(closestVisitorRecord.checkInTime).format('HH:mm'),
               checkOut: closestVisitorRecord.checkOutTime ? dayjs(closestVisitorRecord.checkOutTime).format('HH:mm') : undefined as unknown as string,
+              checkOutDate: closestVisitorRecord.checkOutTime ? dayjs(closestVisitorRecord.checkOutTime).format('YYYY-MM-DD') : undefined,
               borrowedItems: 1,
               returnedItems: record.status === 'RETURNED' ? 1 : 0,
               registrarId: closestVisitorRecord.registrar?.id || record.borrowHandler?.id,
@@ -171,7 +177,7 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
         } else {
           // 例外情况：如果没有该工人的任何访客记录，创建一条基于借物日期的记录
           // 这应该是异常情况，因为后端已经限制了没有入场记录的工人不能借物
-          console.warn(`工人 ${record.worker.name}(${record.worker.workerId}) 没有访客记录但有借物记录，这可能是数据错误。`);
+          // console.warn(`工人 ${record.worker.name}(${record.worker.workerId}) 没有访客记录但有借物记录，这可能是数据错误。`);
           
           // 尽量避免创建新记录，但如果真的没有访客记录，保留这个借物记录信息
           const fallbackKey = `${record.worker.workerId}-${dayjs(record.borrowDate).format('YYYY-MM-DD')}`
@@ -188,6 +194,7 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
             date: dayjs(record.borrowDate).format('YYYY-MM-DD'),
             checkIn: dayjs(record.borrowDate).format('HH:mm'),
             checkOut: record.status === 'RETURNED' && record.returnDate ? dayjs(record.returnDate).format('HH:mm') : undefined as unknown as string,
+            checkOutDate: record.status === 'RETURNED' && record.returnDate ? dayjs(record.returnDate).format('YYYY-MM-DD') : undefined,
             borrowedItems: 1,
             returnedItems: record.status === 'RETURNED' ? 1 : 0,
             registrarId: record.borrowHandler?.id,
@@ -213,7 +220,7 @@ const Reports: React.FC = () => {
   const [itemDetailModalVisible, setItemDetailModalVisible] = useState<boolean>(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
   const [tableHeight, setTableHeight] = useState(400)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [downloadModalVisible, setDownloadModalVisible] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -229,31 +236,51 @@ const Reports: React.FC = () => {
   const loadData = async () => {
     setLoading(true)
     try {
-           // 准备日期参数，确保不会有null值
-           const startDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD');
-           const endDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD');
-           
-           const [visitorData, borrowData, sitesData, distributorsData] = await Promise.all([
-             apiService.getVisitorRecords({
-               siteId: selectedSiteId,
-               startDate: startDateParam,
-               endDate: endDateParam
-             }),
-             apiService.getAllBorrowRecords({
-               siteId: selectedSiteId,
-               startDate: startDateParam,
-               endDate: endDateParam
-             }),
-             apiService.getAllSites(),
-             apiService.getAllDistributors()
-           ])
+      // 准备日期参数，确保不会有null值
+      const startDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD');
+      const endDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD');
+      
+      // 检查是否是今天的日期
+      const today = dayjs().format('YYYY-MM-DD');
+      const isToday = (dateType === 'single' && startDateParam === today) || 
+                      (dateType === 'range' && startDateParam === today && endDateParam === today);
+      
+      let visitorData = [];
+      
+      if (isToday) {
+        // 今日特殊处理：优化为一次性获取所有满足条件的记录
+        // 使用新的API参数获取符合"今日入场或今日离场或未离场"条件的所有记录
+        const allTodayRelevantRecords = await apiService.getVisitorRecords({
+          siteId: selectedSiteId || undefined,
+          todayRelevant: true  // 使用后端新支持的参数，一次获取所有相关记录
+        });
+        
+        visitorData = allTodayRelevantRecords;
+      } else {
+        // 非今日，使用常规筛选
+        visitorData = await apiService.getVisitorRecords({
+          siteId: selectedSiteId || undefined,
+          startDate: startDateParam,
+          endDate: endDateParam
+        });
+      }
+      
+      // 借物记录不再按日期过滤，确保可以显示所有工人的借物记录
+      const [borrowData, sitesData, distributorsData] = await Promise.all([
+        apiService.getAllBorrowRecords({
+          siteId: selectedSiteId || undefined
+          // 移除日期参数，获取所有借用记录
+        }),
+        apiService.getAllSites(),
+        apiService.getAllDistributors()
+      ]);
       
       setVisitorRecords(visitorData)
       setBorrowRecords(borrowData)
       setSites(sitesData)
       setDistributors(distributorsData)
     } catch (error) {
-      console.error('加载数据失败:', error)
+      // console.error('加载数据失败:', error)
       message.error('加载数据失败，请重试')
     } finally {
       setLoading(false)
@@ -298,8 +325,8 @@ const Reports: React.FC = () => {
       finalHeight = Math.max(300, availableHeight - 60)
     }
     
-    // 添加调试信息
-    console.log('屏幕高度:', windowHeight, '可用高度:', availableHeight, '最终高度:', finalHeight)
+    // // 添加调试信息
+    // console.log('屏幕高度:', windowHeight, '可用高度:', availableHeight, '最终高度:', finalHeight)
     
     setTableHeight(finalHeight)
   }
@@ -313,11 +340,45 @@ const Reports: React.FC = () => {
 
   // 生成物品数据
   const generateItemData = (record: AttendanceRecord) => {
-    // 从借用记录中筛选出该工人的物品
-    const workerBorrowRecords = borrowRecords.filter(borrowRecord => 
-      borrowRecord.worker.workerId === record.workerId && 
-      dayjs(borrowRecord.borrowDate).format('YYYY-MM-DD') === record.date
-    )
+    // 添加调试日志
+    console.log('生成物品数据 - 当前工人ID:', record.workerId);
+    console.log('生成物品数据 - 访客记录ID:', record.visitorRecordId);
+    console.log('总借用记录数:', borrowRecords.length);
+    
+    // 从借用记录中筛选出该访客记录关联的物品
+    // 修改筛选逻辑：优先使用visitorRecordId进行匹配
+    // 这样可以确保只显示当前访客记录(入场记录)的借用记录
+    const workerBorrowRecords = borrowRecords.filter(borrowRecord => {
+      // 优先使用visitorRecordId匹配 - 这是最准确的关联方式
+      if (record.visitorRecordId && borrowRecord.visitorRecordId) {
+        return borrowRecord.visitorRecordId === record.visitorRecordId;
+      }
+      
+      // 如果没有visitorRecordId，退化为使用工人ID和日期匹配
+      // 检查多种可能的ID字段组合
+      const workerIdMatches = 
+        // 标准情况：workerId字段
+        (borrowRecord.worker?.workerId === record.workerId) ||
+        // 备选情况1：id字段可能包含workerId
+        (borrowRecord.worker?.id === record.workerId) ||
+        // 备选情况2：可能记录本身有workerId
+        (borrowRecord.workerId === record.workerId);
+      
+      // 如果工人ID匹配，还需要检查日期是否匹配
+      // 确保借用日期和入场日期在同一天
+      if (workerIdMatches) {
+        const borrowDate = dayjs(borrowRecord.borrowDate).format('YYYY-MM-DD');
+        return borrowDate === record.date;
+      }
+      
+      return false;
+    });
+    
+    // 调试日志
+    console.log('找到该访客记录的借用记录数:', workerBorrowRecords.length);
+    if (workerBorrowRecords.length > 0) {
+      console.log('样例借用记录:', workerBorrowRecords[0]);
+    }
     
     return workerBorrowRecords.map((borrowRecord, index) => ({
       id: borrowRecord.id,
@@ -325,9 +386,9 @@ const Reports: React.FC = () => {
       type: borrowRecord.item?.category?.name || t('reports.uncategorized'),
       category: borrowRecord.item?.category?.name || t('reports.uncategorized'),
       categoryDescription: borrowRecord.item?.category?.description || t('reports.noDescription'),
-      borrowedTime: dayjs(borrowRecord.borrowDate).format('HH:mm'),
+      borrowedTime: dayjs(borrowRecord.borrowDate).format('YYYY-MM-DD HH:mm'),
       returnedTime: borrowRecord.status === 'RETURNED' && borrowRecord.returnDate ? 
-        dayjs(borrowRecord.returnDate).format('HH:mm') : null,
+        dayjs(borrowRecord.returnDate).format('YYYY-MM-DD HH:mm') : null,
       status: borrowRecord.status === 'RETURNED' ? 'returned' : 'borrowed',
       borrowHandler: borrowRecord.borrowHandler?.name || record.registrarName || t('reports.unspecified'),
       notes: borrowRecord.notes || ''
@@ -426,8 +487,35 @@ const Reports: React.FC = () => {
       )
     }
     
+    // 根据选择的日期过滤记录
+    const today = dayjs().format('YYYY-MM-DD');
+    const startDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[0].format('YYYY-MM-DD');
+    const endDateParam = dateType === 'single' ? singleDate.format('YYYY-MM-DD') : dateRange[1].format('YYYY-MM-DD');
+    const isToday = (dateType === 'single' && startDateParam === today) || 
+                    (dateType === 'range' && startDateParam === today && endDateParam === today);
+    
+    filtered = filtered.filter(record => {
+      const entryDate = record.date;
+      const exitDate = record.checkOutDate || record.date;
+      const hasNoExitTime = !record.checkOut; // 未离场标志
+      
+      if (isToday) {
+        // 如果选择的是今天，显示入场时间或离场时间至少有一个是今日，或者未离场的记录
+        return entryDate === today || exitDate === today || hasNoExitTime;
+      } else {
+        // 如果选择的不是今天，只显示入场日期在选择范围内的记录
+        if (dateType === 'range') {
+          // 日期范围：入场日期在起始日期和结束日期之间
+          return entryDate >= startDateParam && entryDate <= endDateParam;
+        } else {
+          // 单一日期：入场日期等于所选日期
+          return entryDate === startDateParam;
+        }
+      }
+    })
+    
     return filtered
-  }, [attendanceRecords, searchKeyword, selectedSiteId, selectedDistributors, sites, distributors])
+  }, [attendanceRecords, searchKeyword, selectedSiteId, selectedDistributors, sites, distributors, dateType, singleDate, dateRange])
 
   // 计算各种统计数据 - 只与工地筛选框联动
   const siteOnlyFilteredData = useMemo(() => {
@@ -436,15 +524,52 @@ const Reports: React.FC = () => {
     if (!site) return []
     return attendanceRecords.filter(record => record.siteName === site.name)
   }, [selectedSiteId, sites, attendanceRecords])
+  
+  // 获取当前选择的日期 - 在统计卡片标题中不再使用，但保留注释以便将来可能需要时参考
+  // const selectedDateStr = dateType === 'single' 
+  //   ? singleDate.format('YYYY-MM-DD') 
+  //   : `${dateRange[0].format('YYYY-MM-DD')} - ${dateRange[1].format('YYYY-MM-DD')}`;
+  
+  // 筛选出入场日期在所选日期范围内的记录
+  const dateFilteredRecords = useMemo(() => {
+    // 如果是日期范围
+    if (dateType === 'range') {
+      const startDate = dateRange[0].format('YYYY-MM-DD');
+      const endDate = dateRange[1].format('YYYY-MM-DD');
+      return siteOnlyFilteredData.filter(record => {
+        const recordDate = record.date;
+        return recordDate >= startDate && recordDate <= endDate;
+      });
+    } 
+    // 如果是单日
+    else {
+      const dateStr = singleDate.format('YYYY-MM-DD');
+      return siteOnlyFilteredData.filter(record => record.date === dateStr);
+    }
+  }, [siteOnlyFilteredData, dateType, singleDate, dateRange]);
 
   const pending = siteOnlyFilteredData.filter(r => !r.checkOut) // 未离场人数
-  const totalEntered = siteOnlyFilteredData.filter(r => !!r.checkIn).length // 当日进场人数
-  const leftCount = siteOnlyFilteredData.filter(r => !!r.checkIn && !!r.checkOut).length // 已离场人数
+  const totalEntered = dateFilteredRecords.filter(r => !!r.checkIn).length // 选定日期进场人数
+  const leftCount = dateFilteredRecords.filter(r => !!r.checkIn && !!r.checkOut).length // 选定日期已离场人数
   
   // 物品统计数据
-  const totalBorrowedItems = siteOnlyFilteredData.reduce((sum, r) => sum + r.borrowedItems, 0) // 已借出物品总数
-  const totalReturnedItems = siteOnlyFilteredData.reduce((sum, r) => sum + r.returnedItems, 0) // 已归还物品总数
-  const totalUnreturnedItems = totalBorrowedItems - totalReturnedItems // 未归还物品总数
+  // 获取今天的日期
+  const today = dayjs().format('YYYY-MM-DD')
+  
+  // 筛选今日借出的物品记录
+  const todayBorrowRecords = borrowRecords.filter(record => {
+    const borrowDate = dayjs(record.borrowDate).format('YYYY-MM-DD')
+    return borrowDate === today
+  })
+  
+  // 统计今日借出的物品数量
+  const totalBorrowedItems = todayBorrowRecords.length
+  
+  // 统计今日借出且已归还的物品数量
+  const totalReturnedItems = todayBorrowRecords.filter(record => record.status === 'RETURNED').length
+  
+  // 统计所有未归还的物品数量(不限于今日)
+  const totalUnreturnedItems = borrowRecords.filter(record => record.status !== 'RETURNED').length
 
   // Excel下载功能
   const downloadExcel = () => {
@@ -493,8 +618,9 @@ const Reports: React.FC = () => {
           [t('reports.idType')]: record.idType,
           [t('reports.idNumber')]: record.idNumber,
           [t('reports.physicalCardId')]: record.physicalCardId || '-',
-          [t('reports.date')]: record.date,
+          [t('reports.entryDate')]: record.date,
           [t('reports.checkIn')]: record.checkIn || '-',
+          [t('reports.exitDate')]: record.checkOutDate || record.date || '-',
           [t('reports.checkOut')]: record.checkOut || '-',
           [t('reports.borrowedItems')]: record.borrowedItems,
           [t('reports.returnedItems')]: record.returnedItems,
@@ -533,7 +659,7 @@ const Reports: React.FC = () => {
         message.success(t('reports.downloadVisitorRecords').replace('{count}', filteredData.length.toString()))
       }
     } catch (error) {
-      console.error('导出失败:', error)
+      // console.error('导出失败:', error)
       message.error(t('reports.exportFailed'))
     }
   }
@@ -598,19 +724,43 @@ const Reports: React.FC = () => {
     { 
       title: t('reports.checkInTime'), 
       key: 'checkIn', 
-      width: 90,
+      width: 120,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkIn || '').localeCompare(b.checkIn || ''),
       render: (_: any, record: AttendanceRecord) => {
-        return record.checkIn || '-'
+        if (!record.checkIn) return '-';
+        
+        // 如果有完整日期信息，判断是否为今日
+        if (record.date) {
+          const today = dayjs().format('YYYY-MM-DD');
+          // 如果是今天的日期，只显示时间
+          if (record.date === today) {
+            return record.checkIn; // 只显示时间部分
+          }
+          // 如果不是今天的日期，显示完整的日期+时间
+          return `${record.date} ${record.checkIn}`;
+        }
+        
+        return record.checkIn || '-';
       }
     },
     { 
       title: t('reports.checkOutTime'), 
       key: 'checkOut', 
-      width: 90,
+      width: 120,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkOut || '').localeCompare(b.checkOut || ''),
       render: (_: any, record: AttendanceRecord) => {
-        return record.checkOut || '-'
+        if (!record.checkOut) return '-';
+        
+        // 使用离场日期而不是入场日期来判断
+        const checkOutDate = record.checkOutDate || record.date; // 如果没有单独的离场日期，才使用入场日期
+        const today = dayjs().format('YYYY-MM-DD');
+        
+        // 如果是今天的日期，只显示时间
+        if (checkOutDate === today) {
+          return record.checkOut; // 只显示时间部分
+        }
+        // 如果不是今天的日期，显示完整的日期+时间
+        return `${checkOutDate} ${record.checkOut}`;
       }
     },
     { 
@@ -675,6 +825,42 @@ const Reports: React.FC = () => {
       width: 100,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.returnedItems - b.returnedItems,
       render: (_: any, record: AttendanceRecord) => {
+        // 当借用物品数量为0时，无论已归还数量如何都显示绿色（没有需要归还的物品）
+        if (record.borrowedItems === 0) {
+          // 绿色 - 没有需要归还的物品
+          const color = '#52c41a'
+          const backgroundColor = '#f6ffed'
+          const borderColor = '#b7eb8f'
+          return (
+            <Tooltip title="无借用物品">
+              <span 
+                style={{ 
+                  color, 
+                  fontWeight: 'bold',
+                  backgroundColor,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  border: `1px solid ${borderColor}`,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onClick={() => showItemDetail(record)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#d9f7be'
+                  e.currentTarget.style.borderColor = '#95de64'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = backgroundColor
+                  e.currentTarget.style.borderColor = borderColor
+                }}
+              >
+                {record.returnedItems}
+              </span>
+            </Tooltip>
+          )
+        }
+        
+        // 有借用物品时的原有逻辑
         const isPartiallyReturned = record.returnedItems > 0 && record.returnedItems < record.borrowedItems
         const isNotReturned = record.returnedItems === 0
         
@@ -766,7 +952,8 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title={t('reports.dailyEnteredCount')}
+              title={`${t('reports.dailyEnteredCount')}`}
+              // title={`${t('reports.dailyEnteredCount')}（${selectedDateStr}）`}
               value={totalEntered}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#52c41a', fontWeight: 700 }}
@@ -776,7 +963,8 @@ const Reports: React.FC = () => {
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card>
             <Statistic
-              title={t('reports.leftCount')}
+              title={`${t('reports.leftCount')}`}
+              // title={`${t('reports.leftCount')}（${selectedDateStr}）`}
               value={leftCount}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#1890ff', fontWeight: 700 }}
@@ -1091,10 +1279,20 @@ const Reports: React.FC = () => {
                   <strong>{t('reports.distributor')}：</strong>{selectedRecord.distributorName}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>{t('reports.checkInTime')}：</strong>{selectedRecord.checkIn || '-'}
+                  <strong>{t('reports.checkInTime')}：</strong>
+                  {selectedRecord.checkIn ? 
+                    (selectedRecord.date === dayjs().format('YYYY-MM-DD') 
+                      ? selectedRecord.checkIn 
+                      : `${selectedRecord.date} ${selectedRecord.checkIn}`) 
+                    : '-'}
                 </Col>
                 <Col span={12} style={{ marginTop: 8 }}>
-                  <strong>{t('reports.checkOutTime')}：</strong>{selectedRecord.checkOut || '-'}
+                  <strong>{t('reports.checkOutTime')}：</strong>
+                  {selectedRecord.checkOut ? 
+                    ((selectedRecord.checkOutDate || selectedRecord.date) === dayjs().format('YYYY-MM-DD') 
+                      ? selectedRecord.checkOut 
+                      : `${selectedRecord.checkOutDate || selectedRecord.date} ${selectedRecord.checkOut}`) 
+                    : '-'}
                 </Col>
               </Row>
             </div>

@@ -26,14 +26,20 @@ export class VisitorRecordsController {
     @Query('siteId') siteId?: string,
     @Query('status') status?: VisitorStatus,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
+    @Query('checkOutStartDate') checkOutStartDate?: string,
+    @Query('checkOutEndDate') checkOutEndDate?: string,
+    @Query('todayRelevant') todayRelevant?: string
   ) {
     return this.visitorRecordsService.findAll({
       workerId,
       siteId,
       status,
       startDate,
-      endDate
+      endDate,
+      checkOutStartDate,
+      checkOutEndDate,
+      todayRelevant: todayRelevant === 'true'
     })
   }
 

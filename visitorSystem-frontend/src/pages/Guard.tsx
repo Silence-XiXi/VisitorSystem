@@ -134,7 +134,7 @@ const Guard: React.FC = () => {
   const [passwordForm] = Form.useForm()
   const [pagination, setPagination] = useState({
     current: 1,
-    pageSize: 10,
+    pageSize: 20,
     total: 0
   })
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -185,9 +185,11 @@ const Guard: React.FC = () => {
   const currentOnSite = guardStats?.onSiteWorkers ?? workers.filter(w => w.status === 'in').length
   const totalExitedToday = guardStats?.todayExited ?? workers.filter(w => w.status === 'out').length
   const totalEnteredToday = guardStats?.todayEntered ?? 0
-  const totalBorrowedItems = guardStats?.borrowedItems ?? workers.reduce((total, worker) => {
-    return total + (worker.borrowedItems?.length || 0)
-  }, 0)
+  
+  // 统计今日借出物品的数量（需要从借用记录中筛选今日的）
+  const [todayBorrowedItems, setTodayBorrowedItems] = useState<number>(0)
+  
+  // 仍然使用guardStats中的总未归还物品数
   const totalUnreturnedItems = guardStats?.borrowedItems ?? workers.reduce((total, worker) => {
     const unreturnedItems = worker.borrowedItems?.filter(item => !item.returnTime) || []
     return total + unreturnedItems.length
@@ -199,10 +201,31 @@ const Guard: React.FC = () => {
     
     try {
       setLoading(true)
+      
+      // 获取基本统计数据
       const stats = await apiService.getGuardStats()
       setGuardStats(stats)
+      
+      // 获取借用记录
+      const today = dayjs().format('YYYY-MM-DD')
+      const allBorrowRecords = await apiService.getGuardSiteBorrowRecords()
+      
+      // 筛选今日借出的物品记录
+      const todayBorrows = allBorrowRecords.filter(record => {
+        // 确保borrowDate存在且是今日
+        if (record.borrowDate) {
+          const borrowDate = dayjs(record.borrowDate).format('YYYY-MM-DD')
+          return borrowDate === today
+        }
+        return false
+      })
+      
+      // 设置今日借出物品的数量
+      setTodayBorrowedItems(todayBorrows.length)
+      // console.log(`今日借出物品数量: ${todayBorrows.length}`)
+      
     } catch (error) {
-      console.error('Failed to load guard stats:', error)
+      // console.error('Failed to load guard stats:', error)
       message.error('加载统计数据失败')
     } finally {
       setLoading(false)
@@ -215,15 +238,15 @@ const Guard: React.FC = () => {
       const categories = await apiService.getAllItemCategories()
       setItemCategories(categories)
     } catch (error) {
-      console.error('加载物品类型数据失败:', error)
+      // console.error('加载物品类型数据失败:', error)
     }
   }
 
   // 在访客记录中添加借用物品和归还物品的数量信息
   const enrichVisitorRecord = (record: any, borrowRecordsMap: Map<string, any[]>): any => {
-    // 只有当记录有工人ID时才处理
-    if (!record.worker?.workerId) {
-      console.log('记录缺少工人ID:', record);
+    // 只有当记录有工人ID和记录ID时才处理
+    if (!record.worker?.workerId || !record.id) {
+      // console.log('记录缺少工人ID或记录ID:', record);
       return {
         ...record,
         borrowedItems: 0,
@@ -232,15 +255,18 @@ const Guard: React.FC = () => {
     }
     
     const workerId = record.worker.workerId;
-    console.log(`处理工人ID: ${workerId}`);
+    const visitorRecordId = record.id;
+    // console.log(`处理工人ID: ${workerId}, 访客记录ID: ${visitorRecordId}`);
     
-    const borrowRecords = borrowRecordsMap.get(workerId) || [];
-    console.log(`工人 ${workerId} 的借用记录:`, borrowRecords);
+    // 使用访客记录ID作为key
+    const visitorRecordKey = `visitor_${visitorRecordId}`;
+    const borrowRecords = borrowRecordsMap.get(visitorRecordKey) || [];
+    // console.log(`访客记录 ${visitorRecordId} 的借用记录:`, borrowRecords);
     
     const borrowedItems = borrowRecords.length;
     const returnedItems = borrowRecords.filter(item => item.status === 'RETURNED').length;
     
-    console.log(`工人 ${workerId} - 借用物品: ${borrowedItems}, 已归还: ${returnedItems}`);
+    // console.log(`访客记录 ${visitorRecordId} - 借用物品: ${borrowedItems}, 已归还: ${returnedItems}`);
 
     // 保留原始记录的所有字段，只添加借用物品和已归还物品的数量
     return {
@@ -255,6 +281,7 @@ const Guard: React.FC = () => {
     startDate?: string;
     endDate?: string;
     status?: string;
+    showTodayRecords?: boolean; // 新增参数: 显示今日记录（未离场+今日离场）
   }) => {
     if (!user || user.role !== 'GUARD') return
     
@@ -262,40 +289,49 @@ const Guard: React.FC = () => {
       setVisitorRecordsLoading(true)
       
       // 1. 获取所有访客记录
-      const records = await apiService.getGuardSiteVisitorRecords(filters)
-      console.log('Loaded visitor records:', records) // 调试信息
+      let records;
       
-      // 收集所有工人ID以批量获取借用记录（去重）
-      const workerIds = Array.from(new Set(
-        records
-          .filter(record => record.worker && record.worker.workerId)
-          .map(record => record.worker!.workerId)
-      ))
-      
-      // 为了优化性能，按批次获取借用记录（每批10个工人）
-      const batchSize = 10
-      const borrowRecordsMap = new Map() // 用于存储工人ID到借用记录的映射
-      
-      for (let i = 0; i < workerIds.length; i += batchSize) {
-        const batch = workerIds.slice(i, i + batchSize)
-        const batchPromises = batch.map(async (workerId) => {
-          try {
-            const workerBorrowRecords = await apiService.getWorkerBorrowRecords(workerId)
-            borrowRecordsMap.set(workerId, workerBorrowRecords)
-          } catch (error) {
-            console.error(`Failed to get borrow records for worker ${workerId}:`, error)
-            borrowRecordsMap.set(workerId, [])
-          }
-        })
-        
-        // 等待当前批次完成
-        await Promise.all(batchPromises)
+      if (filters?.showTodayRecords) {
+        // 使用新的todayRelevant参数，一次性获取所有相关记录
+        records = await apiService.getGuardSiteVisitorRecords({
+          todayRelevant: true
+        });
+      } else {
+        // 使用常规筛选
+        records = await apiService.getGuardSiteVisitorRecords(filters);
       }
       
+      // console.log('Loaded visitor records:', records) // 调试信息
+      
+      // 为每个访客记录单独获取借用记录（使用访客记录ID）
+      const borrowRecordsMap = new Map() // 用于存储访客记录ID到借用记录的映射
+      
+      // 使用Promise.all并行获取所有借用记录
+      const borrowRecordPromises = records.map(async (record) => {
+        const visitorRecordId = record.id;
+        const workerId = record.worker?.workerId;
+        
+        if (visitorRecordId && workerId) {
+          try {
+            // 使用访客记录ID获取特定于该访客记录的借用记录
+            const visitorBorrowRecords = await apiService.getWorkerBorrowRecords(workerId, visitorRecordId);
+            const visitorRecordKey = `visitor_${visitorRecordId}`;
+            borrowRecordsMap.set(visitorRecordKey, visitorBorrowRecords);
+          } catch (error) {
+            // console.error(`获取访客记录 ${visitorRecordId} 的借用记录失败:`, error);
+            const visitorRecordKey = `visitor_${visitorRecordId}`;
+            borrowRecordsMap.set(visitorRecordKey, []);
+          }
+        }
+      });
+      
+      // 等待所有借用记录获取完成
+      await Promise.all(borrowRecordPromises);
+      
       // 打印借用记录映射的内容
-      console.log("借用记录Map内容:");
-      for (const [workerId, records] of borrowRecordsMap.entries()) {
-        console.log(`工人ID: ${workerId}, 借用记录数量: ${records.length}`);
+      // console.log("借用记录Map内容:");
+      for (const [recordKey, records] of borrowRecordsMap.entries()) {
+        // console.log(`访客记录Key: ${recordKey}, 借用记录数量: ${records.length}`);
       }
       
       // 2. 在记录中添加借用物品和归还物品的数量信息
@@ -306,14 +342,14 @@ const Guard: React.FC = () => {
       enrichedRecords.forEach(record => {
         if (record.borrowedItems === undefined) {
           missingCount++;
-          console.error("记录缺少borrowedItems:", record);
+          // console.error("记录缺少borrowedItems:", record);
         }
       });
-      console.log(`总记录数: ${enrichedRecords.length}, 缺少借用物品信息的记录数: ${missingCount}`);
-      console.log('Enriched visitor records:', enrichedRecords)
+      // console.log(`总记录数: ${enrichedRecords.length}, 缺少借用物品信息的记录数: ${missingCount}`);
+      // console.log('Enriched visitor records:', enrichedRecords)
       setVisitorRecords(enrichedRecords)
     } catch (error) {
-      console.error('Failed to load visitor records:', error)
+      // console.error('Failed to load visitor records:', error)
       message.error('加载访客记录失败')
     } finally {
       setVisitorRecordsLoading(false)
@@ -707,10 +743,10 @@ const Guard: React.FC = () => {
         // 如果没有找到入场记录，说明工人未入场，可以继续登记
         if (entryError?.statusCode === 400) {
           // 工人未入场，可以继续
-          console.log('工人未入场，可以继续登记')
+          // console.log('工人未入场，可以继续登记')
         } else {
           // 其他错误，可能是网络问题等
-          console.warn('检查入场记录时出现错误:', entryError)
+          // console.warn('检查入场记录时出现错误:', entryError)
         }
       }
 
@@ -725,7 +761,7 @@ const Guard: React.FC = () => {
       setPhoneNumber(worker.phone)
       message.success(t('guard.workerQuerySuccess'))
     } catch (error: any) {
-      console.error('查询工人信息失败:', error)
+      // console.error('查询工人信息失败:', error)
       // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound')
       message.error(errorMessage)
@@ -746,8 +782,8 @@ const Guard: React.FC = () => {
 
     try {
       // 调试日志：记录修改前后的电话号码
-      console.log('工人原始电话号码:', selectedWorker.phone);
-      console.log('修改后的电话号码:', phoneNumber.trim());
+      // console.log('工人原始电话号码:', selectedWorker.phone);
+      // console.log('修改后的电话号码:', phoneNumber.trim());
       
       // 调用后端API创建访客记录（使用门卫专用接口）
       const visitorRecord = await apiService.createGuardVisitorRecord({
@@ -763,7 +799,7 @@ const Guard: React.FC = () => {
         notes: `入场登记 - ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`
       })
 
-      console.log('创建访客记录成功:', visitorRecord)
+      // console.log('创建访客记录成功:', visitorRecord)
       message.success(t('guard.entryCompleted'))
       
       // 刷新统计数据
@@ -775,12 +811,12 @@ const Guard: React.FC = () => {
       setPhysicalCardId('')
       setPhoneNumber('')
     } catch (error: any) {
-      console.error('创建访客记录失败:', error)
-      console.log('错误详情:', {
-        message: error?.message,
-        statusCode: error?.statusCode,
-        originalResponse: error?.originalResponse
-      })
+      // console.error('创建访客记录失败:', error)
+      // console.log('错误详情:', {
+      //   message: error?.message,
+      //   statusCode: error?.statusCode,
+      //   originalResponse: error?.originalResponse
+      // })
       
       // 根据不同的错误类型显示不同的错误信息
       let errorMessage = '入场登记失败，请重试'
@@ -840,10 +876,10 @@ const Guard: React.FC = () => {
       // 使用工人ID（而不是扫描的ID）获取借用物品列表
       // 这样无论是通过工号还是实体卡ID查询，都能正确获取借用物品
       const workerId = result.worker.workerId;
-      console.log('使用工人ID查询借用物品:', workerId);
+      // console.log('使用工人ID查询借用物品:', workerId);
       
       const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
-      console.log('Worker borrow records:', borrowRecords);
+      // console.log('Worker borrow records:', borrowRecords);
       
       const borrowedItems = borrowRecords.map((record: any) => ({
         recordId: record.id, // 保存记录ID用于归还操作
@@ -858,7 +894,7 @@ const Guard: React.FC = () => {
       
       message.success(t('guard.workerQuerySuccess'))
     } catch (error: any) {
-      console.error('查询工人入场记录失败:', error)
+      // console.error('查询工人入场记录失败:', error)
       // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound')
       message.error(errorMessage)
@@ -959,7 +995,7 @@ const Guard: React.FC = () => {
       loadGuardStats()
       
     } catch (error: any) {
-      console.error('归还物品失败:', error)
+      // console.error('归还物品失败:', error)
       const errorMessage = error?.message || '归还物品失败，请重试'
       message.error(errorMessage)
     } finally {
@@ -983,14 +1019,14 @@ const Guard: React.FC = () => {
       
       // 首先检查工人是否有有效的入场记录
       try {
-        console.log('借用物品前检查工人入场状态:', {
-          workerId: selectedWorker.workerId,
-          workerInfo: selectedWorker
-        });
+        // console.log('借用物品前检查工人入场状态:', {
+        //   workerId: selectedWorker.workerId,
+        //   workerInfo: selectedWorker
+        // });
         // 这个API会验证工人是否有有效的入场记录，如果没有会抛出错误
         await apiService.checkWorkerEntryRecord(selectedWorker.workerId)
       } catch (error: any) {
-        console.error('工人入场验证失败:', error);
+        // console.error('工人入场验证失败:', error);
         message.error(t('guard.workerNotOnSiteCannotBorrow'))
         setLoading(false)
         return
@@ -1004,11 +1040,11 @@ const Guard: React.FC = () => {
         }
 
         // 创建物品借用记录
-        console.log('创建借用记录，物品信息:', {
-          itemType: item.itemType,
-          itemId: item.itemId,
-          category
-        });
+        // console.log('创建借用记录，物品信息:', {
+        //   itemType: item.itemType,
+        //   itemId: item.itemId,
+        //   category
+        // });
         
         const borrowRecord = {
           workerId: selectedWorker.workerId, // 使用workerId而不是id，确保后端能正确找到工人
@@ -1026,7 +1062,7 @@ const Guard: React.FC = () => {
           // visitorRecordId 会由后端自动关联到当前有效的访客记录
         }
         
-        console.log('发送借用记录数据:', borrowRecord);
+        // console.log('发送借用记录数据:', borrowRecord);
 
         return await apiService.createBorrowRecord(borrowRecord as any)
       })
@@ -1066,7 +1102,7 @@ const Guard: React.FC = () => {
       setCurrentBorrowedItems([])
       setSelectedReturnItems([])
     } catch (error: any) {
-      console.error('创建物品借用记录失败:', error)
+      // console.error('创建物品借用记录失败:', error)
       const errorMessage = error?.message || '创建物品借用记录失败'
       message.error(errorMessage)
     } finally {
@@ -1106,10 +1142,10 @@ const Guard: React.FC = () => {
       
       // 使用工人ID获取借用物品列表
       const workerId = result.worker.workerId;
-      console.log('使用工人ID查询借用物品:', workerId);
+      // console.log('使用工人ID查询借用物品:', workerId);
       
       const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
-      console.log('Worker borrow records:', borrowRecords);
+      // console.log('Worker borrow records:', borrowRecords);
       
       const borrowedItems = borrowRecords.map((record: any) => ({
         recordId: record.id, // 保存记录ID用于归还操作
@@ -1136,7 +1172,7 @@ const Guard: React.FC = () => {
       
       message.success(t('guard.workerQuerySuccess'))
     } catch (error: any) {
-      console.error('查询工人入场记录失败:', error)
+      // console.error('查询工人入场记录失败:', error)
       // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound')
       message.error(errorMessage)
@@ -1175,7 +1211,7 @@ const Guard: React.FC = () => {
       if (unreturnedItems.length > 0) {
         // 这里可以添加API调用，记录未归还物品的原因
         // 例如：apiService.updateUnreturnedItemRemarks(visitorRecordId, unreturnedItemRemarks)
-        console.log('未归还物品备注:', unreturnedItemRemarks)
+        // console.log('未归还物品备注:', unreturnedItemRemarks)
       }
       
       // 3. 调用离场登记API
@@ -1206,7 +1242,7 @@ const Guard: React.FC = () => {
       setUnreturnedItemRemarks({})
       setPhysicalCardReturned(false)
     } catch (error) {
-      console.error('离场登记失败:', error)
+      // console.error('离场登记失败:', error)
       message.error(t('guard.exitFailed'))
     } finally {
       setLoading(false)
@@ -1216,11 +1252,9 @@ const Guard: React.FC = () => {
   // 4. 报表功能
   const handleReports = () => {
     setCurrentView('reports')
-    // 加载今日访客记录
-    const today = dayjs().format('YYYY-MM-DD')
+    // 加载今日访客记录（未离场 + 今日离场的记录）
     loadVisitorRecords({
-      startDate: today,
-      endDate: today
+      showTodayRecords: true
     })
   }
 
@@ -1228,25 +1262,51 @@ const Guard: React.FC = () => {
   const handleStatClick = (filterType: 'all' | 'in' | 'out') => {
     setStatusFilter(filterType)
     setCurrentView('reports')
-    // 加载今日访客记录
-    const today = dayjs().format('YYYY-MM-DD')
-    loadVisitorRecords({
-      startDate: today,
-      endDate: today,
-      status: filterType === 'all' ? undefined : filterType === 'in' ? 'ON_SITE' : 'LEFT'
-    })
+    
+    if (filterType === 'all') {
+      // 显示所有今日未离场和今日离场的记录
+      loadVisitorRecords({
+        showTodayRecords: true
+      })
+    } else if (filterType === 'in') {
+      // 在场：显示所有日期当前未离场的访客记录
+      loadVisitorRecords({
+        status: 'ON_SITE'
+      })
+    } else {
+      // 已离场：只显示今日离场的记录
+      const today = dayjs().format('YYYY-MM-DD')
+      loadVisitorRecords({
+        checkOutStartDate: today,
+        checkOutEndDate: today,
+        status: 'LEFT'
+      })
+    }
   }
 
   // 处理状态筛选变化
   const handleStatusFilterChange = (value: string) => {
     setStatusFilter(value)
-    // 重新加载访客记录
-    const today = dayjs().format('YYYY-MM-DD')
-    loadVisitorRecords({
-      startDate: today,
-      endDate: today,
-      status: value === 'all' ? undefined : value === 'in' ? 'ON_SITE' : 'LEFT'
-    })
+    
+    if (value === 'all') {
+      // 显示所有今日未离场和今日离场的记录
+      loadVisitorRecords({
+        showTodayRecords: true
+      })
+    } else if (value === 'in') {
+      // 在场：显示所有日期当前未离场的访客记录
+      loadVisitorRecords({
+        status: 'ON_SITE'
+      })
+    } else {
+      // 已离场：只显示今日离场的记录
+      const today = dayjs().format('YYYY-MM-DD')
+      loadVisitorRecords({
+        checkOutStartDate: today,
+        checkOutEndDate: today,
+        status: 'LEFT'
+      })
+    }
   }
 
   // 处理日期筛选变化
@@ -1255,19 +1315,53 @@ const Guard: React.FC = () => {
       const startDate = dates[0].format('YYYY-MM-DD')
       const endDate = dates[1].format('YYYY-MM-DD')
       setDateFilter({ startDate, endDate })
-      loadVisitorRecords({
-        startDate,
-        endDate,
-        status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
-      })
+      
+      // 如果是今天的日期，且状态是全部，则使用showTodayRecords模式
+      const today = dayjs().format('YYYY-MM-DD')
+      if (startDate === today && endDate === today && statusFilter === 'all') {
+        loadVisitorRecords({
+          showTodayRecords: true
+        })
+      } else if (statusFilter === 'in') {
+        // 在场状态：所有未离场的记录（不论日期）
+        loadVisitorRecords({
+          status: 'ON_SITE'
+        })
+      } else if (statusFilter === 'out') {
+        // 如果是筛选已离场记录，根据选择的日期范围筛选离场日期
+        loadVisitorRecords({
+          checkOutStartDate: startDate,
+          checkOutEndDate: endDate,
+          status: 'LEFT'
+        })
+      } else {
+        // 全部状态但不是今天：按入场日期筛选
+        loadVisitorRecords({
+          startDate,
+          endDate
+        })
+      }
     } else {
       setDateFilter({})
-      const today = dayjs().format('YYYY-MM-DD')
-      loadVisitorRecords({
-        startDate: today,
-        endDate: today,
-        status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
-      })
+      // 重置为今日，根据当前筛选状态决定查询方式
+      if (statusFilter === 'all') {
+        loadVisitorRecords({
+          showTodayRecords: true
+        })
+      } else if (statusFilter === 'in') {
+        // 在场：所有未离场的记录
+        loadVisitorRecords({
+          status: 'ON_SITE'
+        })
+      } else {
+        // 已离场：今日离场的记录
+        const today = dayjs().format('YYYY-MM-DD')
+        loadVisitorRecords({
+          checkOutStartDate: today,
+          checkOutEndDate: today,
+          status: 'LEFT'
+        })
+      }
     }
   }
 
@@ -1283,7 +1377,7 @@ const Guard: React.FC = () => {
       message.success(t('login.logoutSuccess'))
       navigate('/login')
     } catch (error) {
-      console.error('Logout error:', error)
+      // console.error('Logout error:', error)
       message.error(t('login.logoutFailed'))
     }
   }
@@ -1320,7 +1414,6 @@ const Guard: React.FC = () => {
     }))
   }
 
-
   // 页数跳转处理函数
   const handleJumpToPage = (totalRecords: number) => {
     const pageNumber = parseInt(jumpPage)
@@ -1343,14 +1436,23 @@ const Guard: React.FC = () => {
     setItemBorrowRecords([])
     
     try {
-      // 获取工人的真实借用记录
+      // 检查必要的信息
       if (!record.worker?.workerId) {
-        console.error('无法获取工人ID')
+        // console.error('无法获取工人ID')
         return
       }
+      if (!record.id) {
+        // console.error('无法获取访客记录ID')
+        return
+      }
+      
+      // 使用访客记录ID获取物品借用记录，确保只显示当前入场记录关联的借用记录
       const workerId = record.worker.workerId
-      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId)
-      console.log(`获取工人 ${workerId} 的借用记录:`, borrowRecords)
+      const visitorRecordId = record.id
+      
+      // console.log(`获取访客记录 ${visitorRecordId} (工人ID: ${workerId}) 的借用记录`)
+      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId, visitorRecordId)
+      // console.log(`获取访客记录 ${visitorRecordId} 的借用记录:`, borrowRecords)
       
       // 转换为前端需要的格式
       const formattedRecords = borrowRecords.map((item: any) => ({
@@ -1365,7 +1467,7 @@ const Guard: React.FC = () => {
       
       setItemBorrowRecords(formattedRecords)
     } catch (error) {
-      console.error(`获取工人 ${record.workerId} 的借用记录失败:`, error)
+      // console.error(`获取工人 ${record.workerId} 的借用记录失败:`, error)
       message.error('获取借用记录失败')
     } finally {
       setItemRecordsLoading(false)
@@ -1459,7 +1561,7 @@ const Guard: React.FC = () => {
       // 刷新统计数据
       loadGuardStats()
     } catch (error) {
-      console.error('归还物品失败:', error)
+      // console.error('归还物品失败:', error)
       message.error(t('guard.returnItemsFailed'))
     } finally {
       setLoading(false)
@@ -1976,8 +2078,8 @@ const Guard: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
                     <Statistic
-                      title={t('guard.borrowedItems')}
-                      value={totalBorrowedItems}
+                      title={t('guard.borrowedItems') + ' (今日)'}
+                      value={todayBorrowedItems}
                       prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
                         color: '#1890ff',
@@ -2867,7 +2969,7 @@ const Guard: React.FC = () => {
 
                 <div>
                   <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>
-                    {selectedWorker.borrowedItems && selectedWorker.borrowedItems.some((item: any) => !item.returnTime) ? t('guard.physicalCardReturnStep5') : t('guard.physicalCardReturnStep4')}
+                    {selectedWorker.borrowedItems && selectedWorker.borrowedItems.some((item: any) => !item.returnTime) ? t('guard.physicalCardReturnStep5') : t('guard.physicalCardReturnStep3')}
                   </Text>
                   <Card size="small" style={{ marginTop: '8px' }}>
                     <div style={{ 
@@ -2929,12 +3031,19 @@ const Guard: React.FC = () => {
   if (currentView === 'reports') {
     const columns = [
       {
-        title: t('guard.workerId'),
-        dataIndex: 'worker',
-        key: 'workerId',
-        width: 100,
-        render: (worker: any) => worker?.workerId || '-',
+        title: t('guard.physicalCardId'),
+        dataIndex: 'physicalCardId',
+        key: 'physicalCardId',
+        width: 120,
+        render: (text: string) => text || '-',
       },
+      // {
+      //   title: t('guard.workerId'),
+      //   dataIndex: 'worker',
+      //   key: 'workerId',
+      //   width: 100,
+      //   render: (worker: any) => worker?.workerId || '-',
+      // },
       {
         title: t('guard.workerName'),
         dataIndex: 'worker',
@@ -2957,6 +3066,13 @@ const Guard: React.FC = () => {
         },
       },
       {
+        title: t('guard.contactPhone'),
+        dataIndex: 'phone',
+        key: 'phone',
+        width: 120,
+        render: (text: string, record: any) => text || record.worker?.phone || '-',
+      },
+      {
         title: t('guard.entryTime'),
         dataIndex: 'checkInTime',
         key: 'checkInTime',
@@ -2969,20 +3085,6 @@ const Guard: React.FC = () => {
         key: 'checkOutTime',
         width: 150,
         render: (text: string) => text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-',
-      },
-      {
-        title: t('guard.physicalCardId'),
-        dataIndex: 'physicalCardId',
-        key: 'physicalCardId',
-        width: 120,
-        render: (text: string) => text || '-',
-      },
-      {
-        title: t('guard.contactPhone'),
-        dataIndex: 'phone',
-        key: 'phone',
-        width: 120,
-        render: (text: string, record: any) => text || record.worker?.phone || '-',
       },
       {
         title: t('guard.distributor'),
@@ -3018,7 +3120,7 @@ const Guard: React.FC = () => {
         key: 'borrowedItems',
         width: 100,
         render: (value: number, record: AttendanceRecord) => {
-          console.log("借用物品列渲染，值为:", value, "记录:", record);
+          // console.log("借用物品列渲染，值为:", value, "记录:", record);
           return (
             <span 
               style={{ 
@@ -3075,8 +3177,45 @@ const Guard: React.FC = () => {
         key: 'returnedItems',
         width: 100,
         render: (value: number, record: AttendanceRecord) => {
-          console.log("已归还列渲染，值为:", value, "记录:", record);
+          // 移除调试日志
+          // console.log("已归还列渲染，值为:", value, "记录:", record);
           
+          // 当借用物品数量为0时，无论已归还数量如何都显示绿色（没有需要归还的物品）
+          if (record.borrowedItems === 0) {
+            // 绿色 - 没有需要归还的物品
+            const color = '#52c41a'
+            const backgroundColor = '#f6ffed'
+            const borderColor = '#b7eb8f'
+            return (
+              <Tooltip title="无借用物品">
+                <span 
+                  style={{ 
+                    color, 
+                    fontWeight: 'bold',
+                    backgroundColor,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    border: `1px solid ${borderColor}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onClick={() => handleViewItemRecords(record)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#d9f7be'
+                    e.currentTarget.style.borderColor = '#95de64'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = backgroundColor
+                    e.currentTarget.style.borderColor = borderColor
+                  }}
+                >
+                  {value !== undefined ? value : '?'}
+                </span>
+              </Tooltip>
+            )
+          }
+          
+          // 有借用物品时的原有逻辑
           const isPartiallyReturned = value > 0 && value < record.borrowedItems
           const isNotReturned = value === 0
           
@@ -3129,9 +3268,9 @@ const Guard: React.FC = () => {
 
     // 使用API数据，如果没有数据则显示空数组
     const records = visitorRecords
-    console.log('Records for table:', records) // 调试信息
-    console.log('visitorRecords length:', visitorRecords.length) // 调试信息
-    console.log('visitorRecords content:', JSON.stringify(visitorRecords, null, 2)) // 调试信息
+    // console.log('Records for table:', records) // 调试信息
+    // console.log('visitorRecords length:', visitorRecords.length) // 调试信息
+    // console.log('visitorRecords content:', JSON.stringify(visitorRecords, null, 2)) // 调试信息
 
     // 根据状态筛选记录
     const filteredRecords = records.filter(record => {
@@ -3141,7 +3280,7 @@ const Guard: React.FC = () => {
       if (statusFilter === 'out') return record.status === 'LEFT'
       return true
     })
-    console.log('Filtered records:', filteredRecords) // 调试信息
+    // console.log('Filtered records:', filteredRecords) // 调试信息
 
     // 客户端分页处理
     const startIndex = (pagination.current - 1) * pagination.pageSize
@@ -3176,17 +3315,25 @@ const Guard: React.FC = () => {
                   icon={<BarChartOutlined />}
                   loading={visitorRecordsLoading}
                   onClick={() => {
-                    const today = dayjs().format('YYYY-MM-DD')
-                    console.log('Loading visitor records with filters:', {
-                      startDate: today,
-                      endDate: today,
-                      status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
-                    })
-                    loadVisitorRecords({
-                      startDate: today,
-                      endDate: today,
-                      status: statusFilter === 'all' ? undefined : statusFilter === 'in' ? 'ON_SITE' : 'LEFT'
-                    })
+                    // 根据当前状态筛选决定使用不同的查询条件
+                    if (statusFilter === 'all') {
+                      loadVisitorRecords({
+                        showTodayRecords: true
+                      })
+                    } else if (statusFilter === 'in') {
+                      // 在场：显示所有日期当前未离场的访客记录
+                      loadVisitorRecords({
+                        status: 'ON_SITE'
+                      })
+                    } else {
+                      // 已离场：只显示今日离场的记录
+                      const today = dayjs().format('YYYY-MM-DD')
+                      loadVisitorRecords({
+                        checkOutStartDate: today,
+                        checkOutEndDate: today,
+                        status: 'LEFT'
+                      })
+                    }
                   }}
                   size="small"
                 >

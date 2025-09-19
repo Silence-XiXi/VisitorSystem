@@ -528,7 +528,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           showTotal: (total, range) => 
             t('pagination.showTotal').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
           pageSizeOptions: ['10', '20', '50', '100'],
-          defaultPageSize: 20,
+          defaultPageSize: 10,
         }}
         size="middle"
         style={{ fontSize: '14px' }}
