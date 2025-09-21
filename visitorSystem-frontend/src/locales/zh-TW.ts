@@ -702,6 +702,7 @@ export default {
     jumpTo: '跳轉至',
     // 消息提示
     workerAlreadyEntered: '該工人已入場，請檢查狀態',
+    workerInactiveCannotEnter: '該工人狀態為停用，禁止入場。請聯繫管理員激活工人狀態。',
     itemAlreadyInList: '該物品已添加到借用清單中',
     itemAddedToList: '物品已添加到借用清單',
     itemRemovedFromList: '物品已從借用清單中移除',
@@ -717,6 +718,9 @@ export default {
     returnItemsSuccess: '成功歸還 {count} 個物品',
     borrowRegistrationSuccess: '借物登記完成，共借用 {count} 個物品',
     returnItemsSuccessCount: '成功歸還 {count} 件物品',
+    // 弹窗标题
+    todayRelatedItemsRecord: '今日相關物品記錄（今日借出+未歸還+今日歸還）',
+    todayReturnedItemsRecord: '今日歸還物品記錄',
   },
   worker: {
     title: '工人管理',
@@ -882,7 +886,7 @@ export default {
     currentOnSiteCount: '當前在場人數',
     leftCount: '已離場人數',
     pendingCount: '未離場人數',
-    borrowedItemsCount: '已借出物品',
+    borrowedItemsCount: '借出物品',
     returnedItemsCount: '已歸還物品',
     unreturnedItemsCount: '未歸還物品',
     visitorRecords: '訪客記錄',
@@ -925,6 +929,8 @@ export default {
     partiallyReturned: '橙色: ⚠️ 部分歸還',
     notReturned: '紅色: ❌ 未歸還',
     itemDetails: '借用物品詳情',
+    todayRelatedItemsRecord: '今日相關物品記錄（今日借出+未歸還+今日歸還）',
+    todayReturnedItemsRecord: '今日歸還物品記錄',
     close: '關閉',
     workerName: '工人姓名',
     distributor: '分判商',

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Body, Patch, Put, Param, Delete, Query, UseGuards } from '@nestjs/common'
 import { VisitorRecordsService } from './visitor-records.service'
 import { CreateVisitorRecordDto } from './dto/create-visitor-record.dto'
 import { UpdateVisitorRecordDto } from './dto/update-visitor-record.dto'
@@ -64,6 +64,12 @@ export class VisitorRecordsController {
   @Patch(':id/checkout')
   @Roles(UserRole.ADMIN, UserRole.GUARD)
   checkOut(@Param('id') id: string, @Body('checkOutTime') checkOutTime?: string) {
+    return this.visitorRecordsService.checkOut(id, checkOutTime)
+  }
+
+  @Put(':id/checkout')
+  @Roles(UserRole.ADMIN, UserRole.GUARD)
+  checkOutPut(@Param('id') id: string, @Body('checkOutTime') checkOutTime?: string) {
     return this.visitorRecordsService.checkOut(id, checkOutTime)
   }
 

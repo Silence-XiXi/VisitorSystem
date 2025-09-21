@@ -63,6 +63,7 @@ interface Worker {
   status: 'in' | 'out'
   idType?: string
   borrowedItems?: Array<{
+    recordId: string
     itemType: string
     itemId: string
     borrowTime: string
@@ -141,6 +142,7 @@ const Guard: React.FC = () => {
   const [jumpPage, setJumpPage] = useState<string>('')
   const [itemRecordsModalVisible, setItemRecordsModalVisible] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
+  const [itemRecordsModalType, setItemRecordsModalType] = useState<'unreturned' | 'todayReturned'>('unreturned')
   const [itemBorrowRecords, setItemBorrowRecords] = useState<Array<{
     id: string
     itemName: string
@@ -176,6 +178,8 @@ const Guard: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [visitorRecords, setVisitorRecords] = useState<any[]>([])
   const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(false)
+  const [siteName, setSiteName] = useState<string>('')
+  const [siteInfo, setSiteInfo] = useState<{id: string, name: string} | null>(null)
   const [dateFilter, setDateFilter] = useState<{
     startDate?: string;
     endDate?: string;
@@ -250,7 +254,8 @@ const Guard: React.FC = () => {
       return {
         ...record,
         borrowedItems: 0,
-        returnedItems: 0
+        returnedItems: 0,
+        unreturnedItems: 0
       };
     }
     
@@ -258,21 +263,58 @@ const Guard: React.FC = () => {
     const visitorRecordId = record.id;
     // console.log(`处理工人ID: ${workerId}, 访客记录ID: ${visitorRecordId}`);
     
-    // 使用访客记录ID作为key
+    // 获取该工人所有借用记录（包括之前访客记录的）
+    const workerKey = `worker_${workerId}`;
+    const allWorkerRecords = borrowRecordsMap.get(workerKey) || [];
+    
+    // 获取当前访客记录关联的借用记录
     const visitorRecordKey = `visitor_${visitorRecordId}`;
-    const borrowRecords = borrowRecordsMap.get(visitorRecordKey) || [];
-    // console.log(`访客记录 ${visitorRecordId} 的借用记录:`, borrowRecords);
+    const currentVisitorRecords = borrowRecordsMap.get(visitorRecordKey) || [];
     
-    const borrowedItems = borrowRecords.length;
-    const returnedItems = borrowRecords.filter(item => item.status === 'RETURNED').length;
+    // 计算该工人今日相关的物品数量（借用日期是今日的 + 当前所有未归还的 + 归还时间是今日的）
+    const today = dayjs().format('YYYY-MM-DD');
     
-    // console.log(`访客记录 ${visitorRecordId} - 借用物品: ${borrowedItems}, 已归还: ${returnedItems}`);
+    // 1. 借用日期是今日的物品（无论是否归还）
+    const todayBorrowedItems = allWorkerRecords.filter(item => {
+      if (!item.borrowDate) return false;
+      const borrowDate = dayjs(item.borrowDate).format('YYYY-MM-DD');
+      return borrowDate === today;
+    });
+    
+    // 2. 当前所有未归还的物品（无论借用日期）
+    const allUnreturnedItems = allWorkerRecords.filter(item => item.status === 'BORROWED');
+    
+    // 3. 归还时间是今日的物品（无论借用日期）
+    const todayReturnedItems = allWorkerRecords.filter(item => {
+      if (item.status !== 'RETURNED' || !item.returnDate) return false;
+      const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD');
+      return returnDate === today;
+    });
+    
+    // 合并三种类型的物品，去重（使用Set来避免重复计算同一个物品）
+    const allTodayRelatedItems = new Set([
+      ...todayBorrowedItems.map(item => item.id),
+      ...allUnreturnedItems.map(item => item.id),
+      ...todayReturnedItems.map(item => item.id)
+    ]);
+    
+    const totalTodayRelatedItems = allTodayRelatedItems.size;
+    
+    // 计算该工人所有今日归还的物品数量
+    const totalTodayReturnedItems = allWorkerRecords.filter(item => {
+      if (item.status !== 'RETURNED' || !item.returnDate) return false;
+      const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD');
+      return returnDate === today;
+    }).length;
+    
+    // console.log(`工人 ${workerId} - 今日相关物品: ${totalTodayRelatedItems}, 今日归还: ${totalTodayReturnedItems}`);
 
-    // 保留原始记录的所有字段，只添加借用物品和已归还物品的数量
+    // 保留原始记录的所有字段，借用物品列显示今日相关物品数量，已归还物品列显示今日归还数量
     return {
       ...record,
-      borrowedItems: borrowedItems,
-      returnedItems: returnedItems
+      borrowedItems: totalTodayRelatedItems, // 借用物品列显示该工人今日相关的物品数量（借用日期是今日的 + 当前所有未归还的 + 归还时间是今日的）
+      returnedItems: totalTodayReturnedItems, // 已归还物品列显示该工人所有今日归还的物品数量
+      unreturnedItems: totalTodayRelatedItems // 保留此字段用于其他用途
     };
   };
 
@@ -282,6 +324,8 @@ const Guard: React.FC = () => {
     endDate?: string;
     status?: string;
     showTodayRecords?: boolean; // 新增参数: 显示今日记录（未离场+今日离场）
+    checkOutStartDate?: string;
+    checkOutEndDate?: string;
   }) => {
     if (!user || user.role !== 'GUARD') return
     
@@ -306,6 +350,9 @@ const Guard: React.FC = () => {
       // 为每个访客记录单独获取借用记录（使用访客记录ID）
       const borrowRecordsMap = new Map() // 用于存储访客记录ID到借用记录的映射
       
+      // 收集所有唯一的工人ID
+      const uniqueWorkerIds = [...new Set(records.map(record => record.worker?.workerId).filter(Boolean))];
+      
       // 使用Promise.all并行获取所有借用记录
       const borrowRecordPromises = records.map(async (record) => {
         const visitorRecordId = record.id;
@@ -325,8 +372,22 @@ const Guard: React.FC = () => {
         }
       });
       
+      // 为每个工人获取所有未归还的物品记录
+      const workerBorrowRecordPromises = uniqueWorkerIds.map(async (workerId) => {
+        try {
+          // 获取该工人所有未归还的物品记录（不指定访客记录ID）
+          const allWorkerBorrowRecords = await apiService.getWorkerBorrowRecords(workerId!);
+          const workerKey = `worker_${workerId}`;
+          borrowRecordsMap.set(workerKey, allWorkerBorrowRecords);
+        } catch (error) {
+          // console.error(`获取工人 ${workerId} 的所有借用记录失败:`, error);
+          const workerKey = `worker_${workerId}`;
+          borrowRecordsMap.set(workerKey, []);
+        }
+      });
+      
       // 等待所有借用记录获取完成
-      await Promise.all(borrowRecordPromises);
+      await Promise.all([...borrowRecordPromises, ...workerBorrowRecordPromises]);
       
       // 打印借用记录映射的内容
       // console.log("借用记录Map内容:");
@@ -376,11 +437,121 @@ const Guard: React.FC = () => {
     return () => clearInterval(timer)
   }, [locale])
 
+  // 更新工地名称
+  useEffect(() => {
+    const getSiteName = () => {
+      // console.log('=== 开始获取工地名称 ===')
+      // console.log('完整用户信息:', user)
+      // console.log('当前siteInfo:', siteInfo)
+      
+      if (!user) {
+        // console.warn('用户信息未加载')
+        return t('navigation.system')
+      }
+
+      // console.log('用户基本信息:', {
+      //   id: user.id,
+      //   username: user.username,
+      //   role: user.role,
+      //   siteId: user.siteId,
+      //   siteName: user.siteName
+      // })
+
+      // console.log('门卫信息:', user.guard)
+
+      // 优先使用从API获取的工地信息
+      if (siteInfo?.name) {
+        // console.log('✅ 使用从API获取的工地名称:', siteInfo.name)
+        return siteInfo.name
+      }
+
+      // 优先从用户直接属性获取
+      if (user.siteName) {
+        // console.log('✅ 从user.siteName获取工地名称:', user.siteName)
+        return user.siteName
+      }
+
+      // 从门卫信息获取
+      if (user.guard?.siteName) {
+        // console.log('✅ 从user.guard.siteName获取工地名称:', user.guard.siteName)
+        return user.guard.siteName
+      }
+
+      // 如果都没有，记录警告并返回默认值
+      // console.warn('❌ 未找到工地名称，用户信息详情:', {
+      //   userId: user.id,
+      //   username: user.username,
+      //   role: user.role,
+      //   siteId: user.siteId,
+      //   siteName: user.siteName,
+      //   guardInfo: user.guard,
+      //   guardSiteName: user.guard?.siteName,
+      //   guardSiteId: user.guard?.siteId,
+      //   siteInfo: siteInfo
+      // })
+      
+      // console.log('使用默认系统标题:', t('navigation.system'))
+      return t('navigation.system')
+    }
+
+    const currentSiteName = getSiteName()
+    setSiteName(currentSiteName)
+    // console.log('工地名称已更新:', currentSiteName)
+    // console.log('=== 工地名称获取完成 ===')
+  }, [user, siteInfo, t])
+
   // 加载统计数据
   useEffect(() => {
     if (user && user.role === 'GUARD') {
+      const loadSiteInfo = async () => {
+        try {
+          // console.log('🔍 尝试通过门卫API获取工地信息...')
+          
+          // 使用门卫专用的API获取门卫详细信息
+          const guardProfile = await apiService.getGuardProfile()
+          // console.log('门卫详细信息:', guardProfile)
+          
+          if (guardProfile && guardProfile.siteId) {
+            // console.log('从门卫信息获取到siteId:', guardProfile.siteId)
+            
+            // 尝试通过门卫信息中的siteId获取工地名称
+            // 如果guardProfile中有site信息，直接使用
+            if (guardProfile.site) {
+              // console.log('✅ 从门卫信息中获取到工地信息:', guardProfile.site)
+              setSiteInfo(guardProfile.site)
+              setSiteName(guardProfile.site.name)
+              return
+            }
+            
+            // 如果没有site信息，但有siteId，尝试通过其他方式获取
+            // console.log('门卫信息中没有site详情，尝试其他方式获取工地名称')
+          }
+          
+          // 如果门卫API没有返回工地信息，尝试从用户信息中获取
+          const siteId = user.siteId || user.guard?.siteId
+          if (siteId) {
+            // console.log('使用用户信息中的siteId:', siteId)
+            // 这里可以尝试其他方式获取工地名称，比如从统计数据中获取
+            // console.log('尝试从统计数据中获取工地信息...')
+            try {
+              const stats = await apiService.getGuardStats()
+              // console.log('门卫统计数据:', stats)
+              // 如果统计数据中有工地信息，可以使用
+            } catch (statsError) {
+              // console.warn('获取统计数据失败:', statsError)
+            }
+          }
+          
+          // console.warn('❌ 无法通过API获取工地信息')
+          
+        } catch (error) {
+          // console.error('❌ 获取工地信息失败:', error)
+        }
+      }
+
       loadGuardStats()
       loadItemCategories()
+      loadSiteInfo() // 加载工地信息
       
       // 设置自动刷新，每30秒刷新一次统计数据
       const interval = setInterval(() => {
@@ -728,6 +899,14 @@ const Guard: React.FC = () => {
       // 首先查询工人基本信息
       const worker = await apiService.getWorkerByWorkerId(scannedWorkerId.trim())
       
+      // 检查工人状态，如果是INACTIVE则禁止入场
+      if (worker.status === 'INACTIVE') {
+        message.error(t('guard.workerInactiveCannotEnter'))
+        setSelectedWorker(null)
+        setScannedWorkerId('')
+        return
+      }
+      
       // 检查工人是否已经有有效的入场记录
       try {
         const entryRecord = await apiService.checkWorkerEntryRecord(worker.workerId)
@@ -791,7 +970,7 @@ const Guard: React.FC = () => {
         siteId: user?.guard?.siteId || '',
         checkInTime: new Date().toISOString(), // 自动设置入场时间为当前时间
         status: 'ON_SITE', // 自动设置状态为在场
-        idType: selectedWorker.idType || 'ID_CARD', // 直接使用工人的证件类型，默认为身份证
+        idType: (selectedWorker.idType as 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER') || 'ID_CARD', // 直接使用工人的证件类型，默认为身份证
         idNumber: selectedWorker.idCard,
         physicalCardId: physicalCardId.trim(),
         registrarId: user?.guard?.id, // 自动设置门卫ID
@@ -881,15 +1060,18 @@ const Guard: React.FC = () => {
       const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
       // console.log('Worker borrow records:', borrowRecords);
       
-      const borrowedItems = borrowRecords.map((record: any) => ({
-        recordId: record.id, // 保存记录ID用于归还操作
-        itemType: record.item?.category?.id || record.item?.categoryId,
-        itemId: record.item?.itemCode || record.itemCode,
-        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
-        remark: record.notes || ''
-      }))
+      // 过滤出未归还的物品
+      const unreturnedItems = borrowRecords
+        .filter((record: any) => record.status === 'BORROWED')
+        .map((record: any) => ({
+          recordId: record.id, // 保存记录ID用于归还操作
+          itemType: record.item?.category?.id || record.item?.categoryId,
+          itemId: record.item?.itemCode || record.itemCode,
+          borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+          remark: record.notes || ''
+        }))
       
-      setCurrentBorrowedItems(borrowedItems)
+      setCurrentBorrowedItems(unreturnedItems)
       setSelectedReturnItems([])
       
       message.success(t('guard.workerQuerySuccess'))
@@ -1068,10 +1250,11 @@ const Guard: React.FC = () => {
       })
 
       // 等待所有借用记录创建完成
-      await Promise.all(borrowPromises)
+      const borrowResults = await Promise.all(borrowPromises)
 
-      // 将借用列表中的物品转换为完整的借用记录
-      const borrowedItems = borrowItemsList.map(item => ({
+      // 将借用列表中的物品转换为完整的借用记录，包含记录ID
+      const borrowedItems = borrowItemsList.map((item, index) => ({
+        recordId: borrowResults[index]?.id || '', // 从API响应中获取记录ID
         itemType: item.itemType,
         itemId: item.itemId,
         borrowTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
@@ -1147,24 +1330,21 @@ const Guard: React.FC = () => {
       const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
       // console.log('Worker borrow records:', borrowRecords);
       
-      const borrowedItems = borrowRecords.map((record: any) => ({
-        recordId: record.id, // 保存记录ID用于归还操作
-        itemType: record.item?.category?.id || record.item?.categoryId,
-        itemId: record.item?.itemCode || record.itemCode,
-        borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
-        returnTime: record.returnDate ? dayjs(record.returnDate).format('YYYY-MM-DD HH:mm:ss') : null,
-        remark: record.notes || ''
-      }))
-      
-      // 更新工人的借用物品列表
-      const borrowedItemsConverted = borrowedItems.map(item => ({
-        ...item,
-        returnTime: item.returnTime || undefined
-      }));
+      // 过滤出未归还的物品
+      const unreturnedItems = borrowRecords
+        .filter((record: any) => record.status === 'BORROWED')
+        .map((record: any) => ({
+          recordId: record.id, // 保存记录ID用于归还操作
+          itemType: record.item?.category?.id || record.item?.categoryId,
+          itemId: record.item?.itemCode || record.itemCode,
+          borrowTime: record.borrowDate ? dayjs(record.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '',
+          returnTime: record.returnDate ? dayjs(record.returnDate).format('YYYY-MM-DD HH:mm:ss') : undefined,
+          remark: record.notes || ''
+        }))
       
       const workerWithBorrowedItems = {
         ...frontendWorker,
-        borrowedItems: borrowedItemsConverted
+        borrowedItems: unreturnedItems
       }
       
       setSelectedWorker(workerWithBorrowedItems)
@@ -1428,9 +1608,10 @@ const Guard: React.FC = () => {
     setJumpPage('')
   }
 
-  // 查看物品借用记录
-  const handleViewItemRecords = async (record: AttendanceRecord) => {
+  // 查看未归还物品记录（点击借用物品列）
+  const handleViewUnreturnedItemRecords = async (record: AttendanceRecord) => {
     setSelectedRecord(record)
+    setItemRecordsModalType('unreturned')
     setItemRecordsModalVisible(true)
     setItemRecordsLoading(true)
     setItemBorrowRecords([])
@@ -1441,21 +1622,46 @@ const Guard: React.FC = () => {
         // console.error('无法获取工人ID')
         return
       }
-      if (!record.id) {
-        // console.error('无法获取访客记录ID')
-        return
-      }
       
-      // 使用访客记录ID获取物品借用记录，确保只显示当前入场记录关联的借用记录
       const workerId = record.worker.workerId
-      const visitorRecordId = record.id
       
-      // console.log(`获取访客记录 ${visitorRecordId} (工人ID: ${workerId}) 的借用记录`)
-      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId, visitorRecordId)
-      // console.log(`获取访客记录 ${visitorRecordId} 的借用记录:`, borrowRecords)
+      // 获取该工人所有借用记录（不指定访客记录ID）
+      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId)
+      
+      // 过滤出今日相关的物品（借用日期是今日的 + 当前所有未归还的 + 归还时间是今日的）
+      const today = dayjs().format('YYYY-MM-DD');
+      
+      // 1. 借用日期是今日的物品（无论是否归还）
+      const todayBorrowedItems = borrowRecords.filter((item: any) => {
+        if (!item.borrowDate) return false;
+        const borrowDate = dayjs(item.borrowDate).format('YYYY-MM-DD');
+        return borrowDate === today;
+      });
+      
+      // 2. 当前所有未归还的物品（无论借用日期）
+      const allUnreturnedItems = borrowRecords.filter((item: any) => item.status === 'BORROWED');
+      
+      // 3. 归还时间是今日的物品（无论借用日期）
+      const todayReturnedItems = borrowRecords.filter((item: any) => {
+        if (item.status !== 'RETURNED' || !item.returnDate) return false;
+        const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD');
+        return returnDate === today;
+      });
+      
+      // 合并三种类型的物品，去重
+      const allTodayRelatedItems = new Set([
+        ...todayBorrowedItems.map((item: any) => item.id),
+        ...allUnreturnedItems.map((item: any) => item.id),
+        ...todayReturnedItems.map((item: any) => item.id)
+      ]);
+      
+      // 获取所有今日相关物品的完整记录
+      const todayRelatedRecords = borrowRecords.filter((item: any) => 
+        allTodayRelatedItems.has(item.id)
+      );
       
       // 转换为前端需要的格式
-      const formattedRecords = borrowRecords.map((item: any) => ({
+      const formattedRecords = todayRelatedRecords.map((item: any) => ({
         id: item.id,
         itemName: item.item?.category?.name || '未知物品类型',
         itemId: item.item?.itemCode || item.itemCode || '未知编号',
@@ -1467,8 +1673,56 @@ const Guard: React.FC = () => {
       
       setItemBorrowRecords(formattedRecords)
     } catch (error) {
-      // console.error(`获取工人 ${record.workerId} 的借用记录失败:`, error)
-      message.error('获取借用记录失败')
+      // console.error(`获取工人 ${record.workerId} 的未归还物品记录失败:`, error)
+      message.error('获取今日相关物品记录失败')
+    } finally {
+      setItemRecordsLoading(false)
+    }
+  }
+
+  // 查看今日归还物品记录（点击已归还列）
+  const handleViewTodayReturnedItemRecords = async (record: AttendanceRecord) => {
+    setSelectedRecord(record)
+    setItemRecordsModalType('todayReturned')
+    setItemRecordsModalVisible(true)
+    setItemRecordsLoading(true)
+    setItemBorrowRecords([])
+    
+    try {
+      // 检查必要的信息
+      if (!record.worker?.workerId) {
+        // console.error('无法获取工人ID')
+        return
+      }
+      
+      const workerId = record.worker.workerId
+      
+      // 获取该工人所有借用记录
+      const borrowRecords = await apiService.getWorkerBorrowRecords(workerId)
+      
+      // 过滤出今日归还的物品
+      const today = dayjs().format('YYYY-MM-DD')
+      const todayReturnedRecords = borrowRecords.filter((item: any) => {
+        if (item.status !== 'RETURNED' || !item.returnDate) return false
+        const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD')
+        return returnDate === today
+      })
+      
+      // 转换为前端需要的格式
+      const formattedRecords = todayReturnedRecords.map((item: any) => ({
+        id: item.id,
+        itemName: item.item?.category?.name || '未知物品类型',
+        itemId: item.item?.itemCode || item.itemCode || '未知编号',
+        borrowTime: item.borrowDate ? dayjs(item.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '-',
+        returnTime: item.returnDate ? dayjs(item.returnDate).format('YYYY-MM-DD HH:mm:ss') : null,
+        status: 'returned',
+        remark: item.notes || ''
+      }))
+      
+      setItemBorrowRecords(formattedRecords)
+    } catch (error) {
+      // console.error(`获取工人 ${record.workerId} 的今日归还物品记录失败:`, error)
+      message.error('获取今日归还物品记录失败')
     } finally {
       setItemRecordsLoading(false)
     }
@@ -1587,7 +1841,7 @@ const Guard: React.FC = () => {
   }
 
   // 借/还物品页面查询工人信息
-  const handleBorrowQuery = () => {
+  const handleBorrowQuery = async () => {
     if (!borrowQueryId.trim()) {
       message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForQuery'))
       return
@@ -1607,8 +1861,35 @@ const Guard: React.FC = () => {
       return
     }
 
-    setSelectedWorker(worker)
-    message.success(t('guard.workerQuerySuccess'))
+    try {
+      // 获取该工人的借用记录，只显示未归还的物品
+      const borrowRecords = await apiService.getWorkerBorrowRecords(worker.workerId)
+      
+      // 过滤出未归还的物品
+      const unreturnedItems = borrowRecords
+        .filter((record: any) => record.status === 'BORROWED')
+        .map((record: any) => ({
+          recordId: record.id,
+          itemType: record.item?.category?.id || record.item?.categoryId,
+          itemId: record.item?.id || record.itemId,
+          itemName: record.item?.name || record.itemName,
+          borrowTime: record.borrowDate || record.borrowTime,
+          returnTime: record.returnDate || record.returnTime,
+          remark: record.remark || ''
+        }))
+
+      // 创建只包含未归还物品的工人对象
+      const workerWithUnreturnedItems = {
+        ...worker,
+        borrowedItems: unreturnedItems
+      }
+
+      setSelectedWorker(workerWithUnreturnedItems)
+      message.success(t('guard.workerQuerySuccess'))
+    } catch (error) {
+      console.error('获取工人借用记录失败:', error)
+      message.error('获取工人借用记录失败')
+    }
   }
 
   // Header组件
@@ -1635,7 +1916,7 @@ const Guard: React.FC = () => {
           fontSize: 'clamp(16px, 4vw, 24px)',
           lineHeight: '1.2'
         }}>
-          {user?.siteName || '工地管理系统'}
+          {siteName}
         </Title>
         <Text type="secondary" style={{ 
           fontSize: 'clamp(12px, 3vw, 18px)', 
@@ -1820,7 +2101,11 @@ const Guard: React.FC = () => {
 
     return (
       <Modal
-        title={`${selectedRecord.worker?.name || ''} ${t('guard.itemBorrowRecords')}`}
+        title={`${selectedRecord.worker?.name || ''} ${
+          itemRecordsModalType === 'unreturned' 
+            ? t('guard.todayRelatedItemsRecord')
+            : t('guard.todayReturnedItemsRecord')
+        }`}
         open={itemRecordsModalVisible}
         onCancel={() => setItemRecordsModalVisible(false)}
         footer={null}
@@ -1883,7 +2168,7 @@ const Guard: React.FC = () => {
             <Title level={4} style={{ margin: 0 }}>{user?.username || t('common.guard')}</Title>
             <Text type="secondary">{user?.role?.toLowerCase() === 'guard' ? t('common.guard') : t('common.unknownRole')}</Text>
             <br />
-            <Text type="secondary">{t('guard.site')}：{user?.siteName || t('guard.unknownSite')}</Text>
+            <Text type="secondary">{t('guard.site')}：{siteName}</Text>
           </div>
         </Space>
       </div>
@@ -3121,31 +3406,39 @@ const Guard: React.FC = () => {
         width: 100,
         render: (value: number, record: AttendanceRecord) => {
           // console.log("借用物品列渲染，值为:", value, "记录:", record);
+          
+          // 统一显示蓝色样式
+          const color = '#1890ff'
+          const backgroundColor = '#e6f7ff'
+          const borderColor = '#91d5ff'
+          
           return (
-            <span 
-              style={{ 
-                color: '#1890ff', 
-                fontWeight: 'bold',
-                backgroundColor: '#e6f7ff',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                border: '1px solid #91d5ff',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-              onClick={() => handleViewItemRecords(record)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#bae7ff'
-                e.currentTarget.style.borderColor = '#69c0ff'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#e6f7ff'
-                e.currentTarget.style.borderColor = '#91d5ff'
-              }}
-            >
-              {value !== undefined ? value : '?'}
-            </span>
-          );
+            <Tooltip title={`今日相关 ${value} 件物品（今日借出+未归还+今日归还）`}>
+              <span 
+                style={{ 
+                  color, 
+                  fontWeight: 'bold',
+                  backgroundColor,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  border: `1px solid ${borderColor}`,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onClick={() => handleViewUnreturnedItemRecords(record)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#bae7ff'
+                  e.currentTarget.style.borderColor = '#69c0ff'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = backgroundColor
+                  e.currentTarget.style.borderColor = borderColor
+                }}
+              >
+                {value !== undefined ? value : '?'}
+              </span>
+            </Tooltip>
+          )
         },
       },
       {
@@ -3199,7 +3492,7 @@ const Guard: React.FC = () => {
                     cursor: 'pointer',
                     transition: 'all 0.3s ease'
                   }}
-                  onClick={() => handleViewItemRecords(record)}
+                  onClick={() => handleViewTodayReturnedItemRecords(record)}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = '#d9f7be'
                     e.currentTarget.style.borderColor = '#95de64'
@@ -3234,33 +3527,35 @@ const Guard: React.FC = () => {
           }
           
           return (
-            <span 
-              style={{ 
-                color, 
-                fontWeight: 'bold',
-                backgroundColor,
-                padding: '2px 8px',
-                borderRadius: '4px',
-                border: `1px solid ${borderColor}`,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-              onClick={() => handleViewItemRecords(record)}
-              onMouseEnter={(e) => {
-                const currentBg = e.currentTarget.style.backgroundColor
-                const currentBorder = e.currentTarget.style.borderColor
-                e.currentTarget.style.backgroundColor = currentBg === 'rgb(246, 255, 237)' ? '#d9f7be' : 
-                                                     currentBg === 'rgb(255, 251, 230)' ? '#ffe58f' : '#ffccc7'
-                e.currentTarget.style.borderColor = currentBorder === 'rgb(183, 235, 143)' ? '#95de64' :
-                                                  currentBorder === 'rgb(255, 229, 143)' ? '#ffd666' : '#ffa39e'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = backgroundColor
-                e.currentTarget.style.borderColor = borderColor
-              }}
-            >
-              {value !== undefined ? value : '?'}
-            </span>
+            <Tooltip title={`今日归还 ${value} 件物品`}>
+              <span 
+                style={{ 
+                  color, 
+                  fontWeight: 'bold',
+                  backgroundColor,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  border: `1px solid ${borderColor}`,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onClick={() => handleViewTodayReturnedItemRecords(record)}
+                onMouseEnter={(e) => {
+                  const currentBg = e.currentTarget.style.backgroundColor
+                  const currentBorder = e.currentTarget.style.borderColor
+                  e.currentTarget.style.backgroundColor = currentBg === 'rgb(246, 255, 237)' ? '#d9f7be' : 
+                                                       currentBg === 'rgb(255, 251, 230)' ? '#ffe58f' : '#ffccc7'
+                  e.currentTarget.style.borderColor = currentBorder === 'rgb(183, 235, 143)' ? '#95de64' :
+                                                    currentBorder === 'rgb(255, 229, 143)' ? '#ffd666' : '#ffa39e'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = backgroundColor
+                  e.currentTarget.style.borderColor = borderColor
+                }}
+              >
+                {value !== undefined ? value : '?'}
+              </span>
+            </Tooltip>
           )
         },
       },

@@ -1102,7 +1102,7 @@ class ApiService {
 
   async checkOutVisitor(id: string, checkOutTime?: string): Promise<VisitorRecord> {
     return this.requestWithRetry(`/visitor-records/${id}/checkout`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },

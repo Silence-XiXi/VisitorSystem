@@ -38,6 +38,46 @@ interface SiteSummary {
   currentOnSite: number
 }
 
+// 计算工人今日相关物品数量（今日借出+未归还+今日归还）
+const calculateTodayRelatedItems = (workerId: string, borrowRecords: any[]): { borrowedItems: number, returnedItems: number } => {
+  const today = dayjs().format('YYYY-MM-DD')
+  
+  // 获取该工人的所有借用记录
+  const workerBorrowRecords = borrowRecords.filter(record => record.worker.workerId === workerId)
+  
+  // 1. 借用日期是今日的物品（无论是否归还）
+  const todayBorrowedItems = workerBorrowRecords.filter(item => {
+    if (!item.borrowDate) return false
+    const borrowDate = dayjs(item.borrowDate).format('YYYY-MM-DD')
+    return borrowDate === today
+  })
+  
+  // 2. 当前所有未归还的物品（无论借用日期）
+  const allUnreturnedItems = workerBorrowRecords.filter(item => item.status === 'BORROWED')
+  
+  // 3. 归还时间是今日的物品（无论借用日期）
+  const todayReturnedItems = workerBorrowRecords.filter(item => {
+    if (item.status !== 'RETURNED' || !item.returnDate) return false
+    const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD')
+    return returnDate === today
+  })
+  
+  // 合并三种类型的物品，去重（使用Set来避免重复计算同一个物品）
+  const allTodayRelatedItems = new Set([
+    ...todayBorrowedItems.map(item => item.id),
+    ...allUnreturnedItems.map(item => item.id),
+    ...todayReturnedItems.map(item => item.id)
+  ])
+  
+  const totalTodayRelatedItems = allTodayRelatedItems.size
+  const totalTodayReturnedItems = todayReturnedItems.length
+  
+  return {
+    borrowedItems: totalTodayRelatedItems,
+    returnedItems: totalTodayReturnedItems
+  }
+}
+
 // 将访客记录和借用记录转换为AttendanceRecord格式
 const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[]): AttendanceRecord[] => {
   const recordMap = new Map<string, AttendanceRecord>()
@@ -58,6 +98,9 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
     const key = `${record.worker.workerId}-${dayjs(record.checkInTime).format('YYYY-MM-DD')}`
     const existingRecord = recordMap.get(key)
     
+    // 计算该工人今日相关物品数量
+    const todayRelatedItems = calculateTodayRelatedItems(record.worker.workerId, borrowRecords)
+    
     if (existingRecord) {
       // 如果已存在记录，更新离场信息
       if (record.checkOutTime) {
@@ -66,6 +109,9 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
       }
       existingRecord.registrarId = record.registrar?.id
       existingRecord.registrarName = record.registrar?.name || '未指定'
+      // 更新今日相关物品数量
+      existingRecord.borrowedItems = todayRelatedItems.borrowedItems
+      existingRecord.returnedItems = todayRelatedItems.returnedItems
     } else {
       // 创建新记录
       recordMap.set(key, {
@@ -82,8 +128,8 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
         checkIn: dayjs(record.checkInTime).format('HH:mm'),
         checkOut: record.checkOutTime ? dayjs(record.checkOutTime).format('HH:mm') : undefined,
         checkOutDate: record.checkOutTime ? dayjs(record.checkOutTime).format('YYYY-MM-DD') : undefined, // 保存离场日期
-        borrowedItems: 0,
-        returnedItems: 0,
+        borrowedItems: todayRelatedItems.borrowedItems, // 使用今日相关物品数量
+        returnedItems: todayRelatedItems.returnedItems, // 使用今日归还物品数量
         registrarId: record.registrar?.id,
         registrarName: record.registrar?.name || '未指定',
         visitorRecordId: record.id // 存储访客记录ID用于后续关联
@@ -91,119 +137,9 @@ const convertToAttendanceRecords = (visitorRecords: any[], borrowRecords: any[])
     }
   })
   
-  // 处理借用记录，统计每个工人的借用物品数量
-  borrowRecords.forEach(record => {
-    // 如果借物记录关联了访客记录ID，尝试找到对应的访客记录
-    let foundMatchingVisitorRecord = false
-    
-    if (record.visitorRecordId) {
-      // 如果已有访客记录ID，遍历已创建的记录找到匹配的
-      for (const [, attendanceRecord] of recordMap.entries()) {
-        if (attendanceRecord.visitorRecordId === record.visitorRecordId) {
-          attendanceRecord.borrowedItems++
-          if (record.status === 'RETURNED') {
-            attendanceRecord.returnedItems++
-          }
-          foundMatchingVisitorRecord = true
-          break
-        }
-      }
-    }
-    
-    // 如果没有找到通过ID关联的访客记录，尝试通过日期匹配
-    if (!foundMatchingVisitorRecord) {
-      const key = `${record.worker.workerId}-${dayjs(record.borrowDate).format('YYYY-MM-DD')}`
-      const existingRecord = recordMap.get(key)
-      
-      if (existingRecord) {
-        existingRecord.borrowedItems++
-        if (record.status === 'RETURNED') {
-          existingRecord.returnedItems++
-        }
-      } else {
-        // 如果没有当天的记录，尝试找该工人最近的入场记录
-        const workerRecords = workerVisitorMap.get(record.worker.workerId) || []
-        let closestVisitorRecord = null
-        let minDayDiff = Infinity
-        
-        // 寻找日期最接近的访客记录
-        for (const visitorRecord of workerRecords) {
-          const visitorDate = dayjs(visitorRecord.checkInTime)
-          const borrowDate = dayjs(record.borrowDate)
-          const dayDiff = Math.abs(borrowDate.diff(visitorDate, 'day'))
-          
-          // 找到日期差异最小的记录
-          if (dayDiff < minDayDiff) {
-            minDayDiff = dayDiff
-            closestVisitorRecord = visitorRecord
-          }
-        }
-        
-        // 如果找到了该工人的访客记录，使用该记录的日期
-        if (closestVisitorRecord) {
-          const closestKey = `${record.worker.workerId}-${dayjs(closestVisitorRecord.checkInTime).format('YYYY-MM-DD')}`
-          const closestRecord = recordMap.get(closestKey)
-          
-          if (closestRecord) {
-            // 在最接近的记录中增加借用物品数量
-            closestRecord.borrowedItems++
-            if (record.status === 'RETURNED') {
-              closestRecord.returnedItems++
-            }
-          } else {
-            // 只有在极特殊情况下才会走到这里，例如访客记录被删除但还有借物记录
-            // 创建新记录，但使用访客记录的日期
-            recordMap.set(closestKey, {
-              key: closestKey,
-              workerId: record.worker.workerId,
-              name: record.worker.name,
-              distributorName: record.worker.distributor?.name || '未知分判商',
-              siteName: record.site?.name || '未知工地',
-              contact: record.phone || record.worker.phone || record.worker.whatsapp || '',
-              idType: closestVisitorRecord.idType || '身份证',
-              idNumber: closestVisitorRecord.idNumber || record.worker.idCard || '',
-              physicalCardId: closestVisitorRecord.physicalCardId || record.worker.physicalCardId,
-              date: dayjs(closestVisitorRecord.checkInTime).format('YYYY-MM-DD'),
-              checkIn: dayjs(closestVisitorRecord.checkInTime).format('HH:mm'),
-              checkOut: closestVisitorRecord.checkOutTime ? dayjs(closestVisitorRecord.checkOutTime).format('HH:mm') : undefined as unknown as string,
-              checkOutDate: closestVisitorRecord.checkOutTime ? dayjs(closestVisitorRecord.checkOutTime).format('YYYY-MM-DD') : undefined,
-              borrowedItems: 1,
-              returnedItems: record.status === 'RETURNED' ? 1 : 0,
-              registrarId: closestVisitorRecord.registrar?.id || record.borrowHandler?.id,
-              registrarName: closestVisitorRecord.registrar?.name || record.borrowHandler?.name || '未指定',
-              visitorRecordId: closestVisitorRecord.id
-            })
-          }
-        } else {
-          // 例外情况：如果没有该工人的任何访客记录，创建一条基于借物日期的记录
-          // 这应该是异常情况，因为后端已经限制了没有入场记录的工人不能借物
-          // console.warn(`工人 ${record.worker.name}(${record.worker.workerId}) 没有访客记录但有借物记录，这可能是数据错误。`);
-          
-          // 尽量避免创建新记录，但如果真的没有访客记录，保留这个借物记录信息
-          const fallbackKey = `${record.worker.workerId}-${dayjs(record.borrowDate).format('YYYY-MM-DD')}`
-          recordMap.set(fallbackKey, {
-            key: fallbackKey,
-            workerId: record.worker.workerId,
-            name: record.worker.name,
-            distributorName: record.worker.distributor?.name || '未知分判商',
-            siteName: record.site?.name || '未知工地',
-            contact: record.phone || record.worker.phone || record.worker.whatsapp || '',
-            idType: '身份证', // 默认值
-            idNumber: record.worker.idCard || '',
-            physicalCardId: record.worker.physicalCardId,
-            date: dayjs(record.borrowDate).format('YYYY-MM-DD'),
-            checkIn: dayjs(record.borrowDate).format('HH:mm'),
-            checkOut: record.status === 'RETURNED' && record.returnDate ? dayjs(record.returnDate).format('HH:mm') : undefined as unknown as string,
-            checkOutDate: record.status === 'RETURNED' && record.returnDate ? dayjs(record.returnDate).format('YYYY-MM-DD') : undefined,
-            borrowedItems: 1,
-            returnedItems: record.status === 'RETURNED' ? 1 : 0,
-            registrarId: record.borrowHandler?.id,
-            registrarName: record.borrowHandler?.name || '未指定'
-          })
-        }
-      }
-    }
-  })
+  // 注意：借用记录处理逻辑已被新的calculateTodayRelatedItems函数替代
+  // 现在借用物品和归还物品的数量在访客记录处理时直接计算
+  // 这样可以确保显示的是今日相关物品的总数量（今日借出+未归还+今日归还）
   
   return Array.from(recordMap.values())
 }
@@ -219,6 +155,7 @@ const Reports: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>('')
   const [itemDetailModalVisible, setItemDetailModalVisible] = useState<boolean>(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
+  const [itemDetailModalType, setItemDetailModalType] = useState<'todayRelated' | 'todayReturned'>('todayRelated')
   const [tableHeight, setTableHeight] = useState(400)
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
@@ -338,49 +275,55 @@ const Reports: React.FC = () => {
     return () => window.removeEventListener('resize', calculateTableHeight)
   }, [])
 
-  // 生成物品数据
+  // 生成物品数据（根据弹窗类型）
   const generateItemData = (record: AttendanceRecord) => {
-    // 添加调试日志
-    console.log('生成物品数据 - 当前工人ID:', record.workerId);
-    console.log('生成物品数据 - 访客记录ID:', record.visitorRecordId);
-    console.log('总借用记录数:', borrowRecords.length);
+    const today = dayjs().format('YYYY-MM-DD')
     
-    // 从借用记录中筛选出该访客记录关联的物品
-    // 修改筛选逻辑：优先使用visitorRecordId进行匹配
-    // 这样可以确保只显示当前访客记录(入场记录)的借用记录
+    // 获取该工人的所有借用记录
     const workerBorrowRecords = borrowRecords.filter(borrowRecord => {
-      // 优先使用visitorRecordId匹配 - 这是最准确的关联方式
-      if (record.visitorRecordId && borrowRecord.visitorRecordId) {
-        return borrowRecord.visitorRecordId === record.visitorRecordId;
-      }
-      
-      // 如果没有visitorRecordId，退化为使用工人ID和日期匹配
-      // 检查多种可能的ID字段组合
       const workerIdMatches = 
-        // 标准情况：workerId字段
         (borrowRecord.worker?.workerId === record.workerId) ||
-        // 备选情况1：id字段可能包含workerId
         (borrowRecord.worker?.id === record.workerId) ||
-        // 备选情况2：可能记录本身有workerId
         (borrowRecord.workerId === record.workerId);
-      
-      // 如果工人ID匹配，还需要检查日期是否匹配
-      // 确保借用日期和入场日期在同一天
-      if (workerIdMatches) {
-        const borrowDate = dayjs(borrowRecord.borrowDate).format('YYYY-MM-DD');
-        return borrowDate === record.date;
-      }
-      
-      return false;
+      return workerIdMatches;
     });
     
-    // 调试日志
-    console.log('找到该访客记录的借用记录数:', workerBorrowRecords.length);
-    if (workerBorrowRecords.length > 0) {
-      console.log('样例借用记录:', workerBorrowRecords[0]);
+    let filteredRecords: any[] = []
+    
+    if (itemDetailModalType === 'todayRelated') {
+      // 今日相关物品：借用日期是今日的 + 当前所有未归还的 + 归还时间是今日的
+      const todayBorrowedItems = workerBorrowRecords.filter(item => {
+        if (!item.borrowDate) return false
+        const borrowDate = dayjs(item.borrowDate).format('YYYY-MM-DD')
+        return borrowDate === today
+      })
+      
+      const allUnreturnedItems = workerBorrowRecords.filter(item => item.status === 'BORROWED')
+      
+      const todayReturnedItems = workerBorrowRecords.filter(item => {
+        if (item.status !== 'RETURNED' || !item.returnDate) return false
+        const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD')
+        return returnDate === today
+      })
+      
+      // 合并三种类型的物品，去重
+      const allTodayRelatedItems = new Set([
+        ...todayBorrowedItems.map(item => item.id),
+        ...allUnreturnedItems.map(item => item.id),
+        ...todayReturnedItems.map(item => item.id)
+      ])
+      
+      filteredRecords = workerBorrowRecords.filter(item => allTodayRelatedItems.has(item.id))
+    } else if (itemDetailModalType === 'todayReturned') {
+      // 今日归还物品：归还时间是今日的物品
+      filteredRecords = workerBorrowRecords.filter(item => {
+        if (item.status !== 'RETURNED' || !item.returnDate) return false
+        const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD')
+        return returnDate === today
+      })
     }
     
-    return workerBorrowRecords.map((borrowRecord, index) => ({
+    return filteredRecords.map((borrowRecord, index) => ({
       id: borrowRecord.id,
       name: borrowRecord.item?.name || `物品 #${index + 1}`,
       type: borrowRecord.item?.category?.name || t('reports.uncategorized'),
@@ -395,9 +338,17 @@ const Reports: React.FC = () => {
     }))
   }
 
-  // 显示物品详情
-  const showItemDetail = (record: AttendanceRecord) => {
+  // 显示今日相关物品详情（点击借用物品列）
+  const showTodayRelatedItemDetail = (record: AttendanceRecord) => {
     setSelectedRecord(record)
+    setItemDetailModalType('todayRelated')
+    setItemDetailModalVisible(true)
+  }
+
+  // 显示今日归还物品详情（点击已归还列）
+  const showTodayReturnedItemDetail = (record: AttendanceRecord) => {
+    setSelectedRecord(record)
+    setItemDetailModalType('todayReturned')
     setItemDetailModalVisible(true)
   }
 
@@ -770,29 +721,31 @@ const Reports: React.FC = () => {
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.borrowedItems - b.borrowedItems,
       render: (_: any, record: AttendanceRecord) => {
         return (
-          <span 
-            style={{ 
-              color: '#1890ff', 
-              fontWeight: 'bold',
-              backgroundColor: '#e6f7ff',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              border: '1px solid #91d5ff',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-            onClick={() => showItemDetail(record)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#bae7ff'
-              e.currentTarget.style.borderColor = '#69c0ff'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#e6f7ff'
-              e.currentTarget.style.borderColor = '#91d5ff'
-            }}
-          >
-            {record.borrowedItems}
-          </span>
+          <Tooltip title={`今日相关 ${record.borrowedItems} 件物品（今日借出+未归还+今日归还）`}>
+            <span 
+              style={{ 
+                color: '#1890ff', 
+                fontWeight: 'bold',
+                backgroundColor: '#e6f7ff',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: '1px solid #91d5ff',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onClick={() => showTodayRelatedItemDetail(record)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#bae7ff'
+                e.currentTarget.style.borderColor = '#69c0ff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#e6f7ff'
+                e.currentTarget.style.borderColor = '#91d5ff'
+              }}
+            >
+              {record.borrowedItems}
+            </span>
+          </Tooltip>
         )
       }
     },
@@ -844,7 +797,7 @@ const Reports: React.FC = () => {
                   cursor: 'pointer',
                   transition: 'all 0.3s ease'
                 }}
-                onClick={() => showItemDetail(record)}
+                onClick={() => showTodayReturnedItemDetail(record)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#d9f7be'
                   e.currentTarget.style.borderColor = '#95de64'
@@ -879,33 +832,35 @@ const Reports: React.FC = () => {
         }
         
         return (
-          <span 
-            style={{ 
-              color, 
-              fontWeight: 'bold',
-              backgroundColor,
-              padding: '2px 8px',
-              borderRadius: '4px',
-              border: `1px solid ${borderColor}`,
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-            onClick={() => showItemDetail(record)}
-            onMouseEnter={(e) => {
-              const currentBg = e.currentTarget.style.backgroundColor
-              const currentBorder = e.currentTarget.style.borderColor
-              e.currentTarget.style.backgroundColor = currentBg === 'rgb(246, 255, 237)' ? '#d9f7be' : 
-                                                   currentBg === 'rgb(255, 251, 230)' ? '#ffe58f' : '#ffccc7'
-              e.currentTarget.style.borderColor = currentBorder === 'rgb(183, 235, 143)' ? '#95de64' :
-                                                currentBorder === 'rgb(255, 229, 143)' ? '#ffd666' : '#ffa39e'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = backgroundColor
-              e.currentTarget.style.borderColor = borderColor
-            }}
-          >
-            {record.returnedItems}
-          </span>
+          <Tooltip title={`今日归还 ${record.returnedItems} 件物品`}>
+            <span 
+              style={{ 
+                color, 
+                fontWeight: 'bold',
+                backgroundColor,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: `1px solid ${borderColor}`,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onClick={() => showTodayReturnedItemDetail(record)}
+              onMouseEnter={(e) => {
+                const currentBg = e.currentTarget.style.backgroundColor
+                const currentBorder = e.currentTarget.style.borderColor
+                e.currentTarget.style.backgroundColor = currentBg === 'rgb(246, 255, 237)' ? '#d9f7be' : 
+                                                     currentBg === 'rgb(255, 251, 230)' ? '#ffe58f' : '#ffccc7'
+                e.currentTarget.style.borderColor = currentBorder === 'rgb(183, 235, 143)' ? '#95de64' :
+                                                  currentBorder === 'rgb(255, 229, 143)' ? '#ffd666' : '#ffa39e'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = backgroundColor
+                e.currentTarget.style.borderColor = borderColor
+              }}
+            >
+              {record.returnedItems}
+            </span>
+          </Tooltip>
         )
       }
     }
@@ -1258,7 +1213,11 @@ const Reports: React.FC = () => {
 
       {/* 物品详情弹窗 */}
       <Modal
-        title={`${selectedRecord?.name} - ${t('reports.itemDetails')}`}
+        title={`${selectedRecord?.name} - ${
+          itemDetailModalType === 'todayRelated' 
+            ? t('reports.todayRelatedItemsRecord')
+            : t('reports.todayReturnedItemsRecord')
+        }`}
         open={itemDetailModalVisible}
         onCancel={() => setItemDetailModalVisible(false)}
         footer={[

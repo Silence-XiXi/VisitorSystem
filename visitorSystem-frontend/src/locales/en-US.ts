@@ -407,6 +407,7 @@ export default {
     itemIdLabel: 'ID: ',
     // Message prompts
     workerAlreadyEntered: 'Worker has already entered, please check status',
+    workerInactiveCannotEnter: 'Worker status is inactive, entry is prohibited. Please contact administrator to activate worker status.',
     itemAlreadyInList: 'Item already added to borrowing list',
     itemAddedToList: 'Item added to borrowing list',
     itemRemovedFromList: 'Item removed from borrowing list',
@@ -481,6 +482,9 @@ export default {
     darkTheme: 'Dark',
     changePassword: 'Change Password',
     updatePassword: 'Update Password',
+    // Modal titles
+    todayRelatedItemsRecord: 'Today Related Items Record (Today Borrowed + Unreturned + Today Returned)',
+    todayReturnedItemsRecord: 'Today Returned Items Record',
   },
   reports: {
     title: 'View Reports',
@@ -531,6 +535,8 @@ export default {
     partiallyReturned: 'Orange: ⚠️ Partially returned',
     notReturned: 'Red: ❌ Not returned',
     itemDetails: 'Borrowed Item Details',
+    todayRelatedItemsRecord: 'Today Related Items Record (Today Borrowed + Unreturned + Today Returned)',
+    todayReturnedItemsRecord: 'Today Returned Items Record',
     close: 'Close',
     workerName: 'Worker Name',
     distributor: 'Subcontractor',
