@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Modal, Button, message, Spin, Typography, Space, Tag } from 'antd';
-import { DownloadOutlined, CopyOutlined, QrcodeOutlined } from '@ant-design/icons';
+import { Modal, Button, message, Spin, Space } from 'antd';
+import { DownloadOutlined, CopyOutlined, QrcodeOutlined, MailOutlined, MessageOutlined } from '@ant-design/icons';
 import { Worker } from '../types/worker';
 import { useLocale } from '../contexts/LocaleContext';
+import { apiService } from '../services/api';
 import QRCode from 'qrcode';
 
-const { Title, Text } = Typography;
 
 interface QRCodeModalProps {
   worker: Worker | null;
@@ -22,23 +22,15 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [qrCodeText, setQrCodeText] = useState<string>('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const generateQRCode = useCallback(async () => {
     if (!worker) return;
     
     setLoading(true);
     try {
-      // 生成包含工人信息的二维码数据
-      const qrData = {
-        type: 'worker',
-        workerId: worker.workerId,
-        name: worker.name,
-        idCard: worker.idCard,
-        timestamp: Date.now(),
-        // 这里可以添加更多需要的信息
-      };
-      
-      const qrText = JSON.stringify(qrData);
+      // 生成只包含工人编号的二维码数据
+      const qrText = worker.workerId;
       setQrCodeText(qrText);
       
       // 生成二维码图片
@@ -102,6 +94,51 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
     }
   };
 
+  const handleSendEmail = async () => {
+    if (!worker?.email) {
+      message.warning(t('qrcode.noEmailWarning'));
+      return;
+    }
+
+    if (!qrCodeDataUrl) {
+      message.error(t('qrcode.generateFailed'));
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const result = await apiService.sendQRCodeEmail({
+        workerEmail: worker.email,
+        workerName: worker.name,
+        workerId: worker.workerId,
+        qrCodeDataUrl: qrCodeDataUrl,
+      });
+
+      if (result.success) {
+        message.success(t('qrcode.qrCodeSentToEmail', { email: worker.email }));
+      } else {
+        message.error(result.message || t('qrcode.emailSendFailed'));
+      }
+    } catch (error: unknown) {
+      console.error('发送邮件失败:', error);
+      const errorMessage = error instanceof Error ? error.message : t('qrcode.emailSendFailed');
+      message.error(`${t('qrcode.emailSendFailed')}: ${errorMessage}`);
+      message.warning('请检查系统邮件配置是否正确，或联系管理员');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!worker?.whatsapp) {
+      message.warning(t('qrcode.noWhatsappWarning'));
+      return;
+    }
+    // 这里应该调用实际的WhatsApp发送API
+    console.log('发送WhatsApp二维码到:', worker.whatsapp, '工人编号:', worker.workerId);
+    message.success(t('qrcode.qrCodeSentToWhatsapp', { whatsapp: worker.whatsapp }));
+  };
+
   if (!worker) return null;
 
   return (
@@ -123,17 +160,6 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
       centered
     >
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <div style={{ marginBottom: '20px' }}>
-          <Title level={4}>{worker.name}</Title>
-          <Space direction="vertical" size="small">
-            <Text>{t('qrcode.workerId')}：{worker.workerId}</Text>
-            <Text>{t('qrcode.idCard')}：{worker.idCard}</Text>
-            <Text>{t('qrcode.contactPhone')}：{worker.phone}</Text>
-            <Text>{t('qrcode.status')}：<Tag color={worker.status === 'active' ? 'green' : 'red'}>
-              {worker.status === 'active' ? t('qrcode.active') : worker.status === 'inactive' ? t('qrcode.inactive') : t('qrcode.suspended')}
-            </Tag></Text>
-          </Space>
-        </div>
 
         {loading ? (
           <div style={{ padding: '40px' }}>
@@ -155,36 +181,45 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
               />
             </div>
             
-            <Space size="middle">
-              <Button
-                type="primary"
-                icon={<DownloadOutlined />}
-                onClick={handleDownload}
-              >
-                {t('qrcode.downloadQR')}
-              </Button>
-              <Button
-                icon={<CopyOutlined />}
-                onClick={handleCopyText}
-              >
-                {t('qrcode.copyData')}
-              </Button>
-              <Button
-                icon={<CopyOutlined />}
-                onClick={handleCopyImage}
-              >
-                {t('qrcode.copyImage')}
-              </Button>
-            </Space>
-            
-            <div style={{ marginTop: '20px', textAlign: 'left' }}>
-              <Text type="secondary">
-                <strong>{t('qrcode.qrDescription')}：</strong><br />
-                {t('qrcode.qrDescription1')}<br />
-                {t('qrcode.qrDescription2')}<br />
-                {t('qrcode.qrDescription3')}<br />
-                {t('qrcode.qrDescription4')}
-              </Text>
+            <div style={{ textAlign: 'center' }}>
+              <Space size="middle" style={{ marginBottom: '16px' }}>
+                <Button
+                  type="primary"
+                  icon={<DownloadOutlined />}
+                  onClick={handleDownload}
+                >
+                  {t('qrcode.downloadQR')}
+                </Button>
+                <Button
+                  icon={<CopyOutlined />}
+                  onClick={handleCopyText}
+                >
+                  {t('qrcode.copyData')}
+                </Button>
+                <Button
+                  icon={<CopyOutlined />}
+                  onClick={handleCopyImage}
+                >
+                  {t('qrcode.copyImage')}
+                </Button>
+              </Space>
+              <Space size="middle">
+                <Button
+                  icon={<MailOutlined />}
+                  onClick={handleSendEmail}
+                  disabled={!worker?.email || sendingEmail}
+                  loading={sendingEmail}
+                >
+                  {sendingEmail ? t('qrcode.sendingEmail') : t('qrcode.sendEmail')}
+                </Button>
+                <Button
+                  icon={<MessageOutlined />}
+                  onClick={handleSendWhatsApp}
+                  disabled={!worker?.whatsapp}
+                >
+                  {t('qrcode.sendWhatsApp')}
+                </Button>
+              </Space>
             </div>
           </div>
         ) : (

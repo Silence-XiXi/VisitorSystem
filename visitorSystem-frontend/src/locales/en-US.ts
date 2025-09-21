@@ -39,6 +39,8 @@ export default {
     subcontractor: 'Subcontractor',
     guard: 'Guard',
     unknownRole: 'Unknown Role',
+    enable: 'Enable',
+    disable: 'Disable',
   },
   worker: {
     title: 'Worker Management',
@@ -169,6 +171,14 @@ export default {
     close: 'Close',
     qrCodeGenerationFailed: 'QR code generation failed',
     qrCodeAlt: 'Worker QR Code',
+    sendEmail: 'Send Email',
+    sendWhatsApp: 'Send WhatsApp',
+    noEmailWarning: 'This worker has no email address, cannot send email',
+    noWhatsappWarning: 'This worker has no WhatsApp number, cannot send message',
+    qrCodeSentToEmail: 'QR code sent to email: {email}',
+    qrCodeSentToWhatsapp: 'QR code sent to WhatsApp: {whatsapp}',
+    sendingEmail: 'Sending email...',
+    emailSendFailed: 'Email send failed',
   },
   form: {
     required: 'This field is required',

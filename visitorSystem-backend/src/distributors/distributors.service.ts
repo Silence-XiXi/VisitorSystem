@@ -288,9 +288,17 @@ export class DistributorsService {
       throw new NotFoundException('工人不存在或您没有权限修改此工人');
     }
 
+    // 处理可选字段，确保空字符串转换为null
+    const processedData = {
+      ...updateData,
+      email: updateData.email || null,
+      whatsapp: updateData.whatsapp || null,
+      birthDate: updateData.birthDate ? new Date(updateData.birthDate) : null
+    };
+
     return this.prisma.worker.update({
       where: { id: workerId },
-      data: updateData,
+      data: processedData,
       include: {
         site: true
       }

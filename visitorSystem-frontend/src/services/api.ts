@@ -1124,7 +1124,7 @@ class ApiService {
       if (visitorRecordId) {
         url = `/guards/borrow-records?visitorRecordId=${visitorRecordId}`;
       }
-      const result = await this.requestWithRetry(url, {
+      const result = await this.requestWithRetry<any[]>(url, {
         method: 'GET',
       });
       console.log(`工人 ${workerId} ${visitorRecordId ? `(访客记录ID: ${visitorRecordId})` : ''} 的借用记录 API 响应:`, result);
@@ -1302,6 +1302,28 @@ class ApiService {
         config_value: value,
         is_encrypted: isEncrypted 
       }),
+    });
+  }
+
+  // 邮件相关API
+  async sendQRCodeEmail(data: {
+    workerEmail: string;
+    workerName: string;
+    workerId: string;
+    qrCodeDataUrl: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return this.requestWithRetry('/email/send-qrcode', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async testEmailConfig(): Promise<{ success: boolean; message: string }> {
+    return this.requestWithRetry('/email/test-config', {
+      method: 'POST',
     });
   }
 

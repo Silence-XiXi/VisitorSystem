@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
 
 const { Option } = Select
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, QrcodeOutlined, MailOutlined, MessageOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, QrcodeOutlined } from '@ant-design/icons'
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Site } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
 import { 
@@ -14,6 +14,7 @@ import { useAuth } from '../hooks/useAuth'
 import apiService from '../services/api'
 import dayjs from 'dayjs'
 import ExcelImportExportModal from '../components/ExcelImportExportModal'
+import QRCodeModal from '../components/QRCodeModal'
 
 
 // 表格样式
@@ -287,62 +288,7 @@ const DistributorWorkerUpload: React.FC = () => {
     })
   }
 
-  // 发送二维码
-  const handleSendQRCode = (method: 'email' | 'whatsapp', worker?: Worker) => {
-    const targetWorker = worker || selectedWorkerForQR
-    if (!targetWorker) return
 
-    if (method === 'email') {
-      if (!targetWorker.email) {
-        message.warning(t('distributor.noEmailWarning'))
-        return
-      }
-      // 这里应该调用实际的邮件发送API，传入工人信息生成二维码
-      console.log('发送邮件二维码到:', targetWorker.email, '工人信息:', {
-        workerId: targetWorker.workerId,
-        name: targetWorker.name,
-        phone: targetWorker.phone
-      })
-      message.success(t('distributor.qrCodeSentToEmail', { email: targetWorker.email }))
-    } else if (method === 'whatsapp') {
-      if (!targetWorker.whatsapp) {
-        message.warning(t('distributor.noWhatsappWarning'))
-        return
-      }
-      // 这里应该调用实际的WhatsApp发送API，传入工人信息生成二维码
-      console.log('发送WhatsApp二维码到:', targetWorker.whatsapp, '工人信息:', {
-        workerId: targetWorker.workerId,
-        name: targetWorker.name,
-        phone: targetWorker.phone
-      })
-      message.success(t('distributor.qrCodeSentToWhatsapp', { whatsapp: targetWorker.whatsapp }))
-    }
-
-    setQrCodeModalOpen(false)
-    setSelectedWorkerForQR(null)
-  }
-
-  // 批量发送二维码
-  const handleBatchSendQRCode = (method: 'email' | 'whatsapp') => {
-    if (selectedWorkerIds.length === 0) {
-      message.warning(t('distributor.pleaseSelectWorkers'))
-      return
-    }
-
-    const selectedWorkers = workers.filter(w => selectedWorkerIds.includes(w.id))
-    const validWorkers = selectedWorkers.filter(w => 
-      method === 'email' ? w.email : w.whatsapp
-    )
-
-    if (validWorkers.length === 0) {
-      message.warning(method === 'email' ? t('distributor.noValidEmailWarning') : t('distributor.noValidWhatsappWarning'))
-      return
-    }
-
-    // 这里应该调用实际的批量发送API
-    message.success(t('distributor.qrCodeBatchSent', { count: validWorkers.length.toString() }))
-    setSelectedWorkerIds([])
-  }
 
 
   // 切换工人状态
@@ -921,20 +867,6 @@ const DistributorWorkerUpload: React.FC = () => {
                 {selectedWorkerIds.length === 0 ? t('distributor.exportAll') : `${t('distributor.exportSelected')}(${selectedWorkerIds.length})`}
               </Button>
               <Button 
-                icon={<MailOutlined />} 
-                onClick={() => handleBatchSendQRCode('email')}
-                disabled={selectedWorkerIds.length === 0}
-              >
-                {t('distributor.batchSendEmail')}
-              </Button>
-              <Button 
-                icon={<MessageOutlined />} 
-                onClick={() => handleBatchSendQRCode('whatsapp')}
-                disabled={selectedWorkerIds.length === 0}
-              >
-                {t('distributor.batchSendWhatsApp')}
-              </Button>
-              <Button 
                 type="primary" 
                 icon={<PlusOutlined />} 
                 onClick={() => { 
@@ -1203,61 +1135,15 @@ const DistributorWorkerUpload: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* 二维码发送模态框 */}
-      <Modal
-        title={t('distributor.sendQRCodeTitle')}
-        open={qrCodeModalOpen}
-        onCancel={() => {
-          setQrCodeModalOpen(false)
-          setSelectedWorkerForQR(null)
+      {/* 二维码模态框 */}
+      <QRCodeModal
+        worker={selectedWorkerForQR}
+        visible={qrCodeModalOpen}
+        onClose={() => {
+          setQrCodeModalOpen(false);
+          setSelectedWorkerForQR(null);
         }}
-        footer={null}
-        width={500}
-      >
-        {selectedWorkerForQR && (
-          <div>
-            <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
-              <div><strong>{t('distributor.workerName')}</strong>{selectedWorkerForQR.name}</div>
-              <div><strong>{t('distributor.workerIdLabel')}</strong>{selectedWorkerForQR.workerId}</div>
-              <div><strong>{t('distributor.phoneLabel')}</strong>{selectedWorkerForQR.phone}</div>
-              {selectedWorkerForQR.email && <div><strong>{t('distributor.emailLabel')}</strong>{selectedWorkerForQR.email}</div>}
-              {selectedWorkerForQR.whatsapp && <div><strong>{t('distributor.whatsappLabel')}</strong>{selectedWorkerForQR.whatsapp}</div>}
-            </div>
-            
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: 16 }}>
-                {t('distributor.selectSendMethod')}
-              </div>
-              <Space size="large">
-                <Button 
-                  type="primary" 
-                  icon={<MailOutlined />} 
-                  size="large"
-                  onClick={() => handleSendQRCode('email')}
-                  disabled={!selectedWorkerForQR.email}
-                >
-                  {t('distributor.sendEmail')}
-                </Button>
-                <Button 
-                  type="primary" 
-                  icon={<MessageOutlined />} 
-                  size="large"
-                  onClick={() => handleSendQRCode('whatsapp')}
-                  disabled={!selectedWorkerForQR.whatsapp}
-                >
-                  {t('distributor.sendWhatsapp')}
-                </Button>
-              </Space>
-            </div>
-            
-            {(!selectedWorkerForQR.email && !selectedWorkerForQR.whatsapp) && (
-              <div style={{ textAlign: 'center', color: '#999', fontSize: '14px' }}>
-                {t('distributor.noContactInfo')}
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+      />
 
       {/* Excel导入导出对话框 */}
       <ExcelImportExportModal

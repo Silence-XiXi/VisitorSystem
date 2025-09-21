@@ -39,6 +39,8 @@ export default {
     subcontractor: '分判商',
     guard: '门卫',
     unknownRole: '未知角色',
+    enable: '启用',
+    disable: '停用',
   },
   worker: {
     title: '工人管理',
@@ -86,9 +88,11 @@ export default {
     createSuccess: '工人资料创建成功！',
     updateSuccess: '工人资料更新成功！',
     deleteSuccess: '工人资料删除成功！',
+    statusUpdated: '工人状态已更新为：{status}',
     createFailed: '创建失败，请重试！',
     updateFailed: '更新失败，请重试！',
     deleteFailed: '删除失败，请重试！',
+    operationFailed: '操作失败，请重试！',
     uploadPhoto: '上传照片',
     photoUploadSuccess: '照片上传成功',
     photoUploadFailed: '照片上传失败',
@@ -169,6 +173,14 @@ export default {
     close: '关闭',
     qrCodeGenerationFailed: '二维码生成失败',
     qrCodeAlt: '工人二维码',
+    sendEmail: '发送邮件',
+    sendWhatsApp: '发送WhatsApp',
+    noEmailWarning: '该工人没有邮箱地址，无法发送邮件',
+    noWhatsappWarning: '该工人没有WhatsApp号码，无法发送消息',
+    qrCodeSentToEmail: '二维码已发送到邮箱：{email}',
+    qrCodeSentToWhatsapp: '二维码已发送到WhatsApp：{whatsapp}',
+    sendingEmail: '正在发送邮件...',
+    emailSendFailed: '邮件发送失败',
   },
   form: {
     required: '此项为必填项',
@@ -606,7 +618,6 @@ export default {
     importResultTitle: '分判商导入结果',
     importCompleted: '导入完成',
     importTotalProcessed: '共处理 {total} 条记录',
-    
     // 工地导入相关
     siteImportConfirm: '确认导入工地',
     siteImportRulesMessage: '导入规则: 编号唯一，已存在跳过，不存在新增，没有编号自动生成编号',

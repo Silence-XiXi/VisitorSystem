@@ -162,6 +162,35 @@ const WorkerManagement: React.FC = () => {
     }
   };
 
+  // 处理切换工人状态
+  const handleToggleStatus = async (worker: Worker) => {
+    const newStatus = worker.status === 'active' ? 'inactive' : 'active';
+    const backendStatus = newStatus === 'active' ? 'ACTIVE' : 'INACTIVE';
+    
+    try {
+      // 只发送状态字段，避免影响其他字段
+      const updateData = { status: backendStatus };
+      
+      // 调用后端API更新工人状态
+      await apiService.updateWorker(worker.id, updateData);
+      
+      // 更新本地状态
+      setWorkers(prev => prev.map(w => 
+        w.id === worker.id 
+          ? { ...w, status: newStatus, updatedAt: new Date().toISOString() }
+          : w
+      ));
+      
+      // 显示成功消息
+      message.success(t('worker.statusUpdated', { 
+        status: newStatus === 'active' ? t('worker.active') : t('worker.inactive') 
+      }));
+    } catch (error) {
+      console.error('更新工人状态失败:', error);
+      message.error(t('worker.operationFailed'));
+    }
+  };
+
   // 处理编辑工人
   const handleEditWorker = (worker: Worker) => {
     setEditingWorker(worker);
@@ -773,6 +802,7 @@ const WorkerManagement: React.FC = () => {
           onEdit={handleEditWorker}
           onDelete={handleDeleteWorker}
           onViewQR={handleViewQR}
+          onToggleStatus={handleToggleStatus}
           loading={loading}
         />
       </Card>

@@ -11,6 +11,7 @@ import { AdminModule } from './admin/admin.module';
 import { ItemCategoriesModule } from './item-categories/item-categories.module';
 import { VisitorRecordsModule } from './visitor-records/visitor-records.module';
 import { SystemConfigModule } from './system-config/system-config.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { SystemConfigModule } from './system-config/system-config.module';
     ItemCategoriesModule,
     VisitorRecordsModule,
     SystemConfigModule,
+    EmailModule,
   ],
 })
 export class AppModule {}

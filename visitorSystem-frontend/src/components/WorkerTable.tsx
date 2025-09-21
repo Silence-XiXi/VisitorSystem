@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Table, Button, Space, Modal, Tag, Tooltip, Row, Col, message, Timeline, Divider, List, Card, Statistic } from 'antd';
-import { EditOutlined, DeleteOutlined, QrcodeOutlined, EyeOutlined, MailOutlined, WhatsAppOutlined, HistoryOutlined, ClockCircleOutlined, LogoutOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Modal, Tag, Tooltip, Row, Col, message, Timeline, Divider, Card, Statistic } from 'antd';
+import { EditOutlined, DeleteOutlined, QrcodeOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined, MailOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import { Worker, Distributor, Site } from '../types/worker';
 import { VisitorRecord } from '../services/api';
 import dayjs from '../utils/dayjs';
@@ -15,6 +15,7 @@ interface WorkerTableProps {
   onEdit: (worker: Worker) => void;
   onDelete: (id: string) => void;
   onViewQR: (worker: Worker) => void;
+  onToggleStatus?: (worker: Worker) => void;
   loading?: boolean;
 }
 
@@ -25,6 +26,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   onEdit,
   onDelete,
   onViewQR,
+  onToggleStatus,
   loading = false
 }) => {
   const { t } = useLocale();
@@ -142,17 +144,6 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
-  // 获取访客状态标签
-  const getVisitorStatusTag = (status: string) => {
-    const statusConfig = {
-      ON_SITE: { color: 'green', text: t('visitorRecords.onSite') },
-      LEFT: { color: 'blue', text: t('visitorRecords.left') },
-      PENDING: { color: 'orange', text: t('visitorRecords.pending') }
-    };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || { color: 'default', text: status };
-    return <Tag color={config.color}>{config.text}</Tag>;
-  };
 
   // 查看工人详情（包含访客记录和借用物品记录）
   const handleViewDetail = async (worker: Worker) => {
@@ -206,22 +197,6 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       okType: 'danger',
       onOk: () => onDelete(worker.id)
     });
-  };
-
-  // 处理单个发送二维码
-  const handleSendQRCode = async (worker: Worker, method: 'email' | 'whatsapp') => {
-    try {
-      setSendingLoading(true);
-      // 模拟发送过程
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const methodText = method === 'email' ? t('guard.sendToEmail') : t('guard.sendToWhatsApp');
-      message.success(t('guard.sendSuccess').replace('{name}', worker.name).replace('{method}', methodText));
-    } catch (error) {
-      message.error(t('guard.sendFailed'));
-    } finally {
-      setSendingLoading(false);
-    }
   };
 
   // 处理批量发送二维码
@@ -280,7 +255,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       width: 100,
       fixed: 'left' as const,
       sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name),
-      render: (name: string, record: Worker) => name,
+      render: (name: string) => name,
     },
     {
       title: t('worker.gender'),
@@ -320,7 +295,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         const numB = parseInt(ageB);
         return numA - numB;
       },
-      render: (_, record: Worker) => calculateAge(record.birthDate),
+      render: (_: unknown, record: Worker) => calculateAge(record.birthDate),
     },
     {
       title: t('worker.idType'),
@@ -414,7 +389,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       key: 'actions',
       width: 200,
       fixed: 'right' as const,
-      render: (_: any, record: Worker) => (
+      render: (_: unknown, record: Worker) => (
         <Space size="small">
           <Tooltip title={t('common.view')}>
             <Button
@@ -432,24 +407,6 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => onViewQR(record)}
             />
           </Tooltip>
-          <Tooltip title={t('guard.sendToEmail')}>
-            <Button
-              type="text"
-              size="small"
-              icon={<MailOutlined />}
-              onClick={() => handleSendQRCode(record, 'email')}
-              loading={sendingLoading}
-            />
-          </Tooltip>
-          <Tooltip title={t('guard.sendToWhatsApp')}>
-            <Button
-              type="text"
-              size="small"
-              icon={<WhatsAppOutlined />}
-              onClick={() => handleSendQRCode(record, 'whatsapp')}
-              loading={sendingLoading}
-            />
-          </Tooltip>
           <Tooltip title={t('common.edit')}>
             <Button
               type="text"
@@ -458,6 +415,17 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => onEdit(record)}
             />
           </Tooltip>
+          {onToggleStatus && (
+            <Tooltip title={record.status?.toLowerCase() === 'active' ? t('common.disable') : t('common.enable')}>
+              <Button
+                type="text"
+                size="small"
+                icon={record.status?.toLowerCase() === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
+                onClick={() => onToggleStatus(record)}
+                style={{ color: record.status?.toLowerCase() === 'active' ? '#ff4d4f' : '#52c41a' }}
+              />
+            </Tooltip>
+          )}
           <Tooltip title={t('common.delete')}>
             <Button
               type="text"
