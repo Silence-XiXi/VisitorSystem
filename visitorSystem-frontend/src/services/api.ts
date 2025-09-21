@@ -1271,6 +1271,40 @@ class ApiService {
     });
   }
 
+  // 系统配置相关API
+  async getSystemConfigs(): Promise<any[]> {
+    return this.requestWithRetry('/system-config', {
+      method: 'GET',
+    });
+  }
+
+  async getSystemConfig(key: string, decrypt: boolean = false): Promise<any> {
+    return this.requestWithRetry(`/system-config/${key}?decrypt=${decrypt}`, {
+      method: 'GET',
+    });
+  }
+
+  // 获取解密后的配置值
+  async getDecryptedSystemConfig(key: string): Promise<string> {
+    const config = await this.getSystemConfig(key, true);
+    return config.config_value;
+  }
+
+  async updateSystemConfig(key: string, value: string, isEncrypted: boolean = false): Promise<any> {
+    return this.requestWithRetry(`/system-config/${key}`, {
+      method: 'PUT', // 改为PUT方法，CORS兼容性更好
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+      body: JSON.stringify({ 
+        config_value: value,
+        is_encrypted: isEncrypted 
+      }),
+    });
+  }
+
 }
 
 export const apiService = new ApiService();

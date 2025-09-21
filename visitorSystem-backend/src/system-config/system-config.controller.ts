@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -44,6 +45,16 @@ export class SystemConfigController {
   @Patch(':key')
   @Roles(UserRole.ADMIN)
   update(
+    @Param('key') key: string,
+    @Body() updateConfigDto: UpdateConfigDto,
+    @CurrentUser() user,
+  ) {
+    return this.systemConfigService.update(key, updateConfigDto, user.id);
+  }
+
+  @Put(':key')
+  @Roles(UserRole.ADMIN)
+  updatePut(
     @Param('key') key: string,
     @Body() updateConfigDto: UpdateConfigDto,
     @CurrentUser() user,

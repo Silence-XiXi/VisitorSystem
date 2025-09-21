@@ -96,6 +96,26 @@ export class SystemConfigService {
     return config;
   }
 
+  // 根据配置键查找（不抛出异常）
+  async findByKeySafe(key: string, decrypt = false) {
+    const config = await this.prisma.systemConfig.findUnique({
+      where: { config_key: key },
+    });
+
+    if (!config) {
+      return null;
+    }
+
+    if (config.is_encrypted && decrypt) {
+      return {
+        ...config,
+        config_value: this.decryptValue(config.config_value),
+      };
+    }
+
+    return config;
+  }
+
   // 获取配置值（便捷方法）
   async getConfigValue(key: string): Promise<string> {
     try {
@@ -106,10 +126,22 @@ export class SystemConfigService {
     }
   }
 
-  // 更新配置
+  // 更新配置（如果不存在则创建）
   async update(key: string, updateConfigDto: UpdateConfigDto, userId: string) {
     const { config_value, description, is_encrypted } = updateConfigDto;
-    const config = await this.findByKey(key);
+    
+    // 尝试查找现有配置
+    const config = await this.findByKeySafe(key);
+    
+    // 如果配置不存在，创建新配置
+    if (!config) {
+      return this.create({
+        config_key: key,
+        config_value: config_value || '',
+        description: description || `系统配置: ${key}`,
+        is_encrypted: is_encrypted || false
+      }, userId);
+    }
 
     // 处理配置值的更新和加密
     let updatedValue = config.config_value;
