@@ -1311,6 +1311,7 @@ class ApiService {
     workerName: string;
     workerId: string;
     qrCodeDataUrl: string;
+    language?: string;
   }): Promise<{ success: boolean; message: string }> {
     return this.requestWithRetry('/email/send-qrcode', {
       method: 'POST',
@@ -1319,6 +1320,62 @@ class ApiService {
       },
       body: JSON.stringify(data),
     });
+  }
+
+  // 批量发送二维码邮件
+  async batchSendQRCodeEmail(data: {
+    workers: Array<{
+      workerEmail: string;
+      workerName: string;
+      workerId: string;
+      qrCodeDataUrl: string;
+    }>;
+    language?: string;
+  }): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results?: {
+      total: number;
+      succeeded: number;
+      failed: number;
+      details: Array<{
+        workerId: string;
+        workerName: string;
+        success: boolean;
+        message?: string;
+      }>;
+    }
+  }> {
+    return this.requestWithRetry('/email/batch-send-qrcode', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  // 生成工人二维码
+  async generateWorkerQRCode(workerId: string): Promise<{ qrCodeDataUrl: string }> {
+    // 这里使用自定义的QRCode库生成二维码
+    try {
+      // 引入QRCode库
+      const QRCode = await import('qrcode');
+      // 生成二维码图片
+      const qrCodeDataUrl = await QRCode.toDataURL(workerId, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      return { qrCodeDataUrl };
+    } catch (error) {
+      console.error('Generate worker QR code failed:', error);
+      throw new Error('Generate QR code failed');
+    }
   }
 
   async testEmailConfig(): Promise<{ success: boolean; message: string }> {

@@ -483,8 +483,25 @@ const WorkerManagement: React.FC = () => {
       console.log(`准备上传Excel文件: ${file.name}`)
       const result = await apiService.importAdminWorkersFromExcel(file)
       
-      // 重新加载数据
-      await loadData()
+      // 如果有成功导入的工人，获取最新工人数据
+      if (result.success > 0) {
+        try {
+          // 获取最近导入的工人数据
+          const latestWorkers = await apiService.getAllWorkers({
+            limit: result.success,
+            orderBy: 'createdAt',
+            orderDirection: 'desc'
+          });
+          
+          // 将新工人添加到本地状态
+          if (latestWorkers && latestWorkers.length > 0) {
+            setWorkers(prev => [...latestWorkers, ...prev]);
+          }
+        } catch (fetchError) {
+          console.error('获取最新导入的工人数据失败:', fetchError);
+          // 如果获取失败，就不更新本地状态
+        }
+      }
 
       // 显示导入结果弹窗
       showWorkerImportResultModal(result.success, result.skipped, result.errorDetails || [])
@@ -517,8 +534,26 @@ const WorkerManagement: React.FC = () => {
       // 使用批量导入API
       const result = await apiService.importWorkers(workersData)
       
-      // 重新加载数据
-      await loadData()
+      // 如果有成功导入的工人，尝试获取这些工人的完整数据
+      if (result.success > 0) {
+        try {
+          // 这里我们可以获取最近导入的工人数据
+          // 使用当前筛选条件，但限制结果数量为最近导入的数量
+          const latestWorkers = await apiService.getAllWorkers({
+            limit: result.success,
+            orderBy: 'createdAt',
+            orderDirection: 'desc'
+          });
+          
+          // 将新工人添加到本地状态
+          if (latestWorkers && latestWorkers.length > 0) {
+            setWorkers(prev => [...latestWorkers, ...prev]);
+          }
+        } catch (fetchError) {
+          console.error('获取最新导入的工人数据失败:', fetchError);
+          // 如果获取最新工人失败，仍然显示导入结果，但不更新本地状态
+        }
+      }
 
       // 显示导入结果弹窗
       showWorkerImportResultModal(result.success, result.skipped, result.errorDetails || [])

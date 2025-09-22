@@ -107,11 +107,15 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
 
     setSendingEmail(true);
     try {
+      // 获取当前的语言设置
+      const currentLocale = localStorage.getItem('locale') || 'zh-CN';
+      
       const result = await apiService.sendQRCodeEmail({
         workerEmail: worker.email,
         workerName: worker.name,
         workerId: worker.workerId,
         qrCodeDataUrl: qrCodeDataUrl,
+        language: currentLocale,
       });
 
       if (result.success) {

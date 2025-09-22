@@ -1,11 +1,119 @@
 import React, { useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Tag, Tooltip, Row, Col, message, Timeline, Divider, Card, Statistic } from 'antd';
-import { EditOutlined, DeleteOutlined, QrcodeOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined, MailOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, QrcodeOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Worker, Distributor, Site } from '../types/worker';
 import { VisitorRecord } from '../services/api';
 import dayjs from '../utils/dayjs';
 import { useLocale } from '../contexts/LocaleContext';
 import apiService from '../services/api';
+
+// 失败项内容组件，支持选择和重新发送
+interface FailedItemsContentProps {
+  failedItems: Array<{
+    workerId: string;
+    workerName: string;
+    success: boolean;
+    message?: string;
+  }>;
+  onResend: (selectedItems: Array<{
+    workerId: string;
+    workerName: string;
+    success: boolean;
+    message?: string;
+  }>) => void;
+  t: (key: string, params?: Record<string, string>) => string;
+}
+
+const FailedItemsContent: React.FC<FailedItemsContentProps> = ({ failedItems, onResend, t }) => {
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+
+  // 表格行选择配置
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (selectedKeys: React.Key[]) => {
+      setSelectedRowKeys(selectedKeys);
+    }
+  };
+
+  // 处理重新发送
+  const handleResend = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning(t('worker.pleaseSelectItemsToResend'));
+      return;
+    }
+
+    const selectedItems = failedItems.filter(item => selectedRowKeys.includes(item.workerId));
+    onResend(selectedItems);
+  };
+
+  // 全选
+  const handleSelectAll = () => {
+    setSelectedRowKeys(failedItems.map(item => item.workerId));
+  };
+
+  // 取消全选
+  const handleDeselectAll = () => {
+    setSelectedRowKeys([]);
+  };
+
+  return (
+    <div>
+      <p>{t('worker.sendFailureExplanation')}</p>
+      
+      {/* 操作工具栏 */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Space>
+          <Button 
+            size="small" 
+            onClick={handleSelectAll}
+          >
+            {t('worker.selectAll')}
+          </Button>
+          <Button 
+            size="small" 
+            onClick={handleDeselectAll}
+          >
+            {t('worker.deselectAll')}
+          </Button>
+        </Space>
+
+        <Button 
+          type="primary" 
+          icon={<ReloadOutlined />} 
+          onClick={handleResend}
+          disabled={selectedRowKeys.length === 0}
+        >
+          {t('worker.resendSelected')} ({selectedRowKeys.length})
+        </Button>
+      </div>
+
+      <Table
+        rowSelection={rowSelection}
+        size="small"
+        dataSource={failedItems}
+        columns={[
+          {
+            title: t('worker.workerId'),
+            dataIndex: 'workerId',
+            key: 'workerId',
+          },
+          {
+            title: t('worker.name'),
+            dataIndex: 'workerName',
+            key: 'workerName',
+          },
+          {
+            title: t('common.error'),
+            dataIndex: 'message',
+            key: 'message',
+          }
+        ]}
+        pagination={false}
+        rowKey="workerId"
+      />
+    </div>
+  );
+};
 
 
 interface WorkerTableProps {
@@ -33,7 +141,8 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [sendingLoading, setSendingLoading] = useState(false);
+  const [sendingEmailLoading, setSendingEmailLoading] = useState(false);
+  const [sendingWhatsAppLoading, setSendingWhatsAppLoading] = useState(false);
   
   // 访客记录和借用物品记录相关状态
   const [visitorRecords, setVisitorRecords] = useState<VisitorRecord[]>([]);
@@ -202,28 +311,383 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   // 处理批量发送二维码
   const handleBatchSendQRCode = async (method: 'email' | 'whatsapp') => {
     if (selectedRowKeys.length === 0) {
-      message.warning(t('guard.pleaseSelectWorkers'));
+      message.warning(t('worker.pleaseSelectWorkersToSend'));
       return;
     }
 
     const selectedWorkers = workers.filter(worker => selectedRowKeys.includes(worker.id));
-    const methodText = method === 'email' ? t('guard.sendToEmail') : t('guard.sendToWhatsApp');
-
-    try {
-      setSendingLoading(true);
-      
-      // 模拟批量发送过程
-      for (let i = 0; i < selectedWorkers.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        message.success(t('guard.batchSendSuccess').replace('{name}', selectedWorkers[i].name).replace('{method}', methodText).replace('{current}', (i + 1).toString()).replace('{total}', selectedWorkers.length.toString()));
+    
+    // 针对电子邮件发送处理
+    if (method === 'email') {
+      // 检查是否所有选中的工人都有电子邮件地址
+      const workersWithoutEmail = selectedWorkers.filter(w => !w.email);
+      if (workersWithoutEmail.length > 0) {
+        message.warning(t('worker.noValidEmailWarning'));
+        return;
       }
       
-      message.success(t('guard.batchSendComplete').replace('{count}', selectedWorkers.length.toString()));
-      setSelectedRowKeys([]);
-    } catch (error) {
-      message.error(t('guard.batchSendFailed'));
-    } finally {
-      setSendingLoading(false);
+      // 显示加载中的消息
+      const loadingKey = 'sendingQRCodesEmail';
+      message.loading({ 
+        content: t('worker.sendingQRCodes', { count: String(selectedWorkers.length) }), 
+        key: loadingKey 
+      });
+      
+      try {
+        setSendingEmailLoading(true);
+        
+        // 生成二维码并准备批量发送数据
+        const workerDataPromises = selectedWorkers.map(async worker => {
+          try {
+            // 获取工人的二维码数据
+            const qrCodeData = await apiService.generateWorkerQRCode(worker.id);
+            if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
+              throw new Error(t('qrcode.generateFailed'));
+            }
+            
+            return {
+              workerEmail: worker.email,
+              workerName: worker.name,
+              workerId: worker.workerId,
+              qrCodeDataUrl: qrCodeData.qrCodeDataUrl
+            };
+          } catch (err) {
+            console.error(`生成工人[${worker.name}]的二维码失败:`, err);
+            return null;
+          }
+        });
+        
+        // 等待所有二维码生成完成
+        const workerDataResults = await Promise.all(workerDataPromises);
+        const validWorkerData = workerDataResults.filter(data => data !== null);
+        
+        if (validWorkerData.length === 0) {
+          message.error({ content: t('qrcode.allGenerationFailed'), key: loadingKey });
+          return;
+        }
+        
+        // 获取当前的语言设置
+        const currentLocale = localStorage.getItem('locale') || 'zh-CN';
+        
+        // 分批发送，避免请求过大
+        const BATCH_SIZE = 10; // 每批10个工人
+        let successCount = 0;
+        let failedCount = 0;
+        let allFailedItems: any[] = [];
+        
+        // 将工人数据分成多个批次
+        const batches = [];
+        for (let i = 0; i < validWorkerData.length; i += BATCH_SIZE) {
+          batches.push(validWorkerData.slice(i, i + BATCH_SIZE));
+        }
+        
+        // 显示批次信息
+        message.info({ 
+          content: t('worker.batchProcessingInfo', { 
+            batches: String(batches.length), 
+            total: String(validWorkerData.length)
+          }) || `将分${batches.length}批处理${validWorkerData.length}个工人数据`,
+          key: loadingKey 
+        });
+        
+        // 逐批处理
+        for (let i = 0; i < batches.length; i++) {
+          const batch = batches[i];
+          
+          // 更新加载消息
+          message.loading({ 
+            content: `处理第${i+1}/${batches.length}批 (${batch.length}个工人)`, 
+            key: loadingKey 
+          });
+          
+          // 批量发送二维码邮件
+          const result = await apiService.batchSendQRCodeEmail({
+            workers: batch,
+            language: currentLocale
+          });
+          
+          if (result.success) {
+            // 累加成功数量
+            successCount += (result.results?.succeeded || 0);
+            
+            // 收集失败项
+            if (result.results && result.results.failed > 0) {
+              const batchFailedItems = result.results.details.filter(item => !item.success);
+              allFailedItems = [...allFailedItems, ...batchFailedItems];
+              failedCount += result.results.failed;
+            }
+            
+            // 更新进度消息
+            message.loading({ 
+              content: `已完成${i+1}/${batches.length}批，成功${successCount}个，失败${failedCount}个`, 
+              key: loadingKey 
+            });
+          } else {
+            // 整批失败
+            message.error({ 
+              content: `第${i+1}批发送失败: ${result.message || t('worker.batchSendFailed')}`, 
+              key: loadingKey 
+            });
+            failedCount += batch.length;
+          }
+        }
+        
+        // 所有批次处理完毕，设置最终result为汇总结果
+        const result = {
+          success: true,
+          results: {
+            succeeded: successCount,
+            failed: failedCount,
+            total: validWorkerData.length,
+            details: allFailedItems
+          }
+        };
+        
+        if (result.success) {
+          message.success({ 
+            content: t('worker.batchSendComplete', { 
+              count: String(result.results?.succeeded || 0),
+              total: String(result.results?.total || validWorkerData.length)
+            }),
+            key: loadingKey
+          });
+          
+          // 显示详细结果
+          if (result.results && result.results.failed > 0) {
+            // 准备失败项数据
+            const failedItems = result.results.details.filter(item => !item.success);
+            
+            // 创建一个可选择的Modal对话框
+            const failedModal = Modal.warning({
+              title: t('worker.partialSendFailure', { 
+                failed: String(result.results.failed),
+                total: String(result.results.total)
+              }),
+              content: (
+                <FailedItemsContent 
+                  failedItems={failedItems}
+                  onResend={async (selectedItems) => {
+                    // 关闭当前对话框
+                    failedModal.destroy();
+                    
+                    // 如果没有选择任何项，直接返回
+                    if (!selectedItems || selectedItems.length === 0) {
+                      return;
+                    }
+                    
+                    // 显示正在重新发送的消息
+                    const resendKey = 'resendingEmails';
+                    message.loading({ 
+                      content: t('worker.resendingEmails', { count: String(selectedItems.length) }),
+                      key: resendKey
+                    });
+                    
+                    try {
+                      // 为所选项重新生成二维码并发送
+                      const selectedWorkers = workers.filter(worker => 
+                        selectedItems.some(item => item.workerId === worker.workerId)
+                      );
+                      
+                      // 生成二维码并准备批量发送数据
+                      const workerDataPromises = selectedWorkers.map(async worker => {
+                        try {
+                          // 获取工人的二维码数据
+                          const qrCodeData = await apiService.generateWorkerQRCode(worker.id);
+                          if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
+                            throw new Error(t('qrcode.generateFailed'));
+                          }
+                          
+                          return {
+                            workerEmail: worker.email,
+                            workerName: worker.name,
+                            workerId: worker.workerId,
+                            qrCodeDataUrl: qrCodeData.qrCodeDataUrl
+                          };
+                        } catch (err) {
+                          console.error(`生成工人[${worker.name}]的二维码失败:`, err);
+                          return null;
+                        }
+                      });
+                      
+                      // 等待所有二维码生成完成
+                      const workerDataResults = await Promise.all(workerDataPromises);
+                      const validWorkerData = workerDataResults.filter(data => data !== null);
+                      
+                      if (validWorkerData.length === 0) {
+                        message.error({ 
+                          content: t('qrcode.allGenerationFailed'), 
+                          key: resendKey 
+                        });
+                        return;
+                      }
+                      
+                      // 对于重发的项目也要分批处理，避免请求过大
+                      const RESEND_BATCH_SIZE = 10;
+                      let resendSuccessCount = 0;
+                      let resendFailedCount = 0;
+                      let resendFailedItems: any[] = [];
+                      
+                      // 将要重发的数据分批
+                      const resendBatches = [];
+                      for (let i = 0; i < validWorkerData.length; i += RESEND_BATCH_SIZE) {
+                        resendBatches.push(validWorkerData.slice(i, i + RESEND_BATCH_SIZE));
+                      }
+                      
+                      // 显示批次信息
+                      message.info({ 
+                        content: `将分${resendBatches.length}批重发${validWorkerData.length}个工人数据`,
+                        key: resendKey 
+                      });
+                      
+                      // 逐批处理重发
+                      for (let i = 0; i < resendBatches.length; i++) {
+                        const batch = resendBatches[i];
+                        
+                        // 获取当前的语言设置
+                        const currentLocale = localStorage.getItem('locale') || 'zh-CN';
+                        
+                        // 更新重发进度
+                        message.loading({ 
+                          content: `重发进度: ${i+1}/${resendBatches.length}批`, 
+                          key: resendKey 
+                        });
+                        
+                        // 批量重发
+                        const batchResult = await apiService.batchSendQRCodeEmail({
+                          workers: batch,
+                          language: currentLocale
+                        });
+                        
+                        if (batchResult.success) {
+                          resendSuccessCount += (batchResult.results?.succeeded || 0);
+                          
+                          if (batchResult.results && batchResult.results.failed > 0) {
+                            const batchFailedItems = batchResult.results.details.filter(item => !item.success);
+                            resendFailedItems = [...resendFailedItems, ...batchFailedItems];
+                            resendFailedCount += batchResult.results.failed;
+                          }
+                        } else {
+                          resendFailedCount += batch.length;
+                        }
+                      }
+                      
+                      // 所有批次处理完毕，设置最终resendResult为汇总结果
+                      const resendResult = {
+                        success: true,
+                        results: {
+                          succeeded: resendSuccessCount,
+                          failed: resendFailedCount,
+                          total: validWorkerData.length,
+                          details: resendFailedItems
+                        }
+                      };
+                      
+                      if (resendResult.success) {
+                        message.success({ 
+                          content: t('worker.resendComplete', { 
+                            count: String(resendResult.results?.succeeded || 0),
+                            total: String(resendResult.results?.total || validWorkerData.length)
+                          }),
+                          key: resendKey
+                        });
+                        
+                        // 显示详细结果
+                        if (resendResult.results && resendResult.results.failed > 0) {
+                          // 递归调用，显示新的失败项
+                          if (resendResult.results && resendResult.results.failed > 0) {
+                            const failedItems = resendResult.results.details.filter(item => !item.success);
+                            
+                            Modal.warning({
+                              title: t('worker.resendPartialFailure', { 
+                                failed: String(resendResult.results.failed),
+                                total: String(resendResult.results.total)
+                              }),
+                              content: (
+                                <div>
+                                  <p>{t('worker.resendFailureExplanation')}</p>
+                                  <Table
+                                    size="small"
+                                    dataSource={failedItems}
+                                    columns={[
+                                      {
+                                        title: t('worker.workerId'),
+                                        dataIndex: 'workerId',
+                                        key: 'workerId',
+                                      },
+                                      {
+                                        title: t('worker.name'),
+                                        dataIndex: 'workerName',
+                                        key: 'workerName',
+                                      },
+                                      {
+                                        title: t('common.error'),
+                                        dataIndex: 'message',
+                                        key: 'message',
+                                      }
+                                    ]}
+                                    pagination={false}
+                                    rowKey="workerId"
+                                  />
+                                </div>
+                              ),
+                              okText: t('common.ok'),
+                              width: 600,
+                            });
+                          }
+                        }
+                      } else {
+                        message.error({ 
+                          content: t('worker.resendFailed'),
+                          key: resendKey
+                        });
+                      }
+                    } catch (error) {
+                      console.error('重新发送二维码邮件失败:', error);
+                      message.error({ 
+                        content: typeof error === 'string' ? error : t('worker.resendFailed'),
+                        key: resendKey
+                      });
+                    }
+                  }}
+                  t={t}
+                />
+              ),
+              okText: t('common.ok'),
+              width: 700,
+            });
+          }
+          
+          // 批量发送成功后清除选择
+          setSelectedRowKeys([]);
+          } else {
+            message.error({ content: t('worker.batchSendFailed'), key: loadingKey });
+          }
+      } catch (error) {
+        console.error('批量发送二维码邮件失败:', error);
+        message.error({ 
+          content: typeof error === 'string' ? error : t('worker.batchSendFailed'), 
+          key: loadingKey 
+        });
+      }       finally {
+        setSendingEmailLoading(false);
+      }
+    } 
+    // WhatsApp发送处理（可以在未来实现）
+    else if (method === 'whatsapp') {
+      try {
+        setSendingWhatsAppLoading(true);
+        
+        const workersWithoutWhatsApp = selectedWorkers.filter(w => !w.whatsapp);
+        if (workersWithoutWhatsApp.length > 0) {
+          message.warning(t('worker.noValidWhatsappWarning'));
+          return;
+        }
+        
+        // 这里可以实现WhatsApp发送逻辑
+        message.info(t('worker.whatsAppSendingNotImplemented'));
+      } finally {
+        setSendingWhatsAppLoading(false);
+      }
     }
   };
 
@@ -462,7 +926,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               type="primary"
               icon={<MailOutlined />}
               onClick={() => handleBatchSendQRCode('email')}
-              loading={sendingLoading}
+              loading={sendingEmailLoading}
             >
               {t('worker.batchSendToEmail')} ({selectedRowKeys.length})
             </Button>
@@ -470,7 +934,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               type="primary"
               icon={<WhatsAppOutlined />}
               onClick={() => handleBatchSendQRCode('whatsapp')}
-              loading={sendingLoading}
+              loading={sendingWhatsAppLoading}
             >
               {t('worker.batchSendToWhatsApp')} ({selectedRowKeys.length})
             </Button>
