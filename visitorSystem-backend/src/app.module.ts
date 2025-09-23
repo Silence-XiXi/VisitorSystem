@@ -12,6 +12,7 @@ import { ItemCategoriesModule } from './item-categories/item-categories.module';
 import { VisitorRecordsModule } from './visitor-records/visitor-records.module';
 import { SystemConfigModule } from './system-config/system-config.module';
 import { EmailModule } from './email/email.module';
+import { WhatsAppModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { EmailModule } from './email/email.module';
     VisitorRecordsModule,
     SystemConfigModule,
     EmailModule,
+    WhatsAppModule,
   ],
 })
 export class AppModule {}

@@ -1321,6 +1321,22 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
+  
+  // 发送二维码到工人的WhatsApp
+  async sendQRCodeWhatsApp(data: {
+    workerWhatsApp: string;
+    workerName: string;
+    workerId: string;
+    qrCodeDataUrl: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return this.requestWithRetry('/whatsapp/send-qrcode', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
 
   // 批量发送二维码邮件
   async batchSendQRCodeEmail(data: {

@@ -23,6 +23,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [qrCodeText, setQrCodeText] = useState<string>('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   const generateQRCode = useCallback(async () => {
     if (!worker) return;
@@ -133,14 +134,38 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
     }
   };
 
-  const handleSendWhatsApp = () => {
+  const handleSendWhatsApp = async () => {
     if (!worker?.whatsapp) {
       message.warning(t('qrcode.noWhatsappWarning'));
       return;
     }
-    // 这里应该调用实际的WhatsApp发送API
-    console.log('发送WhatsApp二维码到:', worker.whatsapp, '工人编号:', worker.workerId);
-    message.success(t('qrcode.qrCodeSentToWhatsapp', { whatsapp: worker.whatsapp }));
+
+    if (!qrCodeDataUrl) {
+      message.error(t('qrcode.generateFailed'));
+      return;
+    }
+
+    setSendingWhatsApp(true);
+    try {
+      const result = await apiService.sendQRCodeWhatsApp({
+        workerWhatsApp: worker.whatsapp,
+        workerName: worker.name,
+        workerId: worker.workerId,
+        qrCodeDataUrl: qrCodeDataUrl,
+      });
+
+      if (result.success) {
+        message.success(t('qrcode.qrCodeSentToWhatsapp', { whatsapp: worker.whatsapp }));
+      } else {
+        message.error(result.message || t('qrcode.whatsappSendFailed'));
+      }
+    } catch (error: unknown) {
+      console.error('发送WhatsApp失败:', error);
+      const errorMessage = error instanceof Error ? error.message : t('qrcode.whatsappSendFailed');
+      message.error(`${t('qrcode.whatsappSendFailed')}: ${errorMessage}`);
+    } finally {
+      setSendingWhatsApp(false);
+    }
   };
 
   if (!worker) return null;
@@ -219,9 +244,10 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                 <Button
                   icon={<MessageOutlined />}
                   onClick={handleSendWhatsApp}
-                  disabled={!worker?.whatsapp}
+                  disabled={!worker?.whatsapp || sendingWhatsApp}
+                  loading={sendingWhatsApp}
                 >
-                  {t('qrcode.sendWhatsApp')}
+                  {sendingWhatsApp ? t('qrcode.sendingWhatsApp') : t('qrcode.sendWhatsApp')}
                 </Button>
               </Space>
             </div>

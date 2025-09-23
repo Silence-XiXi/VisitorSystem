@@ -28,6 +28,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/bull": "^11.0.3",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.1.6",
@@ -49,6 +50,7 @@
     "cache-manager-redis-store": "^3.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "form-data": "^4.0.4",
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
