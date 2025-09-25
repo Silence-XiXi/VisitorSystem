@@ -194,6 +194,7 @@ export default {
     qrCodeAlt: 'Worker QR Code',
     sendEmail: 'Send Email',
     sendWhatsApp: 'Send WhatsApp',
+    sendingWhatsApp: 'Sending WhatsApp...',
     noEmailWarning: 'This worker has no email address, cannot send email',
     noWhatsappWarning: 'This worker has no WhatsApp number, cannot send message',
     qrCodeSentToEmail: 'QR code sent to email: {email}',

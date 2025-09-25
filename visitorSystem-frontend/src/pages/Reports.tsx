@@ -911,7 +911,7 @@ const Reports: React.FC = () => {
               // title={`${t('reports.dailyEnteredCount')}（${selectedDateStr}）`}
               value={totalEntered}
               prefix={<TeamOutlined />}
-              valueStyle={{ color: '#52c41a', fontWeight: 700 }}
+              valueStyle={{ color: '#1890ff', fontWeight: 700 }}
             />
           </Card>
         </Col>
@@ -922,7 +922,7 @@ const Reports: React.FC = () => {
               // title={`${t('reports.leftCount')}（${selectedDateStr}）`}
               value={leftCount}
               prefix={<TeamOutlined />}
-              valueStyle={{ color: '#1890ff', fontWeight: 700 }}
+              valueStyle={{ color: '#52c41a', fontWeight: 700 }}
             />
           </Card>
         </Col>

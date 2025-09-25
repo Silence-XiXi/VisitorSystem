@@ -14,6 +14,31 @@ import axios from 'axios';
 // 导入用于解密的crypto模块
 import * as crypto from 'crypto';
 
+// 工人二维码数据类型
+interface WorkerQRCodeData {
+  workerWhatsApp: string;
+  workerName: string;
+  workerId: string;
+  qrCodeDataUrl: string;
+}
+
+// 批量发送结果类型
+interface BatchSendResult {
+  success: boolean;
+  message: string;
+  results?: {
+    total: number;
+    succeeded: number;
+    failed: number;
+    details: Array<{
+      workerId: string;
+      workerName: string;
+      success: boolean;
+      message?: string;
+    }>;
+  };
+}
+
 @Injectable()
 export class WhatsAppService implements OnModuleInit {
   private readonly logger = new Logger(WhatsAppService.name);
@@ -220,14 +245,44 @@ export class WhatsAppService implements OnModuleInit {
    * @param mediaId YCloud媒体ID
    * @returns 发送结果
    */
-  private async sendWhatsAppMessage(toPhoneNumber: string, workerName: string, mediaId: string): Promise<any> {
+  private async sendWhatsAppMessage(toPhoneNumber: string, workerName: string, mediaId: string, language?: string): Promise<any> {
     try {
       const url = 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly';
+      
+      // 获取当前系统语言
+      let languageCode = 'zh_HK';
+      let templateSuffix = '_tw';
+      
+      // 根据请求中传递的语言参数设置语言代码和模板后缀
+      if (language) {
+        if (language === 'zh-CN') {
+          languageCode = 'zh_CN';
+          templateSuffix = '_cn';
+        } else if (language === 'en-US') {
+          languageCode = 'en';
+          templateSuffix = '_en';
+        } else if (language === 'zh-TW') {
+          languageCode = 'zh_HK';
+          templateSuffix = '_tw';
+        }
+        this.logger.log(`使用请求中指定的语言: ${language}`);
+      } else {
+        // 如果没有指定语言，使用默认语言（繁体中文）
+        this.logger.log('未指定语言，使用默认语言（繁体中文）');
+      }
+      
+      // 从系统配置获取WhatsApp模板名称基础部分
+      const templateBase = await this.systemConfigService.getConfigValue('WHATSAPP_TEMPLATE_NAME') || 'worker_qrcode_tw';
+      // 由于默认模板名称已经包含后缀，如果使用默认值则不需要再添加后缀
+      const templateName = templateBase === 'worker_qrcode_tw' ? templateBase : templateBase + templateSuffix;
+      
+      this.logger.log(`使用WhatsApp模板: ${templateName}, 语言: ${languageCode}`);
+      
       const payload = {
         type: 'template',
         template: {
-          language: { code: 'zh_HK' },
-          name: 'worker_qrcode_tw',
+          language: { code: languageCode },
+          name: templateName,
           components: [
             { type: 'header', parameters: [{ image: { id: mediaId }, type: 'image' }] },
             { type: 'body', parameters: [{ type: 'text', text: workerName }] }
@@ -264,7 +319,7 @@ export class WhatsAppService implements OnModuleInit {
    * @param qrCodeDataUrl QRCode的DataURL
    * @returns 发送结果
    */
-  async sendQRCode(workerWhatsApp: string, workerName: string, qrCodeDataUrl: string): Promise<{ success: boolean; message: string }> {
+  async sendQRCode(workerWhatsApp: string, workerName: string, qrCodeDataUrl: string, language?: string): Promise<{ success: boolean; message: string }> {
     try {
       // 确保配置已加载
       if (!this.configLoaded) {
@@ -304,7 +359,7 @@ export class WhatsAppService implements OnModuleInit {
         this.logger.log(`媒体文件已上传到YCloud, media ID: ${mediaId}`);
         
         // 3. 发送WhatsApp消息
-        const result = await this.sendWhatsAppMessage(workerWhatsApp, workerName, mediaId);
+        const result = await this.sendWhatsAppMessage(workerWhatsApp, workerName, mediaId, language);
         this.logger.log(`WhatsApp消息已发送: ${JSON.stringify(result)}`);
         
         return { 
@@ -332,5 +387,83 @@ export class WhatsAppService implements OnModuleInit {
         message: `发送失败: API状态码 ${errorStatus}, ${errorDetails}` 
       };
     }
+  }
+  
+  /**
+   * 批量发送QRCode到多个工人WhatsApp
+   * @param workers 工人WhatsApp及二维码数据数组
+   * @param language 语言选项
+   * @returns 批量发送结果
+   */
+  async batchSendQRCode(
+    workers: WorkerQRCodeData[],
+    language?: string
+  ): Promise<BatchSendResult> {
+    const results = {
+      total: workers.length,
+      succeeded: 0,
+      failed: 0,
+      details: [] as Array<{
+        workerId: string;
+        workerName: string;
+        success: boolean;
+        message?: string;
+      }>
+    };
+
+    // 检查是否有工人数据
+    if (!workers || workers.length === 0) {
+      return {
+        success: false,
+        message: '没有提供有效的工人数据'
+      };
+    }
+
+    // 遍历每个工人并发送二维码
+    for (const worker of workers) {
+      try {
+        // 发送单个二维码
+        const result = await this.sendQRCode(
+          worker.workerWhatsApp,
+          worker.workerName,
+          worker.qrCodeDataUrl,
+          language
+        );
+
+        // 添加到结果列表
+        results.details.push({
+          workerId: worker.workerId,
+          workerName: worker.workerName,
+          success: result.success,
+          message: result.success ? undefined : result.message
+        });
+
+        // 累加成功或失败数量
+        if (result.success) {
+          results.succeeded++;
+        } else {
+          results.failed++;
+        }
+      } catch (error) {
+        this.logger.error(`向工人 ${worker.workerName}(${worker.workerId}) 发送WhatsApp失败:`, error);
+        
+        // 添加错误到结果列表
+        results.details.push({
+          workerId: worker.workerId,
+          workerName: worker.workerName,
+          success: false,
+          message: error instanceof Error ? error.message : '未知错误'
+        });
+        
+        results.failed++;
+      }
+    }
+
+    // 返回汇总结果
+    return {
+      success: true,
+      message: `已处理 ${results.total} 个工人，成功 ${results.succeeded} 个，失败 ${results.failed} 个`,
+      results
+    };
   }
 }

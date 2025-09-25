@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class SendQRCodeDto {
   @IsNotEmpty()
@@ -16,4 +16,8 @@ export class SendQRCodeDto {
   @IsNotEmpty()
   @IsString()
   qrCodeDataUrl: string;
+  
+  @IsOptional()
+  @IsString()
+  language?: string;
 }

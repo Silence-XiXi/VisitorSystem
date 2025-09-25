@@ -196,6 +196,7 @@ export default {
     qrCodeAlt: '工人二维码',
     sendEmail: '发送邮件',
     sendWhatsApp: '发送WhatsApp',
+    sendingWhatsApp: '正在发送WhatsApp...',
     noEmailWarning: '该工人没有邮箱地址，无法发送邮件',
     noWhatsappWarning: '该工人没有WhatsApp号码，无法发送消息',
     qrCodeSentToEmail: '二维码已发送到邮箱：{email}',

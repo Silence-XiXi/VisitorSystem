@@ -882,6 +882,7 @@ export default {
     qrCodeAlt: '工人二維碼',
     sendEmail: '發送郵件',
     sendWhatsApp: '發送WhatsApp',
+    sendingWhatsApp: '正在發送WhatsApp...',
     noEmailWarning: '該工人沒有郵箱地址，無法發送郵件',
     noWhatsappWarning: '該工人沒有WhatsApp號碼，無法發送消息',
     qrCodeSentToEmail: '二維碼已發送到郵箱：{email}',

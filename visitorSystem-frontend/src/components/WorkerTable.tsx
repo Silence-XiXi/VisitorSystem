@@ -340,7 +340,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         const workerDataPromises = selectedWorkers.map(async worker => {
           try {
             // 获取工人的二维码数据
-            const qrCodeData = await apiService.generateWorkerQRCode(worker.id);
+            const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId);
             if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
               throw new Error(t('qrcode.generateFailed'));
             }
@@ -492,7 +492,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                       const workerDataPromises = selectedWorkers.map(async worker => {
                         try {
                           // 获取工人的二维码数据
-                          const qrCodeData = await apiService.generateWorkerQRCode(worker.id);
+                          const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId);
                           if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
                             throw new Error(t('qrcode.generateFailed'));
                           }
@@ -672,19 +672,182 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         setSendingEmailLoading(false);
       }
     } 
-    // WhatsApp发送处理（可以在未来实现）
+    // WhatsApp发送处理
     else if (method === 'whatsapp') {
+      // 检查是否所有选中的工人都有WhatsApp号码
+      const workersWithoutWhatsApp = selectedWorkers.filter(w => !w.whatsapp);
+      if (workersWithoutWhatsApp.length > 0) {
+        message.warning(t('worker.noValidWhatsappWarning'));
+        return;
+      }
+      
+      // 显示加载中的消息
+      const loadingKey = 'sendingQRCodesWhatsApp';
+      message.loading({ 
+        content: t('worker.sendingQRCodesToWhatsApp', { count: String(selectedWorkers.length) }) || `正在发送二维码到${selectedWorkers.length}个工人的WhatsApp`, 
+        key: loadingKey 
+      });
+      
       try {
         setSendingWhatsAppLoading(true);
         
-        const workersWithoutWhatsApp = selectedWorkers.filter(w => !w.whatsapp);
-        if (workersWithoutWhatsApp.length > 0) {
-          message.warning(t('worker.noValidWhatsappWarning'));
+        // 生成二维码并准备批量发送数据
+        const workerDataPromises = selectedWorkers.map(async worker => {
+          try {
+            // 获取工人的二维码数据
+            const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId);
+            if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
+              throw new Error(t('qrcode.generateFailed'));
+            }
+            
+            return {
+              workerWhatsApp: worker.whatsapp,
+              workerName: worker.name,
+              workerId: worker.workerId,
+              qrCodeDataUrl: qrCodeData.qrCodeDataUrl
+            };
+          } catch (err) {
+            console.error(`生成工人[${worker.name}]的二维码失败:`, err);
+            return null;
+          }
+        });
+        
+        // 等待所有二维码生成完成
+        const workerDataResults = await Promise.all(workerDataPromises);
+        const validWorkerData = workerDataResults.filter(data => data !== null);
+        
+        if (validWorkerData.length === 0) {
+          message.error({ content: t('qrcode.allGenerationFailed'), key: loadingKey });
           return;
         }
         
-        // 这里可以实现WhatsApp发送逻辑
-        message.info(t('worker.whatsAppSendingNotImplemented'));
+        // 获取当前的语言设置
+        const currentLocale = localStorage.getItem('locale') || 'zh-CN';
+        
+        // 分批发送，避免请求过大
+        const BATCH_SIZE = 10; // 每斑10个工人
+        let successCount = 0;
+        let failedCount = 0;
+        let allFailedItems: any[] = [];
+        
+        // 将工人数据分成多个批次
+        const batches = [];
+        for (let i = 0; i < validWorkerData.length; i += BATCH_SIZE) {
+          batches.push(validWorkerData.slice(i, i + BATCH_SIZE));
+        }
+        
+        // 显示批次信息
+        message.info({ 
+          content: t('worker.batchProcessingInfo', { 
+            batches: String(batches.length), 
+            total: String(validWorkerData.length)
+          }) || `将分${batches.length}批处理${validWorkerData.length}个工人数据`,
+          key: loadingKey 
+        });
+        
+        // 逐批处理
+        for (let i = 0; i < batches.length; i++) {
+          const batch = batches[i];
+          
+          // 更新加载消息
+          message.loading({ 
+            content: `处理第${i+1}/${batches.length}批 (${batch.length}个工人)`, 
+            key: loadingKey 
+          });
+          
+          // 批量发送二维码到WhatsApp
+          const result = await apiService.batchSendQRCodeWhatsApp({
+            workers: batch,
+            language: currentLocale
+          });
+          
+          if (result.success) {
+            // 累加成功数量
+            successCount += (result.results?.succeeded || 0);
+            
+            // 收集失败项
+            if (result.results && result.results.failed > 0) {
+              const batchFailedItems = result.results.details.filter(item => !item.success);
+              allFailedItems = [...allFailedItems, ...batchFailedItems];
+              failedCount += result.results.failed;
+            }
+            
+            // 更新进度消息
+            message.loading({ 
+              content: `已完成${i+1}/${batches.length}批，成功${successCount}个，失败${failedCount}个`, 
+              key: loadingKey 
+            });
+          } else {
+            // 整批失败
+            message.error({ 
+              content: `第${i+1}批发送失败: ${result.message || t('worker.batchSendFailed')}`, 
+              key: loadingKey 
+            });
+            failedCount += batch.length;
+          }
+        }
+        
+        // 所有批次处理完毕，设置最终result为汇总结果
+        const result = {
+          success: true,
+          results: {
+            succeeded: successCount,
+            failed: failedCount,
+            total: validWorkerData.length,
+            details: allFailedItems
+          }
+        };
+        
+        if (result.success) {
+          message.success({ 
+            content: t('worker.batchSendComplete', { 
+              count: String(result.results?.succeeded || 0),
+              total: String(result.results?.total || validWorkerData.length)
+            }),
+            key: loadingKey
+          });
+          
+          // 显示详细结果
+          if (result.results && result.results.failed > 0) {
+            // 准备失败项数据
+            const failedItems = result.results.details.filter(item => !item.success);
+            
+            // 创建一个可选择的Modal对话框
+            const failedModal = Modal.warning({
+              title: t('worker.partialSendFailure', { 
+                failed: String(result.results.failed),
+                total: String(result.results.total)
+              }),
+              content: (
+                <FailedItemsContent 
+                  failedItems={failedItems}
+                  onResend={async (selectedItems) => {
+                    // 类似邮件重发的逻辑，可以根据需求实现WhatsApp的重发逻辑
+                    // 这里简化处理，只显示一个信息
+                    failedModal.destroy();
+                    if (selectedItems && selectedItems.length > 0) {
+                      message.info(t('worker.whatsAppResendNotImplemented') || '重新发送WhatsApp功能暂未实现');
+                    }
+                  }}
+                  t={t}
+                />
+              ),
+              okText: t('common.ok'),
+              width: 700,
+            });
+          }
+          
+          // 批量发送成功后清除选择
+          setSelectedRowKeys([]);
+        } else {
+          message.error({ content: t('worker.batchSendFailed'), key: loadingKey });
+        }
+      } catch (error) {
+        console.error('批量发送二维码到WhatsApp失败:', error);
+        message.error({ 
+          content: typeof error === 'string' ? error : t('worker.batchSendFailed'), 
+          key: loadingKey 
+        });
       } finally {
         setSendingWhatsAppLoading(false);
       }
@@ -794,7 +957,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.distributor'),
       dataIndex: 'distributorId',
       key: 'distributorId',
-      width: 120,
+      width: 122,
       sorter: (a: Worker, b: Worker) => getDistributorName(a.distributorId).localeCompare(getDistributorName(b.distributorId)),
       render: (distributorId: string) => getDistributorName(distributorId),
     },

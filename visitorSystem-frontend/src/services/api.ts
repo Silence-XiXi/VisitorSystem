@@ -1328,6 +1328,7 @@ class ApiService {
     workerName: string;
     workerId: string;
     qrCodeDataUrl: string;
+    language?: string;
   }): Promise<{ success: boolean; message: string }> {
     return this.requestWithRetry('/whatsapp/send-qrcode', {
       method: 'POST',
@@ -1371,7 +1372,7 @@ class ApiService {
     });
   }
 
-  // 生成工人二维码
+  // 生成工人二维码方法，使用工人主键id生成
   async generateWorkerQRCode(workerId: string): Promise<{ qrCodeDataUrl: string }> {
     // 这里使用自定义的QRCode库生成二维码
     try {
@@ -1392,6 +1393,61 @@ class ApiService {
       console.error('Generate worker QR code failed:', error);
       throw new Error('Generate QR code failed');
     }
+  }
+
+  // 使用工人工号生成二维码
+  async generateQRCodeByWorkerId(workerNumber: string): Promise<{ qrCodeDataUrl: string }> {
+    try {
+      // 引入QRCode库
+      const QRCode = await import('qrcode');
+      // 生成二维码图片
+      const qrCodeDataUrl = await QRCode.toDataURL(workerNumber, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      return { qrCodeDataUrl };
+    } catch (error) {
+      console.error('Generate worker QR code by worker number failed:', error);
+      throw new Error('Generate QR code failed');
+    }
+  }
+
+  // 批量发送二维码到WhatsApp
+  async batchSendQRCodeWhatsApp(data: {
+    workers: Array<{
+      workerWhatsApp: string;
+      workerName: string;
+      workerId: string;
+      qrCodeDataUrl: string;
+    }>;
+    language?: string;
+  }): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results?: {
+      total: number;
+      succeeded: number;
+      failed: number;
+      details: Array<{
+        workerId: string;
+        workerName: string;
+        success: boolean;
+        message?: string;
+      }>;
+    }
+  }> {
+    return this.requestWithRetry('/whatsapp/batch-send-qrcode', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
   }
 
   async testEmailConfig(): Promise<{ success: boolean; message: string }> {
