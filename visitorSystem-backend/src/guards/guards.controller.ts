@@ -55,6 +55,18 @@ export class GuardsController {
     return this.guardsService.getWorkerByIdentifier(user, identifier);
   }
 
+  @Get('workers/phone/:phone')
+  @Roles(UserRole.GUARD)
+  @ApiOperation({ summary: '根据工人手机号查询工人信息' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  @ApiResponse({ status: 404, description: '工人不存在' })
+  async getWorkerByPhone(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('phone') phone: string
+  ) {
+    return this.guardsService.getWorkerByPhone(user, phone);
+  }
+
   @Get('workers/:workerId/entry-record')
   @Roles(UserRole.GUARD)
   @ApiOperation({ summary: '检查工人是否有有效的入场记录' })

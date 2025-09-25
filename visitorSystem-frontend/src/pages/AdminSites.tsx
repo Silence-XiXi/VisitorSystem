@@ -2597,9 +2597,9 @@ const AdminSites: React.FC = () => {
               icon={<DownloadOutlined />} 
               onClick={loadData}
               loading={loading}
-              title="刷新数据"
+              title={t('common.refresh')}
             >
-              刷新
+              {t('common.refresh')}
             </Button>
             {activeTab === 'sites' ? (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingSite(null); siteForm.resetFields(); setSiteModalOpen(true) }}>

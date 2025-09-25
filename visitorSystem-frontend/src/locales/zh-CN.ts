@@ -386,6 +386,7 @@ export default {
     pleaseEnterItemNumber: '请输入物品编号',
     pleaseEnterQrCodeOrPhysicalCardForBorrow: '请输入二维码编号或实体卡编号',
     pleaseEnterQrCodeOrPhysicalCardForExit: '请输入二维码编号或实体卡编号',
+    pleaseEnterWorkerIdOrPhoneForExit: '请输入工号或手机号进行离场登记',
     pleaseEnterQrCodeOrPhysicalCardForQuery: '请输入二维码编号或实体卡编号',
     // 表单验证消息
     pleaseEnterCurrentPassword: '请输入当前密码',
@@ -397,8 +398,17 @@ export default {
     pleaseQueryWorkerFirst: '请先查询工人资料',
     pleaseSelectItemType: '请选择物品类型',
     passwordMismatch: '两次输入的密码不一致',
+    pleaseEnterWorkerIdOrPhoneForBorrow: '请输入工人编号或手机号码进行查询',
+    workerOnSite: '在场中',
+    workerOffSite: '已离场',
+    workerOffSiteNoBorrow: '工人已离场，无法借用新物品。仅可归还已借物品。',
+    noItemsOffSiteWorker: '该工人已离场，且没有借用任何物品',
     // 步骤标签
     step1QrCodeInput: '1. 输入二维码编号/实体卡编号: ',
+    step1QrCodeOrPhoneInput: '1. 输入二维码编号/手机号: ',
+    step1QrCodeOrPhoneInput2: '1. 输入二维码编号/实体卡编号/手机号: ',
+    qrCodeOrPhonePlaceholder: '请输入工号或手机号',
+    qrCodeOrPhonePlaceholder2: '请输入工号、手机号或实体卡编号',
     step2WorkerInfo: '2. 工人资料确认: ',
     step3PhysicalCard: '3. 实体卡编号: ',
     step3ItemType: '3. 物品类型: ',
@@ -407,6 +417,7 @@ export default {
     borrowTime: '借用时间',
     returnTime: '归还时间',
     borrowTimeLabel: '借用时间: ',
+    notesLabel: '备注: ',
     // 选择操作
     selectAll: '全选',
     selectNone: '取消全选',

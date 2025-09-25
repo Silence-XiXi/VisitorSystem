@@ -891,17 +891,40 @@ const Guard: React.FC = () => {
 
   const handleScanWorkerId = async () => {
     if (!scannedWorkerId.trim()) {
-      message.error(t('guard.pleaseEnterWorkerId'))
+      message.error(t('guard.pleaseEnterWorkerIdOrPhone') || '请输入工号或手机号')
       return
     }
-
+    
+    setLoading(true) // 设置加载状态
     try {
-      // 首先查询工人基本信息
-      const worker = await apiService.getWorkerByWorkerId(scannedWorkerId.trim())
+      // 检查输入的是工号还是手机号
+      const input = scannedWorkerId.trim()
+      
+      // 手机号正则表达式集合
+      const cnMainlandPhoneRegex = /^1[3-9]\d{9}$/  // 中国大陆手机号：1开头，11位
+      const hkPhoneRegex = /^[5689]\d{7}$/  // 香港手机号：5/6/8/9开头，8位
+      const generalPhoneRegex = /^\d{8,11}$/  // 一般手机号：8-11位纯数字
+      
+      // 工号正则表达式
+      const workerIdWithWKRegex = /^WK/i  // 以WK开头的工号
+      const workerIdWithLetterRegex = /[a-z]/i  // 包含字母的工号
+      
+      // 判断是否是工号
+      const isWorkerId = workerIdWithWKRegex.test(input) || workerIdWithLetterRegex.test(input)
+      
+      // 判断输入类型，用于日志记录或未来可能的逻辑分支
+      const isPhoneType = cnMainlandPhoneRegex.test(input) || hkPhoneRegex.test(input) || 
+                          (!isWorkerId && generalPhoneRegex.test(input))
+      
+      // 根据输入内容查询
+      let worker
+      // 使用通用的标识符查询方法
+      // 该方法支持多种标识符（工号、手机号、实体卡编号等）
+      worker = await apiService.getWorkerByIdentifier(input)
       
       // 检查工人状态，如果是INACTIVE则禁止入场
       if (worker.status === 'INACTIVE') {
-        message.error(t('guard.workerInactiveCannotEnter'))
+        message.error(t('guard.workerInactiveCannotEnter') || '该工人已禁用，无法入场')
         setSelectedWorker(null)
         setScannedWorkerId('')
         return
@@ -914,7 +937,7 @@ const Guard: React.FC = () => {
         message.warning(t('guard.workerAlreadyOnSite', { 
           workerName: worker.name,
           entryTime: dayjs(entryRecord.entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss')
-        }))
+        }) || `工人 ${worker.name} 已经在场，入场时间：${dayjs(entryRecord.entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss')}`)
         setSelectedWorker(null)
         setScannedWorkerId('')
         return
@@ -938,13 +961,15 @@ const Guard: React.FC = () => {
       }
       setSelectedWorker(frontendWorker)
       setPhoneNumber(worker.phone)
-      message.success(t('guard.workerQuerySuccess'))
+      message.success(t('guard.workerQuerySuccess') || '工人信息查询成功')
     } catch (error: any) {
       // console.error('查询工人信息失败:', error)
       // 显示后端返回的具体错误信息
-      const errorMessage = error?.message || t('guard.workerNotFound')
+      const errorMessage = error?.message || t('guard.workerNotFound') || '未找到工人信息'
       message.error(errorMessage)
       setSelectedWorker(null)
+    } finally {
+      setLoading(false) // 重置加载状态
     }
   }
 
@@ -1033,28 +1058,77 @@ const Guard: React.FC = () => {
 
   const handleScanForBorrow = async () => {
     if (!scannedWorkerId.trim()) {
-      message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForBorrow'))
+      message.error(t('guard.pleaseEnterWorkerIdOrPhone') || '请输入工号或手机号')
       return
     }
 
     try {
-      // 查询工人入场记录（后端API支持通过工号或实体卡编号查询）
-      const result = await apiService.checkWorkerEntryRecord(scannedWorkerId.trim())
+      // 检查输入的是工号还是手机号
+      const input = scannedWorkerId.trim()
+      
+      // 手机号正则表达式集合
+      const cnMainlandPhoneRegex = /^1[3-9]\d{9}$/  // 中国大陆手机号：1开头，11位
+      const hkPhoneRegex = /^[5689]\d{7}$/  // 香港手机号：5/6/8/9开头，8位
+      const generalPhoneRegex = /^\d{8,11}$/  // 一般手机号：8-11位纯数字
+      
+      // 工号正则表达式
+      const workerIdWithWKRegex = /^WK/i  // 以WK开头的工号
+      const workerIdWithLetterRegex = /[a-z]/i  // 包含字母的工号
+      
+      // 判断是否是工号
+      const isWorkerId = workerIdWithWKRegex.test(input) || workerIdWithLetterRegex.test(input)
+      
+      // 判断输入类型，用于日志记录或未来可能的逻辑分支
+      const isPhoneType = cnMainlandPhoneRegex.test(input) || hkPhoneRegex.test(input) || 
+                          (!isWorkerId && generalPhoneRegex.test(input))
+      
+      // 设置环境变量用于调试
+      // console.log('Input type:', isPhoneType ? 'Phone' : 'Worker ID/Card ID')
+      
+      // 获取工人信息
+      let worker
+      
+      try {
+        if (isPhoneType) {
+          // 如果是手机号格式，直接查询工人信息
+          worker = await apiService.getWorkerByIdentifier(input)
+        } else {
+          // 如果是工号或实体卡ID，也直接查询工人信息
+          worker = await apiService.getWorkerByIdentifier(input)
+        }
+      } catch (error) {
+        // 如果工人信息查询失败，显示错误并返回
+        message.error(t('guard.workerNotFound') || '未找到工人信息')
+        setSelectedWorker(null)
+        return
+      }
+      
+      // 检查工人是否有入场记录，但不会阻止程序继续
+      let entryRecord = null
+      let isOnSite = false
+      
+      try {
+        const entryResult = await apiService.checkWorkerEntryRecord(worker.workerId)
+        entryRecord = entryResult.entryRecord
+        isOnSite = true
+      } catch (error) {
+        // 如果工人没有入场记录，仍然允许查询其借用物品
+        isOnSite = false
+      }
       
       // 转换API返回的Worker类型为前端使用的Worker类型
       const frontendWorker: Worker = {
-        ...result.worker,
-        idCard: result.worker.idNumber, // 将idNumber映射到idCard
-        status: 'in' as const, // 有入场记录说明工人在场
+        ...worker,
+        idCard: worker.idNumber, // 将idNumber映射到idCard
+        status: isOnSite ? 'in' : 'out' as const, // 根据是否有入场记录决定工人状态
         borrowedItems: [],
-        entryTime: result.entryRecord?.checkInTime ? dayjs(result.entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss') : undefined
+        entryTime: entryRecord?.checkInTime ? dayjs(entryRecord.checkInTime).format('YYYY-MM-DD HH:mm:ss') : undefined
       }
       
       setSelectedWorker(frontendWorker)
       
-      // 使用工人ID（而不是扫描的ID）获取借用物品列表
-      // 这样无论是通过工号还是实体卡ID查询，都能正确获取借用物品
-      const workerId = result.worker.workerId;
+      // 使用工人ID获取借用物品列表
+      const workerId = worker.workerId;
       // console.log('使用工人ID查询借用物品:', workerId);
       
       const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
@@ -1302,15 +1376,36 @@ const Guard: React.FC = () => {
 
   const handleScanForExit = async () => {
     if (!scannedWorkerId.trim()) {
-      message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForExit'))
+      message.error(t('guard.pleaseEnterWorkerIdOrPhoneForExit') || '请输入工号或手机号')
       return
     }
 
     try {
       setLoading(true)
       
-      // 查询工人入场记录（后端API支持通过工号或实体卡编号查询）
-      const result = await apiService.checkWorkerEntryRecord(scannedWorkerId.trim())
+      const input = scannedWorkerId.trim();
+      // 检测输入是否为手机号
+      // 判断是否为手机号：中国手机号11位数字，或者是8-11位纯数字（香港等地区）
+      // 判断是否为工号：包含字母或者以WK开头
+      const isLikelyPhoneNumber = /^\d{8,11}$/.test(input) || /^1[3-9]\d{9}$/.test(input);
+      const isLikelyWorkerId = /[a-zA-Z]/.test(input) || /^WK/i.test(input);
+      
+      let result;
+      
+      if (isLikelyPhoneNumber && !isLikelyWorkerId) {
+        // 如果像手机号，先尝试用手机号查询
+        try {
+          const worker = await apiService.getWorkerByPhone(input);
+          // 获取到工人信息后，再查询入场记录
+          result = await apiService.checkWorkerEntryRecord(worker.workerId);
+        } catch (phoneError) {
+          // 如果手机号查询失败，尝试使用常规查询
+          result = await apiService.checkWorkerEntryRecord(input);
+        }
+      } else {
+        // 直接使用常规查询（工号或实体卡编号）
+        result = await apiService.checkWorkerEntryRecord(input);
+      }
       
       // 转换API返回的Worker类型为前端使用的Worker类型
       const frontendWorker: Worker = {
@@ -1350,6 +1445,15 @@ const Guard: React.FC = () => {
       setSelectedWorker(workerWithBorrowedItems)
       setSelectedReturnItems([])
       
+      // 将已有的备注信息填入到 unreturnedItemRemarks 中
+      const newUnreturnedItemRemarks = { ...unreturnedItemRemarks }
+      unreturnedItems.forEach(item => {
+        if (item.itemId && item.remark) {
+          newUnreturnedItemRemarks[item.itemId] = item.remark
+        }
+      })
+      setUnreturnedItemRemarks(newUnreturnedItemRemarks)
+      
       message.success(t('guard.workerQuerySuccess'))
     } catch (error: any) {
       // console.error('查询工人入场记录失败:', error)
@@ -1388,15 +1492,9 @@ const Guard: React.FC = () => {
       const visitorRecordId = entryRecordResult.entryRecord.id
       
       // 2. 对于未归还的物品，记录未归还原因
-      if (unreturnedItems.length > 0) {
-        // 这里可以添加API调用，记录未归还物品的原因
-        // 例如：apiService.updateUnreturnedItemRemarks(visitorRecordId, unreturnedItemRemarks)
-        // console.log('未归还物品备注:', unreturnedItemRemarks)
-      }
-      
-      // 3. 调用离场登记API
+      // 3. 调用离场登记API，并传递未归还物品的备注信息
       const checkOutTime = new Date().toISOString()
-      await apiService.checkOutVisitor(visitorRecordId, checkOutTime)
+      await apiService.checkOutVisitor(visitorRecordId, checkOutTime, unreturnedItems.length > 0 ? unreturnedItemRemarks : undefined)
       
       // 4. 更新本地状态
       const updatedWorkers = workers.map(w => 
@@ -2505,17 +2603,19 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeInput')}</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeOrPhoneInput') || '输入工号或手机号'}</Text>
               <Input
-                placeholder={t('guard.qrCodePlaceholder')}
+                placeholder={t('guard.qrCodeOrPhonePlaceholder') || '请输入工号(如WK123/A001)或手机号'}
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
+                disabled={loading}
                 suffix={
                   <Button 
                     type="primary" 
                     size="small"
                     onClick={handleScanWorkerId}
+                    loading={loading}
                     style={{ marginRight: '-8px' }}
                   >
                     {t('guard.query')}
@@ -2679,9 +2779,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeInput')}</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeOrPhoneInput2') || '输入工号或手机号'}</Text>
               <Input
-                placeholder={t('guard.qrCodePlaceholder')}
+                placeholder={t('guard.qrCodeOrPhonePlaceholder2') || '请输入工号(如WK123/A001)或手机号'}
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
@@ -2690,6 +2790,7 @@ const Guard: React.FC = () => {
                     type="primary" 
                     size="small"
                     onClick={handleScanForBorrow}
+                    loading={loading}
                     style={{ marginRight: '-8px' }}
                   >
                     {t('guard.query')}
@@ -2697,6 +2798,7 @@ const Guard: React.FC = () => {
                 }
                 style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(16px, 2.5vw, 22px)' }}
                 onPressEnter={handleScanForBorrow}
+                disabled={loading}
               />
             </div>
 
@@ -2735,14 +2837,16 @@ const Guard: React.FC = () => {
                       </div>
                       <div>
                         <Text type="secondary" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>入场状态：</Text>
-                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px', color: '#52c41a' }}>已入场</Text>
+                        <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginLeft: '8px', color: selectedWorker.status === 'in' ? '#52c41a' : '#f5222d' }}>
+                          {selectedWorker.status === 'in' ? t('guard.workerOnSite') || '在场中' : t('guard.workerOffSite') || '已离场'}
+                        </Text>
                       </div>
                     </Space>
                   </Card>
                 </div>
 
                 {/* 当前借用物品列表 */}
-                {currentBorrowedItems.length > 0 && (
+                {currentBorrowedItems.length > 0 ? (
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.currentBorrowedItems')}</Text>
@@ -2809,7 +2913,7 @@ const Guard: React.FC = () => {
                               {item.remark && (
                                 <div>
                                   <Text type="secondary" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>
-                                    {t('guard.remark')}{item.remark}
+                                    {t('guard.notesLabel')}{item.remark}
                                   </Text>
                                 </div>
                               )}
@@ -2834,60 +2938,80 @@ const Guard: React.FC = () => {
                       </Button>
                     )}
                   </div>
+                ) : selectedWorker && selectedWorker.status !== 'in' && (
+                  <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#fff1f0', borderRadius: '4px', textAlign: 'center' }}>
+                    <Text style={{ fontSize: 'clamp(16px, 2.5vw, 20px)' }}>
+                      {t('guard.noItemsOffSiteWorker') || '该工人已离场，且没有借用任何物品'}
+                    </Text>
+                  </div>
                 )}
 
-                <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step3ItemType')}</Text>
-                  <Select
-                    placeholder={t('guard.itemTypePlaceholder')}
-                    value={selectedItemType}
-                    onChange={setSelectedItemType}
-                    style={{ 
-                      marginTop: '8px', 
-                      width: '100%', 
-                      height: '48px',
-                      fontSize: 'clamp(18px, 3vw, 24px)'
-                    }}
-                    size="large"
-                    loading={itemCategories.length === 0}
-                  >
-                    {itemCategories.map(category => (
-                      <Option key={category.id} value={category.id}>
-                        {category.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
+                {/* 仅当工人在场时显示借用物品的功能 */}
+                {selectedWorker.status === 'in' && (
+                  <>
+                    <div>
+                      <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step3ItemType')}</Text>
+                      <Select
+                        placeholder={t('guard.itemTypePlaceholder')}
+                        value={selectedItemType}
+                        onChange={setSelectedItemType}
+                        style={{ 
+                          marginTop: '8px', 
+                          width: '100%', 
+                          height: '48px',
+                          fontSize: 'clamp(18px, 3vw, 24px)'
+                        }}
+                        size="large"
+                        loading={itemCategories.length === 0}
+                      >
+                        {itemCategories.map(category => (
+                          <Option key={category.id} value={category.id}>
+                            {category.name}
+                          </Option>
+                        ))}
+                      </Select>
+                    </div>
 
-                <div>
-                  <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step4ItemNumber')}</Text>
-                  <Input
-                    placeholder={t('guard.itemNumberPlaceholder')}
-                    value={itemNumber}
-                    onChange={(e) => setItemNumber(e.target.value)}
-                    style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(18px, 3vw, 24px)' }}
-                  />
-                </div>
+                    <div>
+                      <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step4ItemNumber')}</Text>
+                      <Input
+                        placeholder={t('guard.itemNumberPlaceholder')}
+                        value={itemNumber}
+                        onChange={(e) => setItemNumber(e.target.value)}
+                        style={{ marginTop: '8px', height: '48px', fontSize: 'clamp(18px, 3vw, 24px)' }}
+                      />
+                    </div>
 
-                <Button 
-                  type="primary" 
-                  size="large"
-                  onClick={handleAddItemToList}
-                  style={{ 
-                    width: '100%', 
-                    height: '48px', 
-                    fontSize: 'clamp(16px, 2.5vw, 22px)', 
-                    marginTop: '16px',
-                    backgroundColor: '#73d13d',
-                    borderColor: '#73d13d',
-                    color: '#fff'
-                  }}
-                >
-                  {t('guard.addItemToList')}
-                </Button>
+                    <Button 
+                      type="primary" 
+                      size="large"
+                      onClick={handleAddItemToList}
+                      style={{ 
+                        width: '100%', 
+                        height: '48px', 
+                        fontSize: 'clamp(16px, 2.5vw, 22px)', 
+                        marginTop: '16px',
+                        backgroundColor: '#73d13d',
+                        borderColor: '#73d13d',
+                        color: '#fff'
+                      }}
+                    >
+                      {t('guard.addItemToList')}
+                    </Button>
+                  </>
+                )}
+                
+                {/* 显示工人离场提示 */}
+                {selectedWorker.status !== 'in' && (
+                  <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fff1f0', borderRadius: '4px', border: '1px solid #ffccc7' }}>
+                    <Text type="danger" strong style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>
+                      {t('guard.workerOffSiteNoBorrow') || '工人已离场，无法借用新物品。仅可归还已借物品。'}
+                    </Text>
+                  </div>
+                )}
 
-                {/* 借用物品列表 */}
-                {borrowItemsList.length > 0 && (
+                {/* 借用物品列表 - 只有在工人在场时才显示 */}
+                {borrowItemsList.length > 0 && selectedWorker.status === 'in' && (
                   <div style={{ marginTop: '16px' }}>
                     <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.borrowItemsList')}</Text>
                     <Card size="small" style={{ marginTop: '8px' }}>
@@ -2981,11 +3105,12 @@ const Guard: React.FC = () => {
                   </div>
                 )}
 
-                <Button 
-                  type="primary" 
-                  size="large"
-                  onClick={handleCompleteBorrow}
-                  disabled={borrowItemsList.length === 0}
+                {selectedWorker.status === 'in' && (
+                  <Button 
+                    type="primary" 
+                    size="large"
+                    onClick={handleCompleteBorrow}
+                    disabled={borrowItemsList.length === 0}
                   style={{ 
                     width: '100%', 
                     height: '56px', 
@@ -2994,7 +3119,8 @@ const Guard: React.FC = () => {
                   }}
                 >
                   {t('guard.completeBorrowWithItems').replace('{count}', borrowItemsList.length.toString())}
-                </Button>
+                  </Button>
+                )}
               </>
             )}
           </Space>
@@ -3065,9 +3191,9 @@ const Guard: React.FC = () => {
         <Card style={{ padding: '0 24px' }}>
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div>
-              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeInput')}</Text>
+              <Text strong style={{ fontSize: 'clamp(18px, 3vw, 24px)' }}>{t('guard.step1QrCodeOrPhoneInput2') || '输入工号或手机号'}</Text>
               <Input
-                placeholder={t('guard.qrCodePlaceholder')}
+                placeholder={t('guard.qrCodeOrPhonePlaceholder2') || '请输入工号(如WK123/A001)或手机号'}
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}

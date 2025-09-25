@@ -300,9 +300,12 @@ export class VisitorRecordsService {
     })
   }
 
-  async checkOut(id: string, checkOutTime?: string) {
+  async checkOut(id: string, checkOutTime?: string, unreturnedItemRemarks?: Record<string, string>) {
     const existingRecord = await this.prisma.visitorRecord.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        worker: true
+      }
     })
 
     if (!existingRecord) {
@@ -312,7 +315,36 @@ export class VisitorRecordsService {
     if (existingRecord.status === VisitorStatus.LEFT) {
       throw new BadRequestException('该访客已经离场')
     }
-
+    
+    // 如果有未归还物品的备注信息，更新借用记录
+    if (unreturnedItemRemarks && Object.keys(unreturnedItemRemarks).length > 0) {
+      // 获取工人的所有未归还物品
+      const borrowedItems = await this.prisma.itemBorrowRecord.findMany({
+        where: {
+          workerId: existingRecord.workerId,
+          status: 'BORROWED' // 只获取未归还的物品
+        },
+        include: {
+          item: true // 包含物品信息以获取 itemCode
+        }
+      })
+      
+      // 更新未归还物品的备注信息
+      for (const borrowRecord of borrowedItems) {
+        if (borrowRecord.item) {
+          const itemCode = borrowRecord.item.itemCode
+          if (unreturnedItemRemarks[itemCode]) {
+            await this.prisma.itemBorrowRecord.update({
+              where: { id: borrowRecord.id },
+              data: {
+                notes: unreturnedItemRemarks[itemCode]
+              }
+            })
+          }
+        }
+      }
+    }
+    
     return this.prisma.visitorRecord.update({
       where: { id },
       data: {

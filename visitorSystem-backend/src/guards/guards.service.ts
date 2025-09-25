@@ -146,8 +146,106 @@ export class GuardsService {
       }
     }
 
+    // 如果仍然没有找到，尝试通过手机号查找
+    if (!worker) {
+      // 先从 worker 表中查询手机号
+      worker = await this.prisma.worker.findFirst({
+        where: { 
+          phone: identifier,
+          siteId: guard.siteId  // 确保工人属于门卫所在的工地
+        },
+        include: {
+          distributor: true,
+          site: true
+        }
+      });
+      
+      // 如果在 worker 表中没有找到，尝试从 visitor_records 表中查询手机号
+      if (!worker) {
+        const visitorRecord = await this.prisma.visitorRecord.findFirst({
+          where: {
+            phone: identifier,
+            siteId: guard.siteId
+          },
+          include: {
+            worker: {
+              include: {
+                distributor: true,
+                site: true
+              }
+            }
+          },
+          orderBy: {
+            checkInTime: 'desc'
+          }
+        });
+
+        if (visitorRecord && visitorRecord.worker) {
+          worker = visitorRecord.worker;
+        }
+      }
+    }
+
     if (!worker) {
       throw new NotFoundException('工人不存在或不属于当前工地');
+    }
+
+    return worker;
+  }
+  
+  // 根据工人手机号查询工人信息
+  async getWorkerByPhone(user: CurrentUser, phone: string) {
+    if (user.role !== 'GUARD') {
+      throw new ForbiddenException('只有门卫可以访问此接口');
+    }
+
+    const guard = await this.prisma.guard.findUnique({
+      where: { userId: user.id }
+    });
+
+    if (!guard) {
+      throw new NotFoundException('门卫信息不存在');
+    }
+
+    // 先从 worker 表中查询
+    let worker = await this.prisma.worker.findFirst({
+      where: { 
+        phone: phone,
+        siteId: guard.siteId  // 确保工人属于门卫所在的工地
+      },
+      include: {
+        distributor: true,
+        site: true
+      }
+    });
+
+    // 如果在 worker 表中没有找到，尝试从 visitor_records 表中查询
+    if (!worker) {
+      const visitorRecord = await this.prisma.visitorRecord.findFirst({
+        where: {
+          phone: phone,
+          siteId: guard.siteId
+        },
+        include: {
+          worker: {
+            include: {
+              distributor: true,
+              site: true
+            }
+          }
+        },
+        orderBy: {
+          checkInTime: 'desc'
+        }
+      });
+
+      if (visitorRecord && visitorRecord.worker) {
+        worker = visitorRecord.worker;
+      }
+    }
+
+    if (!worker) {
+      throw new NotFoundException('未找到该手机号对应的工人或工人不属于当前工地');
     }
 
     return worker;
@@ -167,13 +265,50 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
+    // 先尝试判断是否为手机号
+    const isPhoneNumber = /^\d{8,11}$/.test(identifier) || /^1[3-9]\d{9}$/.test(identifier);
+    
+    // 如果是手机号，先尝试查找工人
+    let workerId = identifier;
+    if (isPhoneNumber) {
+      // 先从 worker 表中查询
+      const worker = await this.prisma.worker.findFirst({
+        where: { 
+          phone: identifier,
+          siteId: guard.siteId
+        }
+      });
+      
+      if (worker) {
+        workerId = worker.workerId;
+      } else {
+        // 如果在 worker 表中没有找到，尝试从 visitor_records 表中查询
+        const visitorRecord = await this.prisma.visitorRecord.findFirst({
+          where: {
+            phone: identifier,
+            siteId: guard.siteId
+          },
+          include: {
+            worker: true
+          },
+          orderBy: {
+            checkInTime: 'desc'
+          }
+        });
+        
+        if (visitorRecord && visitorRecord.worker) {
+          workerId = visitorRecord.worker.workerId;
+        }
+      }
+    }
+    
     // 查找有效的入场记录（状态为ON_SITE）
     let entryRecord = await this.prisma.visitorRecord.findFirst({
       where: {
         OR: [
           {
             worker: {
-              workerId: identifier,
+              workerId: workerId,
               siteId: guard.siteId
             }
           },

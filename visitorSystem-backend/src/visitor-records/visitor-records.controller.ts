@@ -63,14 +63,22 @@ export class VisitorRecordsController {
 
   @Patch(':id/checkout')
   @Roles(UserRole.ADMIN, UserRole.GUARD)
-  checkOut(@Param('id') id: string, @Body('checkOutTime') checkOutTime?: string) {
-    return this.visitorRecordsService.checkOut(id, checkOutTime)
+  checkOut(
+    @Param('id') id: string, 
+    @Body('checkOutTime') checkOutTime?: string,
+    @Body('unreturnedItemRemarks') unreturnedItemRemarks?: Record<string, string>
+  ) {
+    return this.visitorRecordsService.checkOut(id, checkOutTime, unreturnedItemRemarks)
   }
 
   @Put(':id/checkout')
   @Roles(UserRole.ADMIN, UserRole.GUARD)
-  checkOutPut(@Param('id') id: string, @Body('checkOutTime') checkOutTime?: string) {
-    return this.visitorRecordsService.checkOut(id, checkOutTime)
+  checkOutPut(
+    @Param('id') id: string, 
+    @Body('checkOutTime') checkOutTime?: string,
+    @Body('unreturnedItemRemarks') unreturnedItemRemarks?: Record<string, string>
+  ) {
+    return this.visitorRecordsService.checkOut(id, checkOutTime, unreturnedItemRemarks)
   }
 
   @Delete(':id')

@@ -1100,13 +1100,13 @@ class ApiService {
     });
   }
 
-  async checkOutVisitor(id: string, checkOutTime?: string): Promise<VisitorRecord> {
+  async checkOutVisitor(id: string, checkOutTime?: string, unreturnedItemRemarks?: Record<string, string>): Promise<VisitorRecord> {
     return this.requestWithRetry(`/visitor-records/${id}/checkout`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ checkOutTime }),
+      body: JSON.stringify({ checkOutTime, unreturnedItemRemarks }),
     });
   }
 
@@ -1223,6 +1223,13 @@ class ApiService {
   // 根据工人编号或实体卡编号查询工人信息
   async getWorkerByIdentifier(identifier: string): Promise<Worker> {
     return this.requestWithRetry(`/guards/workers/identifier/${identifier}`, {
+      method: 'GET',
+    });
+  }
+
+  // 根据工人手机号查询工人信息
+  async getWorkerByPhone(phone: string): Promise<Worker> {
+    return this.requestWithRetry(`/guards/workers/phone/${phone}`, {
       method: 'GET',
     });
   }
