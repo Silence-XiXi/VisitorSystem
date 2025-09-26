@@ -9,6 +9,7 @@ import DistributorLayout from './components/DistributorLayout'
 import Guard from './pages/Guard'
 import LoadingSpinner from './components/LoadingSpinner'
 import { useAuth } from './hooks/useAuth'
+import WorkerSelfRegistration from './pages/WorkerSelfRegistration'
 
 function App() {
   const { isAuthenticated, user, isLoading } = useAuth()
@@ -58,6 +59,8 @@ function App() {
               path="/guard" 
               element={isAuthenticated && user?.role?.toLowerCase() === 'guard' ? <Guard /> : <Navigate to="/login" replace />} 
             />
+            {/* 工人自助注册路由 - 无需登录即可访问 */}
+            <Route path="/worker-registration" element={<WorkerSelfRegistration />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>

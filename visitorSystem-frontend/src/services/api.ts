@@ -763,6 +763,13 @@ class ApiService {
       body: JSON.stringify({ workers }),
     });
   }
+  
+  // 获取工人自助注册所需的分判商和工地信息
+  async getWorkerRegistrationInfo(distributorId: string, siteId: string): Promise<any> {
+    return this.request(`/public/worker-registration/info?distributorId=${distributorId}&siteId=${siteId}`, {
+      method: 'GET'
+    });
+  }
 
   // 导入工人数据（分销商）
   async importDistributorWorkers(workers: any[]): Promise<any> {

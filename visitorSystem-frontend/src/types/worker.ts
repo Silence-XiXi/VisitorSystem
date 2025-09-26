@@ -47,6 +47,18 @@ export interface UpdateWorkerRequest extends Partial<CreateWorkerRequest> {
   id: string;
 }
 
+export interface WorkerFormData {
+  name: string;
+  gender: string;
+  idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
+  idNumber: string;
+  region: string;
+  phone: string;
+  email?: string;
+  whatsapp?: string;
+  birthDate?: any; // dayjs对象
+}
+
 export interface Distributor {
   id: string;
   distributorId: string; // 分判商编号

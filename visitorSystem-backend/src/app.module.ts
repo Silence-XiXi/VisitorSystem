@@ -13,6 +13,7 @@ import { VisitorRecordsModule } from './visitor-records/visitor-records.module';
 import { SystemConfigModule } from './system-config/system-config.module';
 import { EmailModule } from './email/email.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
+import { WorkerRegistrationModule } from './worker-registration/worker-registration.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module';
     SystemConfigModule,
     EmailModule,
     WhatsAppModule,
+    WorkerRegistrationModule,
   ],
 })
 export class AppModule {}

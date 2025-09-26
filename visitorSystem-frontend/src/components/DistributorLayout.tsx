@@ -107,14 +107,14 @@ const DistributorLayout: React.FC = () => {
       icon: <GlobalOutlined />,
       children: [
         {
-          key: 'zh-CN',
-          label: t('languages.zhCN'),
-          onClick: () => handleLanguageChange('zh-CN')
-        },
-        {
           key: 'zh-TW',
           label: t('languages.zhTW'),
           onClick: () => handleLanguageChange('zh-TW')
+        },
+        {
+          key: 'zh-CN',
+          label: t('languages.zhCN'),
+          onClick: () => handleLanguageChange('zh-CN')
         },
         {
           key: 'en-US',

@@ -13,8 +13,8 @@ const LocaleSwitcher: React.FC = () => {
   };
 
   const localeOptions = [
-    { value: 'zh-CN', label: '简体中文', flag: '🇨🇳' },
     { value: 'zh-TW', label: '繁體中文', flag: '🇭🇰' },
+    { value: 'zh-CN', label: '简体中文', flag: '🇨🇳' },
     { value: 'en-US', label: 'English', flag: '🇺🇸' },
   ];
 

@@ -43,6 +43,7 @@ export default {
     disable: '停用',
   },
   worker: {
+    phoneNumberExists: '手机号已存在，请检查您的输入',
     title: '工人管理',
     workerId: '工人编号',
     name: '姓名',
@@ -66,6 +67,12 @@ export default {
     active: '启用',
     inactive: '停用',
     suspended: '暂停',
+    // 工人自助注册相关
+    selfRegistration: '工人信息自助登记',
+    registrationSuccessTitle: '信息提交成功！',
+    registrationSuccessDesc: '您的信息已成功提交，请妥善保管您的二维码。',
+    idNumberExists: '证件号码已存在，请检查您的输入',
+    registrationIncomplete: '注册信息不完整，无法提交',
     addWorker: '新增工人',
     editWorker: '编辑工人资料',
     deleteWorker: '删除工人',
@@ -205,6 +212,7 @@ export default {
     emailSendFailed: '邮件发送失败',
   },
   form: {
+    optional: '可选',
     required: '此项为必填项',
     invalidFormat: '格式不正确',
     invalidEmail: '邮箱格式不正确',
@@ -1142,6 +1150,7 @@ export default {
     pageInfo: '第 {start}-{end} 条，共 {total} 条记录',
     editWorkerInfo: '编辑工人资料',
     addWorkerInfo: '新增工人资料',
+    site: '工地',
     workerId: '工号',
     workerIdPlaceholder: '例如: WK001',
     name: '姓名',
@@ -1162,7 +1171,7 @@ export default {
     chinaMacau: '中国澳门',
     chinaTaiwan: '中国台湾',
     whatsapp: 'WhatsApp',
-    whatsappPlaceholder: '例如: +86 13800138001',
+    whatsappPlaceholder: '需加区号, 例如: +85260661023',
     status: '状态',
     sendQRCode: '发送二维码',
     pause: '暂停',
@@ -1216,6 +1225,7 @@ export default {
     // 二维码弹窗相关
     whatsappLabel: 'WhatsApp: ',
     sendWhatsapp: '发送WhatsApp',
+    generateRegistrationLink: '复制表单填写链接',
   },
   visitorRecords: {
     title: '访客记录',

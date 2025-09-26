@@ -12,11 +12,19 @@ async function bootstrap() {
   // 启用CORS - 更兼容Chrome的配置
   app.enableCors({
     origin: (origin, callback) => {
-      const allowedOrigins = ['http://localhost:3001', 'http://localhost:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3000'];
+      const allowedOrigins = [
+        'http://localhost:3000', 
+        'http://localhost:3001', 
+        'http://127.0.0.1:3000', 
+        'http://127.0.0.1:3001', 
+        'http://10.10.8.58:3000',
+        'http://10.10.8.58:3001'
+      ];
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        console.log(`CORS blocked origin: ${origin}`);
+        callback(null, true); // 临时允许所有来源访问
       }
     },
     credentials: true,

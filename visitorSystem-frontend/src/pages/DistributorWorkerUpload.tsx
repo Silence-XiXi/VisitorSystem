@@ -124,6 +124,45 @@ import dayjs from 'dayjs'
 import ExcelImportExportModal from '../components/ExcelImportExportModal'
 import QRCodeModal from '../components/QRCodeModal'
 
+// 兼容性复制到剪贴板函数
+const fallbackCopyToClipboard = (text: string) => {
+  // 创建一个临时textarea元素
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  
+  // 设置样式使其不可见
+  textArea.style.position = 'fixed';
+  textArea.style.top = '0';
+  textArea.style.left = '0';
+  textArea.style.width = '2em';
+  textArea.style.height = '2em';
+  textArea.style.padding = '0';
+  textArea.style.border = 'none';
+  textArea.style.outline = 'none';
+  textArea.style.boxShadow = 'none';
+  textArea.style.background = 'transparent';
+  
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  
+  try {
+    // 尝试使用document.execCommand('copy')复制
+    const successful = document.execCommand('copy');
+    if (successful) {
+      message.success('分享链接已复制到剪贴板');
+    } else {
+      throw new Error('复制命令执行失败');
+    }
+  } catch (err) {
+    console.error('Fallback复制失败:', err);
+    message.error('复制链接失败，请手动复制');
+  }
+  
+  // 清理
+  document.body.removeChild(textArea);
+};
+
 
 // 表格样式
 const tableStyles = `
@@ -1483,7 +1522,56 @@ const DistributorWorkerUpload: React.FC = () => {
 
       {/* 工人管理表格 */}
       <Card 
-        title={`${t('distributor.workerInfoManagement')} (${workers.length})`}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>{`${t('distributor.workerInfoManagement')} (${workers.length})`}</span>
+            <Button 
+              type="link"
+              onClick={() => {
+                // 生成自注册链接
+                const distributorId = currentDistributor?.id || '';
+                const siteId = sites.length > 0 ? sites[0].id : '';
+                const registrationLink = `${window.location.origin}/worker-registration?distributorId=${distributorId}&siteId=${siteId}`;
+                
+                // 复制链接到剪贴板 - 添加兼容性处理
+                try {
+                  // 现代浏览器 - 首选Clipboard API
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(registrationLink).then(() => {
+                      message.success('分享链接已复制到剪贴板');
+                    }).catch(err => {
+                      console.error('Clipboard API失败:', err);
+                      fallbackCopyToClipboard(registrationLink);
+                    });
+                  } else {
+                    // 回退到传统方法
+                    fallbackCopyToClipboard(registrationLink);
+                  }
+                } catch (err) {
+                  console.error('复制失败:', err);
+                  message.error('复制链接失败，请手动复制');
+                  // 显示链接供手动复制
+                  Modal.info({
+                    title: '分享注册链接',
+                    content: (
+                      <div>
+                        <p>请手动复制以下链接：</p>
+                        <Input.TextArea 
+                          value={registrationLink} 
+                          autoSize={{ minRows: 2, maxRows: 4 }}
+                          onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                        />
+                      </div>
+                    ),
+                    okText: t('common.close')
+                  });
+                }
+              }}
+            >
+              {t('distributor.generateRegistrationLink')}
+            </Button>
+          </div>
+        }
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             {/* 筛选器 */}

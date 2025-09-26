@@ -92,8 +92,8 @@ export class EmailController {
     }
 
     // 验证语言参数格式
-    const validLanguages = ['zh-CN', 'zh-TW', 'en-US'];
-    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-CN';
+    const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
+    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-TW';
 
     try {
       const success = await this.emailService.sendWorkerQRCodeEmail(
@@ -153,8 +153,8 @@ export class EmailController {
     }
 
     // 验证语言参数
-    const validLanguages = ['zh-CN', 'zh-TW', 'en-US'];
-    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-CN';
+    const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
+    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-TW';
 
     // 批量处理结果
     const results = {
