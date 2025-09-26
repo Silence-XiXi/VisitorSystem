@@ -52,6 +52,72 @@ export class EmailService {
     return `${local[0]}**${local.slice(-1)}@${domain}`;
   }
 
+  // 获取分判商账号密码邮件模板
+  private getDistributorAccountTemplate(language: string = 'zh-CN', distributorName: string, username: string, password: string, loginUrl: string) {
+    let subject = '';
+    let greeting = '';
+    let accountInfo = '';
+    let passwordInfo = '';
+    let securityTip = '';
+    let qrCodeTip = '';
+    let footer = '';
+    
+    if (language === 'en-US') {
+      subject = 'Worker Management System Account Information';
+      greeting = `Hello, ${distributorName}:`;
+      accountInfo = `Your Worker Management System account has been created. Here's your login information:`;
+      passwordInfo = `Login URL: ${loginUrl}<br/>Username: ${username}<br/>Initial Password: ${password}`;
+      securityTip = 'To ensure account security, please change your password after your first login.';
+      qrCodeTip = 'You can login to the system to upload worker information and send QR codes to workers for entry registration.';
+      footer = 'This is an automated email. Please do not reply.';
+    } else if (language === 'zh-TW') {
+      subject = '工人信息管理系統帳戶信息';
+      greeting = `您好，${distributorName}：`;
+      accountInfo = `您的工人信息管理系統帳戶已開通，以下是登錄信息：`;
+      passwordInfo = `登錄鏈接：${loginUrl}<br/>帳號：${username}<br/>初始密碼：${password}`;
+      securityTip = '1、為保障帳戶安全，請在首次登錄後及時修改密碼';
+      qrCodeTip = '2、您可登錄系統上傳工人信息，並及時將二維碼發送給工人，用於入場登記。';
+      footer = '此郵件由系統自動發送，請勿回覆。';
+    } else { // zh-CN 默认
+      subject = '工人信息管理系统账户信息';
+      greeting = `您好，${distributorName}：`;
+      accountInfo = `您的工人信息管理系统账户已开通，以下是登录信息：`;
+      passwordInfo = `登录链接：${loginUrl}<br/>账号：${username}<br/>初始密码：${password}`;
+      securityTip = '1、为保障账户安全，请在首次登录后及时修改密码';
+      qrCodeTip = '2、您可登录系统上传工人信息，并及时将二维码发送给工人，用于入场登记。';
+      footer = '此邮件由系统自动发送，请勿回复。';
+    }
+    
+    return {
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+          <p style="margin-bottom: 20px; font-size: 16px;">
+            ${greeting}
+          </p>
+          <p style="margin-bottom: 20px; line-height: 1.6;">
+            ${accountInfo}
+          </p>
+          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px; line-height: 1.8;">
+            ${passwordInfo}
+          </div>
+          <p style="margin-bottom: 10px; color: #d13438;">
+            <strong>*温馨提示：*</strong>
+          </p>
+          <p style="margin-bottom: 10px;">
+            ${securityTip}
+          </p>
+          <p style="margin-bottom: 20px;">
+            ${qrCodeTip}
+          </p>
+          <p style="color: #666; font-size: 12px; margin-top: 30px; padding-top: 10px; border-top: 1px solid #eee;">
+            ${footer}
+          </p>
+        </div>
+      `
+    };
+  }
+
   // 获取并校验邮件配置
   private async getEmailConfig() {
     try {
@@ -229,6 +295,183 @@ export class EmailService {
     };
   }
 
+  // 发送分判商账号密码邮件（带重试）
+  async sendDistributorAccountEmail(
+    distributorEmail: string,
+    distributorName: string,
+    username: string,
+    password: string,
+    loginUrl: string,
+    language: string = 'zh-CN',
+    retryCount = 2,
+  ): Promise<boolean> {
+    // 详细记录函数调用参数
+    this.logger.log('尝试发送分判商账号密码邮件', {
+      distributorEmail,
+      distributorName,
+      username,
+      loginUrl,
+      language
+    });
+    
+    // 校验收件人邮箱
+    if (!this.validateEmail(distributorEmail)) {
+      this.logger.error(`收件人邮箱格式错误：${distributorEmail}`);
+      return false;
+    }
+
+    try {
+      this.logger.log('获取邮件传输器...');
+      const transporter = await this.getTransporter();
+      
+      this.logger.log('获取邮件配置...');
+      const config = await this.getEmailConfig();
+      this.logger.log('邮件配置获取成功', { from: this.maskEmail(config.from) });
+
+      // 获取对应语言的邮件模板
+      this.logger.log('生成邮件模板...');
+      const template = this.getDistributorAccountTemplate(language, distributorName, username, password, loginUrl);
+      this.logger.log('邮件模板生成成功', { subject: template.subject });
+      
+      // 根据语言选择系统名称
+      const systemName = language === 'en-US' ? 'Worker Management System' : 
+                         language === 'zh-TW' ? '工人信息管理系統' : '工人信息管理系统';
+                        
+      this.logger.log('准备邮件选项...');
+      const mailOptions: SMTPTransport.Options = {
+        from: `"${systemName}" <${config.from}>`,
+        to: distributorEmail,
+        subject: template.subject,
+        html: template.html
+      };
+      
+      this.logger.log('邮件发送选项准备完成', { 
+        from: mailOptions.from, 
+        to: this.maskEmail(distributorEmail), 
+        subject: mailOptions.subject 
+      });
+
+      this.logger.log('开始发送邮件...');
+      const startTime = Date.now();
+      const result = await transporter.sendMail(mailOptions);
+      this.logger.log(`分判商账号密码邮件发送成功 [${Date.now() - startTime}ms]：${distributorEmail}，MessageId：${result.messageId}`);
+      
+      // 输出完整的邮件发送结果
+      this.logger.log('邮件发送完成, 返回数据:', { 
+        messageId: result.messageId,
+        response: result.response,
+        accepted: result.accepted,
+        rejected: result.rejected
+      });
+      
+      return true;
+
+    } catch (error) {
+      // 详细记录错误信息
+      this.logger.error('发送分判商账号邮件失败:', { 
+        message: error.message,
+        code: error.code,
+        responseCode: error.responseCode,
+        response: error.response?.substring(0, 500),
+        stack: error.stack?.substring(0, 500),
+        distributorEmail
+      });
+      
+      // 分类错误处理
+      const errorCode = error.code;
+      const errorMessage = error.message || 'Unknown error';
+
+      if (errorCode === 'ECONNREFUSED' || errorCode === 'ETIMEDOUT' || errorCode === 'ENOTFOUND') {
+        this.logger.error(`邮件服务器连接失败：${errorCode} - ${errorMessage}`);
+        throw new EmailConnectionError(`连接邮件服务器失败：${errorMessage}`);
+      } else if (errorCode === 'EAUTH' || errorCode === 'AUTH') {
+        this.logger.error(`邮件认证失败：${errorCode} - ${errorMessage}`);
+        throw new EmailAuthError(`邮件认证失败：${errorMessage}`);
+      } else if (retryCount > 0) {
+        // 重试逻辑
+        this.logger.warn(`发送邮件失败，准备重试，剩余重试次数：${retryCount}`);
+        this.transporter = null; // 重置邮件发送器
+        return this.sendDistributorAccountEmail(
+          distributorEmail, distributorName, username, password, loginUrl, language, retryCount - 1
+        );
+      } else {
+        this.logger.error(`邮件发送失败（重试次数用完）：${errorMessage}`);
+        return false;
+      }
+    }
+  }
+
+  // 批量发送分判商账号密码邮件
+  async batchSendDistributorAccountEmails(
+    distributors: Array<{
+      email: string;
+      name: string;
+      username: string;
+      password: string;
+    }>,
+    loginUrl: string,
+    language: string = 'zh-CN',
+  ): Promise<{
+    total: number;
+    success: number;
+    failed: number;
+    results: Array<{ email: string; success: boolean; error?: string }>;
+  }> {
+    const results = [];
+    let successCount = 0;
+    let failedCount = 0;
+    
+    for (const distributor of distributors) {
+      if (!distributor.email || !this.validateEmail(distributor.email)) {
+        results.push({ 
+          email: distributor.email || 'invalid-email', 
+          success: false, 
+          error: '邮箱格式无效' 
+        });
+        failedCount++;
+        continue;
+      }
+      
+      try {
+        const success = await this.sendDistributorAccountEmail(
+          distributor.email,
+          distributor.name,
+          distributor.username,
+          distributor.password,
+          loginUrl,
+          language
+        );
+        
+        if (success) {
+          results.push({ email: distributor.email, success: true });
+          successCount++;
+        } else {
+          results.push({ 
+            email: distributor.email, 
+            success: false, 
+            error: '发送失败，请检查邮件服务配置' 
+          });
+          failedCount++;
+        }
+      } catch (error) {
+        results.push({ 
+          email: distributor.email, 
+          success: false, 
+          error: error.message || '未知错误' 
+        });
+        failedCount++;
+        this.logger.error(`发送邮件到 ${this.maskEmail(distributor.email)} 失败: ${error.message}`);
+      }
+    }
+    
+    return {
+      total: distributors.length,
+      success: successCount,
+      failed: failedCount,
+      results
+    };
+  }
+
   // 发送工人二维码邮件（带重试）
   async sendWorkerQRCodeEmail(
     workerEmail: string,
@@ -368,4 +611,5 @@ export class EmailService {
       return false;
     }
   }
+  
 }

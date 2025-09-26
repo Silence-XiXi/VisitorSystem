@@ -1375,9 +1375,98 @@ class ApiService {
         success: boolean;
         message?: string;
       }>;
-    }
+    } 
   }> {
     return this.requestWithRetry('/email/batch-send-qrcode', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+  
+  // 发送分判商账号密码到邮箱
+  
+  async sendDistributorAccountEmail(data: {
+    distributorEmail: string;
+    distributorName: string;
+    username: string;
+    password: string;
+    loginUrl: string;
+    language?: string;
+  }): Promise<{ success: boolean; message: string; error?: string; details?: any; step?: string }> {
+    try {
+      // 打印更详细的调试信息
+      console.log('发送请求到 /email/send-distributor-account API端点');
+      console.log('发送数据:', JSON.stringify(data, null, 2));
+      console.log('请求URL:', this.baseURL + '/email/send-distributor-account');
+      
+      const startTime = Date.now();
+      console.log('开始发送邮件请求...');
+      
+      // 发送邮件
+      const response = await this.requestWithRetry('/email/send-distributor-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      console.log(`API响应 [${Date.now() - startTime}ms]:`, response);
+      
+      if (!response.success) {
+        console.warn('邮件发送失败:', response);
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error('API请求失败:', error);
+      
+      // 打印详细错误信息
+      if (error.response) {
+        try {
+          console.error('错误响应体:', await error.response.text());
+        } catch (e) {
+          console.error('无法解析错误响应');
+        }
+      }
+      
+      return { 
+        success: false, 
+        message: `发送失败: ${error?.message || '未知错误'}`,
+        error: error?.message,
+        stack: error?.stack
+      };
+    }
+  }
+  
+  // 批量发送分判商账号密码到邮箱
+  async batchSendDistributorAccountEmails(data: {
+    distributors: Array<{
+      email: string;
+      name: string;
+      username: string;
+      password: string;
+    }>;
+    loginUrl: string;
+    language?: string;
+  }): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results?: {
+      total: number;
+      success: number;
+      failed: number;
+      results: Array<{
+        email: string; 
+        success: boolean;
+        error?: string;
+      }>;
+    } 
+  }> {
+    return this.requestWithRetry('/email/batch-send-distributor-accounts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -35,6 +35,64 @@ export class SendQRCodeEmailDto {
   language?: string; // 可选的语言参数
 }
 
+export class SendDistributorAccountDto {
+  @IsEmail()
+  @IsNotEmpty()
+  distributorEmail: string;
+
+  @IsString()
+  @IsNotEmpty()
+  distributorName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  loginUrl: string;
+  
+  @IsString()
+  language?: string; // 可选的语言参数
+}
+
+export class BatchSendDistributorAccountDto {
+  @IsArray()
+  @ArrayMinSize(1, { message: '至少需要一个分判商数据' })
+  @ValidateNested({ each: true })
+  @Type(() => DistributorAccountDto)
+  distributors: DistributorAccountDto[];
+  
+  @IsString()
+  @IsNotEmpty()
+  loginUrl: string;
+  
+  @IsString()
+  language?: string;
+}
+
+class DistributorAccountDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+
 // 定义单个工人的DTO
 class WorkerQRCodeDto {
   @IsEmail()
@@ -262,5 +320,154 @@ export class EmailController {
       message: '邮件控制器工作正常',
       timestamp: new Date().toISOString()
     };
+  }
+  
+  
+  @Post('send-distributor-account')
+  @Roles(UserRole.ADMIN)
+  async sendDistributorAccountEmail(@Body() body: SendDistributorAccountDto) {
+    try {
+      const { distributorEmail, distributorName, username, password, loginUrl, language } = body;
+      
+      console.log('接收分判商账号邮件请求:', {
+        email: distributorEmail, 
+        name: distributorName, 
+        username,
+        loginUrl,
+        languageProvided: !!language
+      });
+  
+      // 验证必填字段
+      if (!distributorEmail || !distributorName || !username || !password || !loginUrl) {
+        console.error('缺少必填字段', { 
+          hasEmail: !!distributorEmail, 
+          hasName: !!distributorName, 
+          hasUsername: !!username,
+          hasPassword: !!password,
+          hasLoginUrl: !!loginUrl
+        });
+        return {
+          success: false,
+          message: '缺少必填字段',
+          details: { missingFields: [
+            !distributorEmail && 'distributorEmail',
+            !distributorName && 'distributorName',
+            !username && 'username',
+            !password && 'password',
+            !loginUrl && 'loginUrl',
+          ].filter(Boolean) }
+        };
+      }
+  
+      // 验证邮箱格式
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(distributorEmail)) {
+        console.error('邮箱格式不正确', { email: distributorEmail });
+        return {
+          success: false,
+          message: '邮箱格式不正确',
+          details: { email: distributorEmail }
+        };
+      }
+  
+      // 验证语言参数格式
+      const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
+      const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-CN';
+      console.log('使用语言:', selectedLanguage);
+  
+      try {
+        // 先检查邮件配置
+        try {
+          await this.emailService.testEmailConfig();
+        } catch (configError) {
+          console.error('邮件配置检查失败:', configError);
+          return {
+            success: false,
+            message: `邮件服务配置错误: ${configError.message}`,
+            error: configError.message,
+            step: 'config'
+          };
+        }
+        
+        // 发送实际邮件
+        const success = await this.emailService.sendDistributorAccountEmail(
+          distributorEmail,
+          distributorName,
+          username,
+          password,
+          loginUrl,
+          selectedLanguage,
+        );
+  
+        if (success) {
+          return {
+            success: true,
+            message: '邮件发送成功',
+          };
+        } else {
+          console.error('邮件服务返回失败状态');
+          return {
+            success: false,
+            message: '邮件发送失败',
+            error: '邮件服务返回失败',
+            step: 'send'
+          };
+        }
+      } catch (error) {
+        console.error('邮件发送异常:', error);
+        return {
+          success: false,
+          message: `邮件发送失败: ${error.message || '未知错误'}`,
+          error: error.message,
+          stack: error.stack,
+          step: 'send'
+        };
+      }
+    } catch (error) {
+      console.error('处理请求异常:', error);
+      return {
+        success: false,
+        message: `请求处理失败: ${error.message || '未知错误'}`,
+        error: error.message,
+        stack: error.stack
+      };
+    }
+  }
+  
+  @Post('batch-send-distributor-accounts')
+  @Roles(UserRole.ADMIN)
+  async batchSendDistributorAccountEmails(@Body() body: BatchSendDistributorAccountDto) {
+    const { distributors, loginUrl, language } = body;
+
+    // 验证批量发送请求
+    if (!distributors || !Array.isArray(distributors) || distributors.length === 0) {
+      throw new BadRequestException('分判商数据不能为空');
+    }
+
+    // 限制一次最多发送数量
+    const MAX_BATCH_SIZE = 50;
+    if (distributors.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(`一次最多发送${MAX_BATCH_SIZE}个账号信息`);
+    }
+
+    // 验证语言参数
+    const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
+    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-CN';
+
+    try {
+      const result = await this.emailService.batchSendDistributorAccountEmails(
+        distributors,
+        loginUrl,
+        selectedLanguage
+      );
+
+      return {
+        success: true,
+        message: `批量发送完成，成功: ${result.success}, 失败: ${result.failed}`,
+        results: result
+      };
+    } catch (error) {
+      throw new BadRequestException(`批量发送分判商账号邮件失败: ${error.message}`);
+    }
   }
 }

@@ -882,6 +882,7 @@ export default {
     accountInfo: '账号: {username}',
     passwordInfo: '密码: {password}',
     selectSendMethodTip: '请选择发送账号信息的方式: ',
+    emailSendTip: '点击发送按钮将账号信息通过邮件发送给分判商',
     sendByEmail: '通过Email发送',
     sendByWhatsApp: '通过WhatsApp发送',
     sendByEmailSuccess: '已通过Email发送账号信息给 {name}',

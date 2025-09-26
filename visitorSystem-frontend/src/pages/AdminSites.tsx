@@ -191,31 +191,95 @@ const AdminSites: React.FC = () => {
     const hasEmail = distributor.email && distributor.email.trim()
     const hasWhatsApp = distributor.whatsapp && distributor.whatsapp.trim()
     
+    // 获取系统登录链接
+    const frontendUrl = window.location.origin
+    const loginUrl = `${frontendUrl}/login`
+    
+    // 获取当前语言
+    const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+    
+    // 发送邮件的方法
+    const sendEmail = async () => {
+      try {
+        message.loading({ content: t('common.sending'), key: 'sendEmail' })
+        
+        // 准备请求数据
+        const requestData = {
+          distributorEmail: distributor.email || '',
+          distributorName: distributor.name,
+          username: distributor.accountUsername || '',
+          password: password,
+          loginUrl: loginUrl,
+          language: currentLocale
+        }
+        
+        // 检查必填字段
+        if (!requestData.distributorEmail) {
+          message.error({ content: '邮箱地址不能为空', key: 'sendEmail' })
+          return
+        }
+        
+        console.log('发送分判商账号邮件请求数据:', requestData)
+        
+        // 打印所有参数的长度
+        Object.entries(requestData).forEach(([key, value]) => {
+          console.log(`${key} 长度: ${String(value).length}`)
+        })
+        
+        // 发送邮件
+        console.log('开始发送分判商账号邮件...')
+        const result = await apiService.sendDistributorAccountEmail(requestData)
+        console.log('发送分判商账号邮件结果:', result)
+        
+        if (result.success) {
+          message.success({ content: t('admin.sendByEmailSuccess').replace('{name}', distributor.contactName || ''), key: 'sendEmail' })
+        } else {
+          // 显示详细的错误信息
+          let errorMsg = result.message || t('common.operationFailed')
+          if (result.error) {
+            errorMsg += `\n\n错误详情: ${result.error}`
+          }
+          if (result.step) {
+            errorMsg += `\n失败步骤: ${result.step}`
+          }
+          
+          message.error({ content: errorMsg, key: 'sendEmail', duration: 10 })
+        }
+      } catch (error: any) {
+        console.error('发送邮件异常:', error)
+        message.error({ 
+          content: t('common.operationFailed') + ': ' + (error?.message || t('common.unknownError')),
+          key: 'sendEmail',
+          duration: 10
+        })
+      }
+    }
+    
+    // 不再需要WhatsApp发送方法
+    
     if (!hasEmail && !hasWhatsApp) {
       // 如果没有联系方式，直接显示成功信息
-      message.success(t('admin.noContactInfo').replace('{name}', distributor.name).replace('{username}', distributor.accountUsername || '').replace('{password}', password))
+      Modal.success({
+        title: t('admin.distributorAddedSuccess').replace('{name}', distributor.name),
+        content: (
+          <div>
+            <p>{t('admin.accountInfo').replace('{username}', distributor.accountUsername || '')}</p>
+            <p>{t('admin.passwordInfo').replace('{password}', password)}</p>
+            <p style={{ marginTop: '16px', color: '#ff4d4f' }}>{t('admin.noContactInfo')}</p>
+          </div>
+        ),
+        okText: t('common.ok')
+      })
       return
     }
     
-    if (hasEmail && !hasWhatsApp) {
-      // 只有Email，直接发送
-      // TODO: 调用后端API发送Email
-      message.success(t('admin.sendByEmailSuccess').replace('{name}', distributor.contactName || ''))
-      return
-    }
+    // 显示发送邮件对话框
+    // 准备发送邮件
     
-    if (!hasEmail && hasWhatsApp) {
-      // 只有WhatsApp，直接发送
-      // TODO: 调用后端API发送WhatsApp
-      message.success(t('admin.sendByWhatsAppSuccess').replace('{name}', distributor.contactName || ''))
-      return
-    }
-    
-    // 两种方式都有，显示选择对话框
     Modal.confirm({
       title: (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>{t('admin.selectSendMethod')}</span>
+          <span>{t('admin.distributorAddedSuccess')}</span>
           <Button 
             type="text" 
             size="small" 
@@ -230,18 +294,18 @@ const AdminSites: React.FC = () => {
           <p>{t('admin.distributorAddedSuccess').replace('{name}', distributor.name)}</p>
           <p>{t('admin.accountInfo').replace('{username}', distributor.accountUsername || '')}</p>
           <p>{t('admin.passwordInfo').replace('{password}', password)}</p>
-          <p style={{ marginTop: '16px', color: '#666' }}>{t('admin.selectSendMethodTip')}</p>
+          {hasEmail && <p style={{ marginTop: '16px', color: '#666' }}>{t('admin.emailSendTip')}</p>}
         </div>
       ),
-      okText: t('admin.sendByEmail'),
-      cancelText: t('admin.sendByWhatsApp'),
-      onCancel: () => {
-        // TODO: 调用后端API发送WhatsApp
-        message.success(t('admin.sendByWhatsAppSuccess').replace('{name}', distributor.contactName || ''))
-      },
+      okText: hasEmail ? t('admin.sendByEmail') : t('common.ok'),
+      cancelText: t('common.cancel'),
+      cancelButtonProps: { style: { display: 'none' } }, // 隐藏Cancel按钮
+      okButtonProps: { disabled: !hasEmail },
       onOk: () => {
-        // TODO: 调用后端API发送Email
-        message.success(t('admin.sendByEmailSuccess').replace('{name}', distributor.contactName || ''))
+        // 发送Email
+        if (hasEmail) {
+          sendEmail()
+        }
       }
     })
   }
@@ -601,11 +665,56 @@ const AdminSites: React.FC = () => {
       ),
       okText: t('admin.confirm'),
       cancelText: t('admin.cancel'),
-      onOk: () => {
-        // TODO: 调用后端API批量发送Email
-        message.success(t('admin.batchSendEmailSuccess').replace('{count}', hasEmailDistributors.length.toString()))
-        if (noEmailDistributors.length > 0) {
-          message.warning(t('admin.noEmailSkipped').replace('{count}', noEmailDistributors.length.toString()))
+      onOk: async () => {
+        try {
+          // 显示加载中
+          message.loading({ content: t('common.processing'), key: 'batchSendEmail' })
+          
+          // 获取系统配置中的登录链接
+          const frontendUrl = window.location.origin
+          const loginUrl = `${frontendUrl}/login`
+          
+          // 获取当前语言
+          const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+          
+          // 准备数据
+          const distributorsData = hasEmailDistributors.map(d => ({
+            email: d.email || '',  // 增加空字符串默认值处理类型错误
+            name: d.name,
+            username: d.accountUsername || '',
+            password: 'Pass@123' // 默认密码，在实际应用中可能需要使用重置密码获取
+          }))
+          
+          // 调用批量发送API
+          const result = await apiService.batchSendDistributorAccountEmails({
+            distributors: distributorsData,
+            loginUrl: loginUrl,
+            language: currentLocale
+          })
+          
+          // 处理结果
+          if (result.success) {
+            message.success({ 
+              content: t('admin.batchSendEmailSuccess').replace('{count}', result.results?.success.toString() || '0'), 
+              key: 'batchSendEmail' 
+            })
+            
+            if (result.results?.failed > 0) {
+              message.warning(t('common.someEmailsFailed').replace('{count}', result.results?.failed.toString() || '0'))
+            }
+            
+            if (noEmailDistributors.length > 0) {
+              message.warning(t('admin.noEmailSkipped').replace('{count}', noEmailDistributors.length.toString()))
+            }
+          } else {
+            message.error({ content: result.message, key: 'batchSendEmail' })
+          }
+        } catch (error) {
+          console.error('发送失败:', error)
+          message.error({ 
+            content: t('common.operationFailed') + ': ' + (error.message || t('common.unknownError')),
+            key: 'batchSendEmail'
+          })
         }
       }
     })
@@ -2693,8 +2802,8 @@ const AdminSites: React.FC = () => {
             <Input placeholder={t('admin.accountPlaceholder')} />
           </Form.Item>
           {!editingDistributor && (
-            <Form.Item name="defaultPassword" label={t('admin.defaultPasswordLabel')} tooltip={t('admin.defaultPasswordTooltip')}>
-              <Input.Password placeholder={t('admin.defaultPasswordPlaceholder')} />
+            <Form.Item name="defaultPassword" label={t('admin.defaultPasswordLabel')} tooltip={t('admin.defaultPasswordTooltip')} initialValue="Pass@123">
+              <Input placeholder={t('admin.defaultPasswordPlaceholder')} disabled value="Pass@123" />
             </Form.Item>
           )}
           <Form.Item name="accountStatus" label={t('admin.accountStatusLabel')} initialValue={'active'}>
