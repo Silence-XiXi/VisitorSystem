@@ -5,12 +5,12 @@ const prisma = new PrismaClient();
 
 /**
  * 生成工人编号
- * 格式: 'WK' + 6位数字
+ * 格式: 8位数字
  */
 export async function generateWorkerId(): Promise<string> {
-  // 生成6位随机数字
+  // 生成8位随机数字
   const generateRandomDigits = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return Math.floor(10000000 + Math.random() * 90000000).toString();
   };
   
   let workerId: string;
@@ -18,7 +18,7 @@ export async function generateWorkerId(): Promise<string> {
   
   // 最多尝试10次生成唯一ID
   for (let i = 0; i < 10; i++) {
-    workerId = `WK${generateRandomDigits()}`;
+    workerId = generateRandomDigits();
     
     // 检查ID是否已存在
     const existing = await prisma.worker.findFirst({

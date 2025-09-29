@@ -648,7 +648,6 @@ const ItemCategoryManagement: React.FC = () => {
         </div>
       ),
       okText: t('common.confirm'),
-      width: 600
     })
   }
 

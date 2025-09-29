@@ -41,6 +41,7 @@ export default {
     unknownRole: '未知角色',
     enable: '启用',
     disable: '停用',
+    processing: '处理中',
   },
   worker: {
     phoneNumberExists: '手机号已存在，请检查您的输入',
@@ -392,6 +393,7 @@ export default {
     pleaseEnterPhoneNumber: '请输入联系电话',
     pleaseEnterQrCodeOrPhysicalCard: '请输入二维码编号或实体卡编号',
     pleaseEnterItemNumber: '请输入物品编号',
+    pleaseEnterWorkerIdOrPhone: '请输入工人编号或手机号',
     pleaseEnterQrCodeOrPhysicalCardForBorrow: '请输入二维码编号或实体卡编号',
     pleaseEnterQrCodeOrPhysicalCardForExit: '请输入二维码编号或实体卡编号',
     pleaseEnterWorkerIdOrPhoneForExit: '请输入工号或手机号进行离场登记',

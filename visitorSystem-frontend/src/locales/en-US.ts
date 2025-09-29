@@ -41,6 +41,7 @@ export default {
     unknownRole: 'Unknown Role',
     enable: 'Enable',
     disable: 'Disable',
+    processing: 'Processing',
   },
   worker: {
     phoneNumberExists: 'Phone number already exists, please check your input',
@@ -387,6 +388,7 @@ export default {
     pleaseEnterPhoneNumber: 'Please enter contact phone',
     pleaseEnterQrCodeOrPhysicalCard: 'Please enter QR code or physical card ID',
     pleaseEnterItemNumber: 'Please enter item number',
+    pleaseEnterWorkerIdOrPhone: 'Please enter worker ID or phone number',
     pleaseEnterQrCodeOrPhysicalCardForBorrow: 'Please enter QR code or physical card ID',
     pleaseEnterQrCodeOrPhysicalCardForExit: 'Please enter QR code or physical card ID',
     pleaseEnterWorkerIdOrPhoneForExit: 'Please enter worker ID or phone number for exit registration',
@@ -1175,8 +1177,6 @@ export default {
     exportSelected: 'Export Selected',
     importExcel: 'Import Excel',
     downloadTemplate: 'Download Template',
-    importSuccess: 'Import successful',
-    importFailed: 'Import failed',
     exportSuccess: 'Export successful',
     exportFailed: 'Export failed',
     // Site Export Options
@@ -1200,15 +1200,6 @@ export default {
     exportGuardsTip: 'Current site guards only includes guards from the currently selected site from global filter, all guards data includes all guards in the system',
     currentSiteGuardsExported: 'Current site guards data exported successfully, {count} records',
     allGuardsExported: 'All guards data exported successfully, {count} records',
-    guardTemplateDownloaded: 'Guard import template downloaded successfully',
-    guardsImported: 'Guards imported successfully, {count} records',
-    importCompletedWithErrors: 'Import completed: {success} successful, {skipped} skipped, errors: {errors}',
-    // Guard import related
-    guardImportConfirm: 'Confirm Import Guards',
-    guardImportConfirmMessage: 'About to import {count} guards, continue?',
-    guardImportDefaultSiteMessage: 'Default associated site: {siteName}',
-    guardImportRulesMessage: 'Import rules: Duplicate guard IDs or usernames will be skipped, empty IDs will be auto-assigned, default password is 123456',
-    guardImportResultTitle: 'Guard Import Results',
     // QR Code Modal related
     workerName: 'Worker Name: ',
     workerIdLabel: 'Worker ID: ',
@@ -1285,7 +1276,6 @@ export default {
       title: 'WhatsApp Configuration',
       statusUpdated: 'Needs Update',
       statusConfigured: 'Configured',
-      statusNotConfigured: 'Not Configured',
       statusNotConfigured: 'Not Configured',
       senderNumber: 'Sender Number',
       senderNumberPlaceholder: '+12345678901',

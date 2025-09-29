@@ -2396,30 +2396,30 @@ const AdminSites: React.FC = () => {
         </div>
       )}
       
-             <Table 
-         rowKey="id" 
-         columns={siteColumns} 
-         dataSource={filteredSites} 
-         loading={loading}
-         pagination={{
-           current: sitePagination.current,
-           pageSize: sitePagination.pageSize,
-           total: sitePagination.total,
-           showSizeChanger: true,
-           showQuickJumper: true,
-           showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-           pageSizeOptions: ['10', '20', '50', '100'],
-           onChange: handleSitePaginationChange,
-           onShowSizeChange: handleSitePaginationChange
-         }}
-         rowSelection={{
-           selectedRowKeys: selectedSiteIds,
-           onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
-           getCheckboxProps: (record) => ({
-             name: record.name,
-           }),
-         }}
-       />
+      <Table 
+        rowKey="id" 
+        columns={siteColumns} 
+        dataSource={filteredSites} 
+        loading={loading}
+        pagination={{
+          current: sitePagination.current,
+          pageSize: sitePagination.pageSize,
+          total: sitePagination.total,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          onChange: handleSitePaginationChange,
+          onShowSizeChange: handleSitePaginationChange
+        }}
+        rowSelection={{
+          selectedRowKeys: selectedSiteIds,
+          onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
+          getCheckboxProps: (record) => ({
+            name: record.name,
+          }),
+        }}
+      />
     </Card>
   )
 

@@ -2610,6 +2610,7 @@ const Guard: React.FC = () => {
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
                 disabled={loading}
+                inputMode="email"
                 suffix={
                   <Button 
                     type="primary" 
@@ -2785,6 +2786,7 @@ const Guard: React.FC = () => {
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
+                inputMode="email"
                 suffix={
                   <Button 
                     type="primary" 
@@ -3197,6 +3199,7 @@ const Guard: React.FC = () => {
                 value={scannedWorkerId}
                 onChange={(e) => setScannedWorkerId(e.target.value)}
                 prefix={<QrcodeOutlined />}
+                inputMode="email"
                 suffix={
                   <Button 
                     type="primary" 

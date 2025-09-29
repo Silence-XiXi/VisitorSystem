@@ -174,15 +174,17 @@ export class AdminService {
 
   // 生成工人编号
   private async generateWorkerId(): Promise<string> {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    // 生成8位随机数字
+    const generateRandomDigits = () => {
+      return Math.floor(10000000 + Math.random() * 90000000).toString();
+    };
+    
     let workerId: string;
     let exists: boolean;
 
     do {
-      // 生成WK开头的10位编号
-      workerId = 'WK' + Array.from({ length: 8 }, () => 
-        characters.charAt(Math.floor(Math.random() * characters.length))
-      ).join('');
+      // 生成8位纯数字编号
+      workerId = generateRandomDigits();
       
       // 检查是否已存在
       const existingWorker = await this.prisma.worker.findUnique({

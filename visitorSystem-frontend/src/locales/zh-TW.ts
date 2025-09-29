@@ -42,6 +42,7 @@ export default {
     unknownRole: '未知角色',
     enable: '啟用',
     disable: '停用',
+    processing: '處理中',
   },
   form: {
     optional: '可選',
@@ -298,7 +299,6 @@ export default {
     workerInfoUpdated: '工人資料已更新',
     workerInfoAdded: '工人資料已添加',
     workerInfoDeleted: '工人資料已刪除',
-    noEmailWarning: '該工人沒有電郵地址，無法發送郵件',
     noWhatsappWarning: '該工人沒有WhatsApp號碼，無法發送消息',
     qrCodeSentToEmail: '二維碼已發送到 {email}',
     qrCodeSentToWhatsapp: '二維碼已發送到 {whatsapp}',
@@ -308,7 +308,6 @@ export default {
     qrCodeBatchSent: '二維碼已批量發送給 {count} 名工人',
     pleaseSelectWorkersToExport: '請先選擇要導出的工人',
     templateDownloaded: '模板已下載',
-    importSuccess: '成功導入 {count} 條工人資料',
     importError: '導入錯誤: {error}',
     // 工人管理頁面標題和操作
     workerInfoManagement: '工人資料管理',
@@ -385,6 +384,14 @@ export default {
     addGuard: '新增門衛',
     editGuard: '編輯門衛',
     deleteGuard: '刪除門衛',
+    // 篩選和搜索
+    siteKeywordPlaceholder: '關鍵詞（名稱/地址/編碼）',
+    distributorKeywordPlaceholder: '關鍵詞（名稱/聯絡人）',
+    guardKeywordPlaceholder: '關鍵詞（編號/姓名/電話）',
+    guardStatusFilter: '狀態篩選',
+    managerFilterPlaceholder: '負責人篩選（可多選）',
+    accountStatusFilterPlaceholder: '帳號狀態（可多選）',
+    guardSiteFilterPlaceholder: '工地篩選（可多選）',
     // 門衛重置密碼相關
     resetGuardPasswordTitle: '重置門衛密碼',
     resetGuardPasswordConfirm: '確定要重置門衛「{name}」的密碼嗎？重置後密碼將恢復為默認密碼。',
@@ -396,13 +403,6 @@ export default {
     // 分判商刪除相關
     deleteDistributorTitle: '刪除分判商',
     deleteDistributorConfirm: '確定要刪除分判商「{name}」嗎？此操作不可撤銷。',
-    // 篩選和搜索
-    siteKeywordPlaceholder: '關鍵詞（名稱/地址/編碼）',
-    distributorKeywordPlaceholder: '關鍵詞（名稱/聯絡人）',
-    guardKeywordPlaceholder: '關鍵詞（編號/姓名/電話）',
-    managerFilterPlaceholder: '負責人篩選（可多選）',
-    accountStatusFilterPlaceholder: '帳號狀態（可多選）',
-    guardSiteFilterPlaceholder: '工地篩選（可多選）',
     // 導入導出
     importExcel: '匯入Excel',
     // 篩選結果
@@ -685,6 +685,7 @@ export default {
     pleaseSelectRegion: '請選擇地區',
     pleaseEnterQrCodeOrPhysicalCard: '請輸入二維碼編號或實體卡編號',
     pleaseEnterItemNumber: '請輸入物品編號',
+    pleaseEnterWorkerIdOrPhone: '請輸入工人編號或手機號',
     pleaseEnterQrCodeOrPhysicalCardForBorrow: '請輸入二維碼編號或實體卡編號',
     pleaseEnterQrCodeOrPhysicalCardForExit: '請輸入二維碼編號或實體卡編號',
     pleaseEnterWorkerIdOrPhoneForExit: '請輸入工號或手機號進行離場登記',
