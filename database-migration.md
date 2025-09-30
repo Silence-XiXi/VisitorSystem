@@ -1,0 +1,89 @@
+# 数据库迁移与零停机更新
+
+在进行零停机更新时，数据库迁移是一个关键挑战。以下是数据库迁移的最佳实践：
+
+## 数据库迁移原则
+
+1. **向后兼容性设计**：确保新版本代码可以处理旧版本数据库结构
+2. **增量变更**：避免一次性大规模变更数据库结构
+3. **分阶段迁移**：复杂迁移分多个版本进行
+
+## 零停机数据库迁移步骤
+
+### 1. 添加新字段/表（无破坏性变更）
+
+```bash
+# 1. 备份数据库
+docker-compose exec db pg_dump -U postgres visitorsystem > backup_$(date +%Y%m%d).sql
+
+# 2. 应用迁移（添加新字段/表）
+docker-compose exec backend npx prisma migrate dev --name add_new_field
+
+# 3. 部署新版本应用（使用蓝绿部署或滚动更新）
+./zero-downtime-update.sh green
+```
+
+### 2. 重命名或删除字段/表（破坏性变更）
+
+对于破坏性变更，需要分阶段进行：
+
+**阶段1：添加新字段，保留旧字段**
+
+1. 添加新字段/表但保留旧字段/表
+2. 部署新代码，同时写入新旧字段
+3. 等待所有实例更新完成
+
+**阶段2：停止使用旧字段**
+
+1. 修改代码，只使用新字段，但不删除旧字段
+2. 部署更新后的代码
+3. 验证功能正常
+
+**阶段3：删除旧字段**
+
+1. 修改数据库结构，删除旧字段/表
+2. 部署最终版本代码
+
+## 使用Prisma的数据库迁移示例
+
+```bash
+# 创建迁移文件但不立即应用（用于检查）
+docker-compose exec backend npx prisma migrate dev --name migration_name --create-only
+
+# 检查生成的迁移文件
+cat visitorSystem-backend/prisma/migrations/[timestamp]_migration_name/migration.sql
+
+# 应用迁移
+docker-compose exec backend npx prisma migrate deploy
+```
+
+## 回滚策略
+
+如果更新后发现问题，有两种回滚策略：
+
+### 1. 代码回滚（首选）
+
+```bash
+# 切换回之前的稳定版本
+git checkout previous_stable_tag
+./zero-downtime-update.sh blue  # 假设blue环境是旧版本
+```
+
+### 2. 数据库回滚（需谨慎）
+
+```bash
+# 停止所有服务
+docker-compose down
+
+# 恢复数据库备份
+cat backup_20250930.sql | docker-compose exec -T db psql -U postgres visitorsystem
+
+# 启动旧版本服务
+docker-compose up -d
+```
+
+## 注意事项
+
+1. 始终在更新前备份数据库
+2. 尽量设计向后兼容的数据库结构
+3. 对于大型数据表的变更，考虑使用批处理方式进行
