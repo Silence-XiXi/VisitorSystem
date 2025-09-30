@@ -160,6 +160,20 @@ export default {
     exportDistributorsTip: '當前工地分判商僅包含與當前全局篩選選擇的工地關聯的分判商，所有分判商數據包含系統中的全部分判商',
     currentSiteDistributorsExported: '當前工地分判商數據導出成功，共 {count} 條記錄',
     allDistributorsExported: '所有分判商數據導出成功，共 {count} 條記錄',
+    // 門衛導出相關
+    exportGuardsTitle: '導出門衛數據',
+    exportGuardsDescription: '請選擇要導出的門衛數據範圍: ',
+    exportCurrentSiteGuards: '導出當前工地門衛',
+    exportAllGuards: '導出所有門衛',
+    exportCurrentSiteGuardsDescription: '導出當前工地的門衛: {siteName}',
+    exportAllGuardsDescription: '導出系統中所有門衛的數據',
+    exportGuardsTip: '當前工地門衛僅包含當前全局篩選選擇的工地的門衛，所有門衛數據包含系統中的全部门衛',
+    currentSiteGuardsExported: '當前工地門衛數據導出成功，共 {count} 條記錄',
+    allGuardsExported: '所有門衛數據導出成功，共 {count} 條記錄',
+    // 工地导入相关
+    siteImportConfirm: '确认导入工地',
+    siteImportRulesMessage: '导入规则: 编号唯一，已存在跳过，不存在新增，没有编号自动生成编号',
+    siteImportResultTitle: '工地导入结果',
     // 其他管理功能
     siteManagement: '工地管理',
     itemCategoryManagement: '借用物品分類管理',

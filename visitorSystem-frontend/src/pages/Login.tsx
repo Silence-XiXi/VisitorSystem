@@ -44,8 +44,8 @@ const Login: React.FC = () => {
     // 创建验证码图片
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
-    canvas.width = 120
-    canvas.height = 40
+    canvas.width = 100
+    canvas.height = 36
     
     if (ctx) {
       // 背景
@@ -75,9 +75,9 @@ const Login: React.FC = () => {
       ctx.textBaseline = 'middle'
       
       for (let i = 0; i < result.length; i++) {
-        const x = 20 + i * 25
-        const y = 20 + (Math.random() - 0.5) * 10
-        const angle = (Math.random() - 0.5) * 0.4
+        const x = 15 + i * 23
+        const y = 18 + (Math.random() - 0.5) * 6
+        const angle = (Math.random() - 0.5) * 0.3
         
         ctx.save()
         ctx.translate(x, y)
@@ -347,62 +347,63 @@ const Login: React.FC = () => {
 
             <Form.Item
               name="captcha"
-              label={t('login.captcha')}
+              label={
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{t('login.captcha')}</span>
+                  <Button
+                    type="text"
+                    icon={<ReloadOutlined />}
+                    size="small"
+                    style={{
+                      padding: '2px 4px',
+                      minWidth: 'auto',
+                      height: '24px',
+                      background: '#f5f5f5',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '4px'
+                    }}
+                    onClick={generateCaptcha}
+                  />
+                </div>
+              }
               rules={[{ required: true, message: t('login.captchaPlaceholder') + '!' }]}
             >
               <Row gutter={8}>
-                <Col span={16}>
+                <Col xs={14} sm={16}>
                   <Input
                     placeholder={t('login.captchaPlaceholder')}
                     style={{ height: 40 }}
                   />
                 </Col>
-                <Col span={8}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px'
-                  }}>
-                    <div style={{ 
+                <Col xs={10} sm={8}>
+                  <div 
+                    style={{ 
                       height: 40, 
-                      flex: 1,
+                      width: '100%',
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
                       border: '1px solid #d9d9d9',
                       borderRadius: '6px',
                       background: '#fff',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      padding: '2px'
                     }}
                     onClick={generateCaptcha}
-                    >
-                      {captchaImage && (
-                        <img 
-                          src={captchaImage} 
-                          alt="验证码" 
-                          style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'cover',
-                            borderRadius: '6px'
-                          }} 
-                        />
-                      )}
-                    </div>
-                    <Button
-                      type="text"
-                      icon={<ReloadOutlined />}
-                      size="small"
-                      style={{
-                        padding: '4px 6px',
-                        minWidth: 'auto',
-                        height: '32px',
-                        background: '#f5f5f5',
-                        border: '1px solid #d9d9d9',
-                        borderRadius: '6px'
-                      }}
-                      onClick={generateCaptcha}
-                    />
+                  >
+                    {captchaImage && (
+                      <img 
+                        src={captchaImage} 
+                        alt="验证码" 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'contain',
+                          borderRadius: '6px'
+                        }} 
+                      />
+                    )}
                   </div>
                 </Col>
               </Row>

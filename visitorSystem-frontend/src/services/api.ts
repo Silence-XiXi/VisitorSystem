@@ -1,4 +1,18 @@
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000';
+// 支持通过window.location获取当前主机地址，使跨设备访问时能自动连接到正确的API服务器
+const API_BASE_URL = (() => {
+  // 首先尝试使用环境变量
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envUrl) return envUrl;
+
+  // 如果没有环境变量，使用当前主机的地址（替换前端端口3001为后端端口3000）
+  const currentHost = window.location.hostname;
+  // 如果是本地开发环境，使用localhost
+  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+    return 'http://localhost:3000';
+  } 
+  // 否则使用当前访问的主机名+后端端口
+  return `http://${currentHost}:3000`;
+})();
 
 export interface LoginRequest {
   username: string;

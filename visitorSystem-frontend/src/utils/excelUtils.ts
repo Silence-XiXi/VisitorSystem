@@ -741,6 +741,16 @@ export const readWorkerExcelFile = (file: File, distributors?: any[], sites?: an
 
 // 工地Excel列映射配置
 export const SITE_EXCEL_COLUMNS = {
+  code: 'Code',
+  name: 'Name',
+  address: 'Address',
+  manager: 'Manager',
+  phone: 'Phone',
+  status: 'Status'
+};
+
+// 保留中文配置用于兼容性和显示
+export const SITE_EXCEL_COLUMNS_ZH = {
   code: '编码',
   name: '名称',
   address: '地址',
@@ -749,8 +759,21 @@ export const SITE_EXCEL_COLUMNS = {
   status: '状态'
 };
 
-// 分判商Excel列映射配置
+// 分判商Excel列映射配置 - 英文表头
 export const DISTRIBUTOR_EXCEL_COLUMNS = {
+  id: 'Distributor ID',
+  name: 'Name',
+  contactName: 'Contact Person',
+  phone: 'Phone',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  siteIds: 'Site Codes',
+  accountUsername: 'Account Username',
+  accountStatus: 'Account Status'
+};
+
+// 保留中文配置用于兼容性和显示
+export const DISTRIBUTOR_EXCEL_COLUMNS_ZH = {
   id: '分判商编号',
   name: '名称',
   contactName: '联系人',
@@ -822,30 +845,73 @@ export const validateDistributorRequiredFields = (data: any, t?: (key: string) =
   return errors;
 };
 
-// 转换Excel数据为工地对象
+// 转换Excel数据为工地对象 - 支持中英文表头
 export const convertExcelToSite = (row: any, rowIndex: number, t?: (key: string) => string): { data: any; errors: string[] } => {
   const errors: string[] = [];
   
-  // 尝试不同的列名映射
+  // 尝试不同的列名映射 - 优先英文，再中文
   const getValue = (key: string, fallbackKeys: string[] = []) => {
+    // 首先尝试英文表头
+    const englishFields: Record<string, string[]> = {
+      'code': ['Code', 'code', 'CODE', 'Site Code', 'site code', 'SITE_CODE'],
+      'name': ['Name', 'name', 'NAME', 'Site Name', 'site name'],
+      'address': ['Address', 'address', 'ADDRESS', 'Site Address', 'site address'],
+      'manager': ['Manager', 'manager', 'MANAGER', 'Site Manager', 'site manager'],
+      'phone': ['Phone', 'phone', 'PHONE', 'Contact Phone', 'contact phone', 'Telephone'],
+      'status': ['Status', 'status', 'STATUS', 'Site Status', 'site status']
+    };
+    
+    // 尝试从英文表头映射
+    if (englishFields[key]) {
+      for (const englishKey of englishFields[key]) {
+        if (row[englishKey] !== undefined && row[englishKey] !== null && row[englishKey] !== '') {
+          return String(row[englishKey]).trim();
+        }
+      }
+    }
+    
+    // 后备方案 - 尝试中文表头和原始key
     if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
       return String(row[key]).trim();
     }
+    
+    // 中文表头映射
+    const chineseFields: Record<string, string[]> = {
+      'code': ['编码', '编号', '工地编号'],
+      'name': ['名称', '工地名称', '工地名'],
+      'address': ['地址', '工地地址'],
+      'manager': ['负责人', '工地负责人', '负责人姓名'],
+      'phone': ['联系电话', '电话', '负责人电话'],
+      'status': ['状态', '工地状态']
+    };
+    
+    // 尝试中文表头
+    if (chineseFields[key]) {
+      for (const chineseKey of chineseFields[key]) {
+        if (row[chineseKey] !== undefined && row[chineseKey] !== null && row[chineseKey] !== '') {
+          return String(row[chineseKey]).trim();
+        }
+      }
+    }
+    
+    // 尝试用户提供的其他可能的key
     for (const fallbackKey of fallbackKeys) {
       if (row[fallbackKey] !== undefined && row[fallbackKey] !== null && row[fallbackKey] !== '') {
         return String(row[fallbackKey]).trim();
       }
     }
+    
     return '';
   };
   
+  // 从Excel行数据中提取工地信息
   const siteData = {
-    code: getValue('编码', ['code', '编号', '工地编号']),
-    name: getValue('名称', ['name', '工地名称', '工地名']),
-    address: getValue('地址', ['address', '工地地址']),
-    manager: getValue('负责人', ['manager', '工地负责人', '负责人姓名']),
-    phone: getValue('联系电话', ['phone', '电话', '联系电话', '负责人电话']),
-    status: SITE_STATUS_MAP[getValue('状态', ['status', '工地状态']) as keyof typeof SITE_STATUS_MAP] || 'active'
+    code: getValue('code', ['编码', 'Code']),
+    name: getValue('name', ['名称', 'Name']),
+    address: getValue('address', ['地址', 'Address']),
+    manager: getValue('manager', ['负责人', 'Manager']),
+    phone: getValue('phone', ['联系电话', 'Phone']),
+    status: SITE_STATUS_MAP[getValue('status', ['状态', 'Status']) as keyof typeof SITE_STATUS_MAP] || 'active'
   };
   
   const requiredErrors = validateSiteRequiredFields(siteData, t);
@@ -854,57 +920,132 @@ export const convertExcelToSite = (row: any, rowIndex: number, t?: (key: string)
   return { data: siteData, errors };
 };
 
-// 转换Excel数据为分判商对象
+// 转换Excel数据为分判商对象 - 支持中英文表头
 export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any[] = [], t?: (key: string) => string): { data: any; errors: string[] } => {
   const errors: string[] = [];
   
-  // 解析服务工地编号，支持逗号和空格分隔
-  const siteCodesText = String(row['服务工地'] || '').trim();
+  // 获取字段值的辅助函数 - 支持多语言
+  const getValue = (fieldKey: string, options: string[]): string => {
+    for (const option of options) {
+      if (row[option] !== undefined && row[option] !== null && row[option] !== '') {
+        return String(row[option]).trim();
+      }
+    }
+    return '';
+  };
+  
+  // 解析服务工地编号，支持逗号、顿号和空格分隔
+  const siteCodesText = getValue('siteIds', [
+    'Site Codes', 'Sites', 'Site IDs', 'site codes', 
+    '服务工地', '工地编号', '工地', 'siteIds', 'siteId'
+  ]);
+  
+  // 输出工地编号原始文本信息用于调试
+  console.log(`第${rowIndex + 1}行工地编号原始文本: "${siteCodesText}"`);
   
   // 使用更精确的分隔符处理
-  // 先按逗号分割，再按空格分割，确保不会遗漏
+  // 先按逗号、顿号分割，再按空格分割，确保不会遗漏
   let siteCodes: string[] = [];
   if (siteCodesText) {
-    // 先按逗号分割
-    const commaSplit = siteCodesText.split(/[,，]/);
+    // 先按逗号、顿号分割 (增加顿号「、」的支持)
+    const commaSplit = siteCodesText.split(/[,，、]/);
     // 再对每个部分按空格分割
     siteCodes = commaSplit.flatMap(part => 
       part.split(/\s+/).map(code => code.trim()).filter(code => code)
     );
+    
+    // 输出解析后的工地编号列表
+    console.log(`第${rowIndex + 1}行解析后的工地编号: [${siteCodes.join(', ')}]`);
   }
   
   // 根据工地编号查找工地ID
   const siteIds: string[] = [];
   const invalidSiteCodes: string[] = [];
+  const matchedSites: {code: string, name: string}[] = [];
+  
+  // 输出可用的工地总数信息
+  console.log(`系统中可用的工地总数: ${sites.length}`);
+  if (sites.length > 0) {
+    console.log(`工地示例: ${sites[0].code} - ${sites[0].name}`);
+  }
   
   siteCodes.forEach((code: string) => {
     const site = sites.find(s => s.code === code);
     if (site) {
       siteIds.push(site.id);
+      matchedSites.push({code: site.code, name: site.name});
     } else {
       invalidSiteCodes.push(code);
     }
   });
   
+  // 输出匹配到的工地信息
+  console.log(`第${rowIndex + 1}行匹配到${matchedSites.length}个工地:`, 
+    matchedSites.map(s => `${s.code} - ${s.name}`).join(', '));
+  
   // 如果有无效的工地编号，添加错误信息
   if (invalidSiteCodes.length > 0) {
+    console.log(`第${rowIndex + 1}行发现${invalidSiteCodes.length}个无效工地编号:`, invalidSiteCodes.join(', '));
     errors.push(`第${rowIndex + 1}行：找不到工地编号 ${invalidSiteCodes.join(', ')}`);
   }
   
+  // 使用辅助函数获取各字段值
   const distributorData = {
-    id: String(row['分判商编号'] || '').trim() || (Date.now() + Math.random()).toString(),
-    name: String(row['名称'] || '').trim(),
-    contactName: String(row['联系人'] || '').trim(),
-    phone: String(row['电话'] || '').trim(),
-    email: String(row['邮箱'] || '').trim(),
-    whatsapp: String(row['WhatsApp'] || '').trim(),
+    id: getValue('id', [
+      'Distributor ID', 'ID', 'id', 'distributor_id',
+      '分判商编号', '编号', 'ID'
+    ]) || (Date.now() + Math.random()).toString(),
+    
+    name: getValue('name', [
+      'Name', 'name', 'DistributorName', 'distributor_name', 'Company Name',
+      '名称', '分判商名称', '公司名称', '名称(公司)', '公司'
+    ]),
+    
+    contactName: getValue('contactName', [
+      'Contact Person', 'Contact Name', 'Contact', 'contact',
+      '联系人', '联系人姓名', '负责人'
+    ]),
+    
+    phone: getValue('phone', [
+      'Phone', 'Contact Phone', 'Phone Number', 'phone',
+      '电话', '联系电话', '电话号码', '手机号码', '手机'
+    ]),
+    
+    email: getValue('email', [
+      'Email', 'Contact Email', 'E-mail', 'email',
+      '邮箱', '电子邮箱', '邮件', '电邮'
+    ]),
+    
+    whatsapp: getValue('whatsapp', [
+      'WhatsApp', 'Whatsapp', 'WhatsApp Number', 'whatsapp',
+      'WhatsApp号码', '微信'
+    ]),
+    
     siteIds: siteIds,
-    accountUsername: String(row['账号'] || '').trim(),
-    accountStatus: DISTRIBUTOR_STATUS_MAP[row['账号状态'] as keyof typeof DISTRIBUTOR_STATUS_MAP] || 'active'
+    
+    accountUsername: getValue('accountUsername', [
+      'Account Username', 'Username', 'Login', 'Account', 'login', 'Account Name',
+      '账号', '用户名', '登录名', '账户名称', '登录账号', '账户'
+    ]),
+    
+    accountStatus: DISTRIBUTOR_STATUS_MAP[
+      getValue('accountStatus', [
+        'Account Status', 'Status', 'state', 'status',
+        '账号状态', '状态', '账户状态'
+      ]) as keyof typeof DISTRIBUTOR_STATUS_MAP
+    ] || 'active'
   };
   
   const requiredErrors = validateDistributorRequiredFields(distributorData, t);
   errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  
+  // 输出最终解析结果
+  console.log(`第${rowIndex + 1}行分判商最终数据:`, {
+    name: distributorData.name,
+    accountUsername: distributorData.accountUsername,
+    siteIds: distributorData.siteIds,
+    siteCount: distributorData.siteIds.length
+  });
   
   return { data: distributorData, errors };
 };
@@ -983,6 +1124,9 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
         const headers = jsonData[0] as string[];
         const dataRows = jsonData.slice(1);
         
+        // 输出表头信息用于调试
+        console.log('分判商Excel文件表头：', headers);
+        
         const distributors: any[] = [];
         const allErrors: string[] = [];
         
@@ -1000,9 +1144,22 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
             }
           });
           
-          // 检查是否有必填字段
-          const hasName = rowData['名称'] && rowData['名称'].toString().trim() !== '';
-          const hasAccount = rowData['账号'] && rowData['账号'].toString().trim() !== '';
+          // 调试信息：显示每一行的数据内容
+          console.log(`第${index + 2}行数据:`, rowData);
+          
+          // 检查是否有必填字段 - 支持多种可能的列名
+          const nameValues = ['名称', '分判商名称', '公司名称', '名称(公司)', '公司', 'Name', 'DistributorName', 'Company Name'];
+          const accountValues = ['账号', '用户名', '登录名', '账户名称', '登录账号', '账户', 'Account Username', 'Username', 'Login', 'Account', 'Account Name'];
+          
+          // 调试信息：显示检测到的列名
+          const nameMatch = nameValues.find(key => rowData[key] !== undefined);
+          const accountMatch = accountValues.find(key => rowData[key] !== undefined);
+          console.log(`第${index + 2}行检测：名称列=${nameMatch || '未找到'}(值=${nameMatch ? rowData[nameMatch] : '无'}), 账号列=${accountMatch || '未找到'}(值=${accountMatch ? rowData[accountMatch] : '无'})`)
+          
+          // 检查任意一个名称字段是否有值
+          const hasName = nameValues.some(key => rowData[key] && rowData[key].toString().trim() !== '');
+          // 检查任意一个账号字段是否有值
+          const hasAccount = accountValues.some(key => rowData[key] && rowData[key].toString().trim() !== '');
           
           if (!hasName || !hasAccount) {
             // 如果缺少必填字段，记录警告信息
@@ -1010,6 +1167,7 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
             if (!hasName) missingFields.push('名称');
             if (!hasAccount) missingFields.push('账号');
             allErrors.push(`第${index + 2}行：缺少必填字段（${missingFields.join('、')}），已跳过`);
+            console.log(`跳过第${index + 2}行，缺少必填字段：`, rowData);
             return;
           }
           
@@ -1032,7 +1190,7 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
   });
 };
 
-// 导出工地数据到Excel
+// 导出工地数据到Excel - 使用英文表头
 export const exportSitesToExcel = (sites: any[]) => {
   const exportData = sites.map(site => {
     return {
@@ -1041,7 +1199,7 @@ export const exportSitesToExcel = (sites: any[]) => {
       [SITE_EXCEL_COLUMNS.address]: site.address,
       [SITE_EXCEL_COLUMNS.manager]: site.manager,
       [SITE_EXCEL_COLUMNS.phone]: site.phone,
-      [SITE_EXCEL_COLUMNS.status]: site.status === 'active' ? '启用' : site.status === 'suspended' ? '暂停' : '停用'
+      [SITE_EXCEL_COLUMNS.status]: site.status === 'active' ? 'active' : site.status === 'suspended' ? 'suspended' : 'inactive'
     };
   });
   
@@ -1049,22 +1207,22 @@ export const exportSitesToExcel = (sites: any[]) => {
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   
   const colWidths = [
-    { wch: 15 }, // 编码
-    { wch: 20 }, // 名称
-    { wch: 30 }, // 地址
-    { wch: 15 }, // 负责人
-    { wch: 15 }, // 联系电话
-    { wch: 10 }  // 状态
+    { wch: 15 }, // Code
+    { wch: 20 }, // Name
+    { wch: 30 }, // Address
+    { wch: 15 }, // Manager
+    { wch: 15 }, // Phone
+    { wch: 10 }  // Status
   ];
   worksheet['!cols'] = colWidths;
   
-  XLSX.utils.book_append_sheet(workbook, worksheet, '工地信息');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Site Information');
   
-  const fileName = `工地信息_${new Date().toISOString().split('T')[0]}.xlsx`;
+  const fileName = `Sites_${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 };
 
-// 导出分判商数据到Excel
+// 导出分判商数据到Excel - 使用英文表头
 export const exportDistributorsToExcel = (distributors: any[], sites: any[]) => {
   const exportData = distributors.map(distributor => {
     const siteCodes = distributor.siteIds?.map((siteId: string) => {
@@ -1081,7 +1239,7 @@ export const exportDistributorsToExcel = (distributors: any[], sites: any[]) => 
       [DISTRIBUTOR_EXCEL_COLUMNS.whatsapp]: distributor.whatsapp,
       [DISTRIBUTOR_EXCEL_COLUMNS.siteIds]: siteCodes,
       [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: distributor.accountUsername,
-      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: distributor.accountStatus === 'active' ? '启用' : '禁用'
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: distributor.accountStatus === 'active' ? 'active' : 'disabled'
     };
   });
   
@@ -1089,41 +1247,42 @@ export const exportDistributorsToExcel = (distributors: any[], sites: any[]) => 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   
   const colWidths = [
-    { wch: 15 }, // 分判商编号
-    { wch: 20 }, // 名称
-    { wch: 15 }, // 联系人
-    { wch: 15 }, // 电话
-    { wch: 25 }, // 邮箱
-    { wch: 20 }, // 服务工地
-    { wch: 15 }, // 账号
-    { wch: 10 }  // 账号状态
+    { wch: 15 }, // Distributor ID
+    { wch: 20 }, // Name
+    { wch: 15 }, // Contact Person
+    { wch: 15 }, // Phone
+    { wch: 25 }, // Email
+    { wch: 20 }, // Site Codes
+    { wch: 15 }, // Account Username
+    { wch: 10 }  // Account Status
   ];
   worksheet['!cols'] = colWidths;
   
-  XLSX.utils.book_append_sheet(workbook, worksheet, '分判商信息');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Distributor Information');
   
-  const fileName = `分判商信息_${new Date().toISOString().split('T')[0]}.xlsx`;
+  const fileName = `Distributors_${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 };
 
-// 生成工地导入模板
+// 生成工地导入模板 - 使用英文表头
 export const generateSiteImportTemplate = () => {
+  // 使用英文表头
   const templateData = [
     {
       [SITE_EXCEL_COLUMNS.code]: 'BJ-CBD-001',
-      [SITE_EXCEL_COLUMNS.name]: '北京CBD工地',
-      [SITE_EXCEL_COLUMNS.address]: '北京市朝阳区建国门外大街1号',
-      [SITE_EXCEL_COLUMNS.manager]: '张三',
+      [SITE_EXCEL_COLUMNS.name]: 'Beijing CBD Site',
+      [SITE_EXCEL_COLUMNS.address]: 'No.1 Jianguomenwai Street, Chaoyang District, Beijing',
+      [SITE_EXCEL_COLUMNS.manager]: 'Zhang San',
       [SITE_EXCEL_COLUMNS.phone]: '13800138001',
-      [SITE_EXCEL_COLUMNS.status]: '启用'
+      [SITE_EXCEL_COLUMNS.status]: 'active'
     },
     {
       [SITE_EXCEL_COLUMNS.code]: 'SH-PD-001',
-      [SITE_EXCEL_COLUMNS.name]: '上海浦东工地',
-      [SITE_EXCEL_COLUMNS.address]: '上海市浦东新区陆家嘴环路1000号',
-      [SITE_EXCEL_COLUMNS.manager]: '李四',
+      [SITE_EXCEL_COLUMNS.name]: 'Shanghai Pudong Site',
+      [SITE_EXCEL_COLUMNS.address]: 'No.1000 Lujiazui Ring Road, Pudong New District, Shanghai',
+      [SITE_EXCEL_COLUMNS.manager]: 'Li Si',
       [SITE_EXCEL_COLUMNS.phone]: '13800138002',
-      [SITE_EXCEL_COLUMNS.status]: '启用'
+      [SITE_EXCEL_COLUMNS.status]: 'active'
     }
   ];
   
@@ -1131,45 +1290,45 @@ export const generateSiteImportTemplate = () => {
   const worksheet = XLSX.utils.json_to_sheet(templateData);
   
   const colWidths = [
-    { wch: 15 }, // 编码
-    { wch: 20 }, // 名称
-    { wch: 30 }, // 地址
-    { wch: 15 }, // 负责人
-    { wch: 15 }, // 联系电话
-    { wch: 10 }  // 状态
+    { wch: 15 }, // Code
+    { wch: 20 }, // Name
+    { wch: 30 }, // Address
+    { wch: 15 }, // Manager
+    { wch: 15 }, // Phone
+    { wch: 10 }  // Status
   ];
   worksheet['!cols'] = colWidths;
   
-  XLSX.utils.book_append_sheet(workbook, worksheet, '工地信息导入模板');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Site Import Template');
   
-  const fileName = '工地信息导入模板.xlsx';
+  const fileName = 'Site_Import_Template.xlsx';
   XLSX.writeFile(workbook, fileName);
 };
 
-// 生成分判商导入模板
+// 生成分判商导入模板 - 使用英文表头
 export const generateDistributorImportTemplate = () => {
   const templateData = [
     {
       [DISTRIBUTOR_EXCEL_COLUMNS.id]: 'DIST-BJ-001',
-      [DISTRIBUTOR_EXCEL_COLUMNS.name]: '北京分判商A',
-      [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: '王五',
+      [DISTRIBUTOR_EXCEL_COLUMNS.name]: 'Beijing Distributor A',
+      [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: 'Wang Wu',
       [DISTRIBUTOR_EXCEL_COLUMNS.phone]: '13800138003',
       [DISTRIBUTOR_EXCEL_COLUMNS.email]: 'wangwu@example.com',
       [DISTRIBUTOR_EXCEL_COLUMNS.whatsapp]: '+86 13800138003',
       [DISTRIBUTOR_EXCEL_COLUMNS.siteIds]: 'BJ-CBD-001,SH-PD-001',
       [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: 'bj001',
-      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: '启用'
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: 'active'
     },
     {
       [DISTRIBUTOR_EXCEL_COLUMNS.id]: 'DIST-SH-002',
-      [DISTRIBUTOR_EXCEL_COLUMNS.name]: '上海分判商B',
-      [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: '赵六',
+      [DISTRIBUTOR_EXCEL_COLUMNS.name]: 'Shanghai Distributor B',
+      [DISTRIBUTOR_EXCEL_COLUMNS.contactName]: 'Zhao Liu',
       [DISTRIBUTOR_EXCEL_COLUMNS.phone]: '13800138004',
       [DISTRIBUTOR_EXCEL_COLUMNS.email]: 'zhaoliu@example.com',
       [DISTRIBUTOR_EXCEL_COLUMNS.whatsapp]: '+86 13800138004',
       [DISTRIBUTOR_EXCEL_COLUMNS.siteIds]: 'SH-PD-001 GZ-TH-001',
       [DISTRIBUTOR_EXCEL_COLUMNS.accountUsername]: 'sh001',
-      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: '启用'
+      [DISTRIBUTOR_EXCEL_COLUMNS.accountStatus]: 'active'
     }
   ];
   
@@ -1177,26 +1336,38 @@ export const generateDistributorImportTemplate = () => {
   const worksheet = XLSX.utils.json_to_sheet(templateData);
   
   const colWidths = [
-    { wch: 15 }, // 分判商编号
-    { wch: 20 }, // 名称
-    { wch: 15 }, // 联系人
-    { wch: 15 }, // 电话
-    { wch: 25 }, // 邮箱
+    { wch: 15 }, // Distributor ID
+    { wch: 20 }, // Name
+    { wch: 15 }, // Contact Person
+    { wch: 15 }, // Phone
+    { wch: 25 }, // Email
     { wch: 20 }, // WhatsApp
-    { wch: 30 }, // 服务工地
-    { wch: 15 }, // 账号
-    { wch: 12 }  // 账号状态
+    { wch: 30 }, // Site Codes
+    { wch: 15 }, // Account Username
+    { wch: 12 }  // Account Status
   ];
   worksheet['!cols'] = colWidths;
   
-  XLSX.utils.book_append_sheet(workbook, worksheet, '分判商信息导入模板');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Distributor Import Template');
   
-  const fileName = '分判商信息导入模板.xlsx';
+  const fileName = 'Distributor_Import_Template.xlsx';
   XLSX.writeFile(workbook, fileName);
 };
 
-// 门卫Excel列映射配置
+// 门卫Excel列映射配置 - 英文表头
 export const GUARD_EXCEL_COLUMNS = {
+  guardId: 'Guard ID',
+  name: 'Name',
+  siteId: 'Site Code',
+  phone: 'Phone',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  accountUsername: 'Account Username',
+  accountStatus: 'Account Status'
+};
+
+// 保留中文配置用于兼容性和显示
+export const GUARD_EXCEL_COLUMNS_ZH = {
   guardId: '门卫编号',
   name: '姓名',
   siteId: '工地编号',
@@ -1237,20 +1408,67 @@ export const validateGuardRequiredFields = (data: any, t?: (key: string) => stri
   return errors;
 };
 
-// 转换Excel数据为门卫对象
+// 转换Excel数据为门卫对象 - 支持中英文表头
 export const convertExcelToGuard = (row: any, rowIndex: number, defaultSiteId?: string, t?: (key: string) => string): { data: any; errors: string[] } => {
   const errors: string[] = [];
   
+  // 获取字段值的辅助函数 - 支持多语言
+  const getValue = (fieldKey: string, options: string[]): string => {
+    for (const option of options) {
+      if (row[option] !== undefined && row[option] !== null && row[option] !== '') {
+        return String(row[option]).trim();
+      }
+    }
+    return '';
+  };
+  
   const guardData = {
-    id: String(row['门卫ID'] || '').trim() || (Date.now() + Math.random()).toString(),
-    guardId: String(row['门卫编号'] || '').trim(),
-    name: String(row['姓名'] || '').trim(),
-    siteId: String(row['工地编号'] || '').trim() || defaultSiteId || '',
-    phone: String(row['联系电话'] || '').trim(),
-    email: String(row['邮箱'] || '').trim(),
-    whatsapp: String(row['WhatsApp'] || '').trim(),
-    accountUsername: String(row['账号'] || '').trim(),
-    accountStatus: GUARD_STATUS_MAP[row['账号状态'] as keyof typeof GUARD_STATUS_MAP] || 'active'
+    id: getValue('id', [
+      'Guard ID', 'ID', 'id', 'guard_id',
+      '门卫ID', '门卫编码', 'ID'
+    ]) || (Date.now() + Math.random()).toString(),
+    
+    guardId: getValue('guardId', [
+      'Guard ID', 'Guard Number', 'GuardId', 'guard_id',
+      '门卫编号', '编号', '工号'
+    ]),
+    
+    name: getValue('name', [
+      'Name', 'Guard Name', 'name',
+      '姓名', '门卫姓名', '名字'
+    ]),
+    
+    siteId: getValue('siteId', [
+      'Site Code', 'Site ID', 'siteId', 'site_id',
+      '工地编号', '所属工地', '工地'
+    ]) || defaultSiteId || '',
+    
+    phone: getValue('phone', [
+      'Phone', 'Contact Phone', 'Phone Number', 'phone',
+      '联系电话', '电话', '电话号码', '手机号码', '手机'
+    ]),
+    
+    email: getValue('email', [
+      'Email', 'Contact Email', 'E-mail', 'email',
+      '邮箱', '电子邮箱', '邮件', '电邮'
+    ]),
+    
+    whatsapp: getValue('whatsapp', [
+      'WhatsApp', 'Whatsapp', 'WhatsApp Number', 'whatsapp',
+      'WhatsApp号码', '微信'
+    ]),
+    
+    accountUsername: getValue('accountUsername', [
+      'Account Username', 'Username', 'Login', 'Account', 'login',
+      '账号', '用户名', '登录名', '账户名称'
+    ]),
+    
+    accountStatus: GUARD_STATUS_MAP[
+      getValue('accountStatus', [
+        'Account Status', 'Status', 'state', 'status',
+        '账号状态', '状态', '账户状态'
+      ]) as keyof typeof GUARD_STATUS_MAP
+    ] || 'active'
   };
   
   // 调试信息
@@ -1316,7 +1534,7 @@ export const readGuardExcelFile = (file: File, defaultSiteId?: string, t?: (key:
   });
 };
 
-// 导出门卫数据到Excel
+// 导出门卫数据到Excel - 使用英文表头
 export const exportGuardsToExcel = (guards: any[], sites: any[]) => {
   const exportData = guards.map(guard => {
     const site = sites.find(s => s.id === guard.siteId);
@@ -1329,7 +1547,7 @@ export const exportGuardsToExcel = (guards: any[], sites: any[]) => {
       [GUARD_EXCEL_COLUMNS.email]: guard.email,
       [GUARD_EXCEL_COLUMNS.whatsapp]: guard.whatsapp || '',
       [GUARD_EXCEL_COLUMNS.accountUsername]: guard.user?.username || guard.accountUsername || '',
-      [GUARD_EXCEL_COLUMNS.accountStatus]: guard.user?.status === 'ACTIVE' ? '启用' : '禁用'
+      [GUARD_EXCEL_COLUMNS.accountStatus]: guard.user?.status === 'ACTIVE' ? 'active' : 'disabled'
     };
   });
   
@@ -1337,39 +1555,39 @@ export const exportGuardsToExcel = (guards: any[], sites: any[]) => {
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   
   const colWidths = [
-    { wch: 15 }, // 门卫编号
-    { wch: 15 }, // 姓名
-    { wch: 20 }, // 所属工地
-    { wch: 15 }, // 联系电话
-    { wch: 25 }, // 邮箱
+    { wch: 15 }, // Guard ID
+    { wch: 15 }, // Name
+    { wch: 20 }, // Site Code
+    { wch: 15 }, // Phone
+    { wch: 25 }, // Email
     { wch: 18 }, // WhatsApp
-    { wch: 15 }, // 账号
-    { wch: 10 }  // 账号状态
+    { wch: 15 }, // Account Username
+    { wch: 10 }  // Account Status
   ];
   worksheet['!cols'] = colWidths;
   
-  XLSX.utils.book_append_sheet(workbook, worksheet, '门卫信息');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Guard Information');
   
-  const fileName = `门卫信息_${new Date().toISOString().split('T')[0]}.xlsx`;
+  const fileName = `Guards_${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 };
 
-// 生成门卫导入模板
+// 生成门卫导入模板 - 使用英文表头
 export const generateGuardImportTemplate = () => {
   const templateData = [
     {
-      [GUARD_EXCEL_COLUMNS.guardId]: 'G001（可选，不填自动生成）',
-      [GUARD_EXCEL_COLUMNS.name]: '张三（必填）',
-      [GUARD_EXCEL_COLUMNS.siteId]: 'S12345678（可选，默认关联当前工地）',
-      [GUARD_EXCEL_COLUMNS.phone]: '13800138001（必填）',
-      [GUARD_EXCEL_COLUMNS.email]: 'zhangsan@example.com（可选）',
-      [GUARD_EXCEL_COLUMNS.whatsapp]: '+86 13800138001（可选）',
-      [GUARD_EXCEL_COLUMNS.accountUsername]: 'guard001（可选，不填自动生成）',
-      [GUARD_EXCEL_COLUMNS.accountStatus]: '启用（可选）'
+      [GUARD_EXCEL_COLUMNS.guardId]: 'G001 (Optional, auto-generated if empty)',
+      [GUARD_EXCEL_COLUMNS.name]: 'Zhang San (Required)',
+      [GUARD_EXCEL_COLUMNS.siteId]: 'S12345678 (Optional, default to current site)',
+      [GUARD_EXCEL_COLUMNS.phone]: '13800138001 (Required)',
+      [GUARD_EXCEL_COLUMNS.email]: 'zhangsan@example.com (Optional)',
+      [GUARD_EXCEL_COLUMNS.whatsapp]: '+86 13800138001 (Optional)',
+      [GUARD_EXCEL_COLUMNS.accountUsername]: 'guard001 (Optional, auto-generated if empty)',
+      [GUARD_EXCEL_COLUMNS.accountStatus]: 'active (Optional)'
     },
     {
       [GUARD_EXCEL_COLUMNS.guardId]: '',
-      [GUARD_EXCEL_COLUMNS.name]: '李四',
+      [GUARD_EXCEL_COLUMNS.name]: 'Li Si',
       [GUARD_EXCEL_COLUMNS.siteId]: '',
       [GUARD_EXCEL_COLUMNS.phone]: '13800138002',
       [GUARD_EXCEL_COLUMNS.email]: 'lisi@example.com',
@@ -1383,19 +1601,19 @@ export const generateGuardImportTemplate = () => {
   const worksheet = XLSX.utils.json_to_sheet(templateData);
   
   const colWidths = [
-    { wch: 15 }, // 门卫编号
-    { wch: 15 }, // 姓名
-    { wch: 20 }, // 所属工地
-    { wch: 15 }, // 联系电话
-    { wch: 25 }, // 邮箱
+    { wch: 15 }, // Guard ID
+    { wch: 15 }, // Name
+    { wch: 20 }, // Site Code
+    { wch: 15 }, // Phone
+    { wch: 25 }, // Email
     { wch: 18 }, // WhatsApp
-    { wch: 15 }, // 账号
-    { wch: 10 }  // 账号状态
+    { wch: 15 }, // Account Username
+    { wch: 10 }  // Account Status
   ];
   worksheet['!cols'] = colWidths;
   
-  XLSX.utils.book_append_sheet(workbook, worksheet, '门卫信息导入模板');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Guard Import Template');
   
-  const fileName = '门卫信息导入模板.xlsx';
+  const fileName = 'Guard_Import_Template.xlsx';
   XLSX.writeFile(workbook, fileName);
 };

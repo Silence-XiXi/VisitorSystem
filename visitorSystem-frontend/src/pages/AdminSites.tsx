@@ -720,49 +720,6 @@ const AdminSites: React.FC = () => {
     })
   }
 
-  // 批量发送账号密码到WhatsApp
-  const handleBatchSendWhatsApp = () => {
-    if (selectedDistributorIds.length === 0) {
-      message.warning(t('admin.pleaseSelectDistributorsToSend'))
-      return
-    }
-
-    const selectedDistributors = distributors.filter(d => selectedDistributorIds.includes(d.id))
-    const hasWhatsAppDistributors = selectedDistributors.filter(d => d.whatsapp && d.whatsapp.trim())
-    const noWhatsAppDistributors = selectedDistributors.filter(d => !d.whatsapp || !d.whatsapp.trim())
-
-    if (hasWhatsAppDistributors.length === 0) {
-      message.warning(t('admin.noWhatsAppDistributors'))
-      return
-    }
-
-    Modal.confirm({
-      title: t('admin.batchSendWhatsAppTitle'),
-      icon: <ExclamationCircleOutlined />,
-      content: (
-        <div>
-          <p>{t('admin.batchSendWhatsAppConfirm')}</p>
-          <p style={{ marginTop: '8px', color: '#1890ff' }}>
-            {t('admin.willSendTo').replace('{count}', hasWhatsAppDistributors.length.toString())}
-          </p>
-          {noWhatsAppDistributors.length > 0 && (
-            <p style={{ marginTop: '8px', color: '#ff4d4f' }}>
-              {t('admin.noWhatsAppWarning').replace('{count}', noWhatsAppDistributors.length.toString())}
-            </p>
-          )}
-        </div>
-      ),
-      okText: t('admin.confirm'),
-      cancelText: t('admin.cancel'),
-      onOk: () => {
-        // TODO: 调用后端API批量发送WhatsApp
-        message.success(t('admin.batchSendWhatsAppSuccess').replace('{count}', hasWhatsAppDistributors.length.toString()))
-        if (noWhatsAppDistributors.length > 0) {
-          message.warning(t('admin.noWhatsAppSkipped').replace('{count}', noWhatsAppDistributors.length.toString()))
-        }
-      }
-    })
-  }
 
   // 工地表单提交
   const onSiteSubmit = async () => {
@@ -2489,15 +2446,6 @@ const AdminSites: React.FC = () => {
                 title={t('admin.batchSendEmailTitle')}
               >
                 {t('admin.batchSendEmail')}
-              </Button>
-              <Button 
-                size="small" 
-                type="primary"
-                icon={<SendOutlined />}
-                onClick={() => handleBatchSendWhatsApp()}
-                title={t('admin.batchSendWhatsAppTitle')}
-              >
-                {t('admin.batchSendWhatsApp')}
               </Button>
             </Space>
           )}

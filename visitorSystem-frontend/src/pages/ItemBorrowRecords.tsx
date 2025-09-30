@@ -273,22 +273,22 @@ const ItemBorrowRecords: React.FC = () => {
     }
     
     try {
-      // 准备导出数据
+      // 准备导出数据 - 使用英文表头
       const exportData = dataToExport.map(record => ({
-        [t('itemBorrowRecords.borrowDate')]: record.borrowDate,
-        [t('itemBorrowRecords.workerName')]: record.workerName,
-        [t('itemBorrowRecords.physicalCardId')]: record.physicalCardId || '-',
-        [t('itemBorrowRecords.distributor')]: record.distributorName,
-        [t('itemBorrowRecords.siteName')]: record.siteName,
-        [t('itemBorrowRecords.itemType')]: record.itemType,
-        [t('itemBorrowRecords.itemCode')]: record.itemCode,
-        [t('itemBorrowRecords.borrowTime')]: record.borrowTime,
-        [t('itemBorrowRecords.notes') || '备注']: record.notes || '-',
-        [t('itemBorrowRecords.returnDate')]: record.returnDate || '-',
-        [t('itemBorrowRecords.returnTime')]: record.returnTime || '-',
-        [t('itemBorrowRecords.status')]: record.status === 'BORROWED' ? t('itemBorrowRecords.notReturned') : t('itemBorrowRecords.returned'),
-        [t('itemBorrowRecords.borrowDuration')]: record.borrowDuration ? `${record.borrowDuration}小时` : '-',
-        [t('itemBorrowRecords.borrowHandler')]: record.borrowHandlerName || '-'
+        'BorrowDate': record.borrowDate,
+        'WorkerName': record.workerName,
+        'PhysicalCardId': record.physicalCardId || '-',
+        'Distributor': record.distributorName,
+        'Site': record.siteName,
+        'ItemType': record.itemType,
+        'ItemCode': record.itemCode,
+        'BorrowTime': record.borrowTime,
+        'Notes': record.notes || '-',
+        'ReturnDate': record.returnDate || '-',
+        'ReturnTime': record.returnTime || '-',
+        'Status': record.status === 'BORROWED' ? 'Not Returned' : 'Returned',
+        'BorrowDuration': record.borrowDuration ? `${record.borrowDuration} Hours` : '-',
+        'BorrowHandler': record.borrowHandlerName || '-'
       }))
       
       // 创建工作簿
@@ -317,7 +317,7 @@ const ItemBorrowRecords: React.FC = () => {
       XLSX.utils.book_append_sheet(workbook, worksheet, t('itemBorrowRecords.title'))
       
       // 生成文件名并下载
-      const fileName = `物品借用记录_${new Date().toISOString().split('T')[0]}.xlsx`
+      const fileName = `ItemBorrowRecords_${new Date().toISOString().split('T')[0]}.xlsx`
       XLSX.writeFile(workbook, fileName)
       
       const exportType = selectedRowKeys.length > 0 ? t('itemBorrowRecords.exportSelected').replace('({count})', '') : t('itemBorrowRecords.exportAll')

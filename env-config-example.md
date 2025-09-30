@@ -1,0 +1,35 @@
+# 环境变量配置示例
+
+创建一个`.env`文件在项目根目录下，包含以下配置：
+
+```
+# 数据库配置
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=visitorsystem
+DATABASE_URL=postgresql://postgres:postgres@db:5432/visitorsystem
+
+# Redis配置
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# JWT配置
+JWT_SECRET=your_jwt_secret_key_here
+JWT_EXPIRES_IN=1d
+
+# 邮件配置
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@example.com
+EMAIL_PASSWORD=your_email_password
+EMAIL_FROM=no-reply@example.com
+
+# 系统配置
+NODE_ENV=production
+PORT=3000
+
+# WhatsApp配置（如果有）
+WHATSAPP_API_KEY=your_whatsapp_api_key_here
+```
+
+将以上内容保存到`.env`文件中，并根据实际环境进行修改。

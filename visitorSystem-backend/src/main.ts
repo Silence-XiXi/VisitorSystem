@@ -11,6 +11,8 @@ async function bootstrap() {
 
   // 启用CORS - 更兼容Chrome的配置
   app.enableCors({
+    origin: true, // 允许所有来源访问
+    /* 原配置保留注释
     origin: (origin, callback) => {
       const allowedOrigins = [
         'http://localhost:3000', 
@@ -27,6 +29,7 @@ async function bootstrap() {
         callback(null, true); // 临时允许所有来源访问
       }
     },
+    */
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'Cache-Control', 'Pragma'],

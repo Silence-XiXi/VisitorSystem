@@ -262,12 +262,12 @@ const ItemCategoryManagement: React.FC = () => {
     }
     
     try {
-      // 准备导出数据
+      // 准备导出数据 - 使用英文表头
       const exportData = dataToExport.map(category => ({
-        [t('itemCategory.categoryCode')]: category.code,
-        [t('itemCategory.categoryName')]: category.name,
-        [t('itemCategory.descriptionLabel')]: category.description,
-        [t('itemCategory.status')]: category.status === 'ACTIVE' ? t('itemCategory.active') : t('itemCategory.inactive')
+        'Code': category.code,
+        'Name': category.name,
+        'Description': category.description,
+        'Status': category.status === 'ACTIVE' ? 'Active' : 'Inactive'
       }))
       
       // 创建工作簿
@@ -287,7 +287,7 @@ const ItemCategoryManagement: React.FC = () => {
       XLSX.utils.book_append_sheet(workbook, worksheet, t('itemCategory.title'))
       
       // 生成文件名并下载
-      const fileName = `物品分类_${new Date().toISOString().split('T')[0]}.xlsx`
+      const fileName = `ItemCategory_${new Date().toISOString().split('T')[0]}.xlsx`
       XLSX.writeFile(workbook, fileName)
       
       message.success(t('itemCategory.exportSuccess').replace('{count}', dataToExport.length.toString()))
@@ -300,25 +300,25 @@ const ItemCategoryManagement: React.FC = () => {
   // 下载导入模板
   const handleDownloadTemplate = () => {
     try {
-      // 准备模板数据
+      // 准备模板数据 - 使用英文表头
       const templateData = [
         {
-          [t('itemCategory.categoryCode')]: 'C1234567',
-          [t('itemCategory.categoryName')]: '安全帽',
-          [t('itemCategory.descriptionLabel')]: '用于保护头部安全的防护用品',
-          [t('itemCategory.status')]: t('itemCategory.active')
+          'Code': 'C1234567',
+          'Name': '安全帽',
+          'Description': '用于保护头部安全的防护用品',
+          'Status': 'Active'
         },
         {
-          [t('itemCategory.categoryCode')]: 'C2345678',
-          [t('itemCategory.categoryName')]: '防护手套',
-          [t('itemCategory.descriptionLabel')]: '用于保护手部安全的防护用品',
-          [t('itemCategory.status')]: t('itemCategory.active')
+          'Code': 'C2345678',
+          'Name': '防护手套',
+          'Description': '用于保护手部安全的防护用品',
+          'Status': 'Active'
         },
         {
-          [t('itemCategory.categoryCode')]: 'C3456789',
-          [t('itemCategory.categoryName')]: '安全鞋',
-          [t('itemCategory.descriptionLabel')]: '用于保护足部安全的防护用品',
-          [t('itemCategory.status')]: t('itemCategory.active')
+          'Code': 'C3456789',
+          'Name': '安全鞋',
+          'Description': '用于保护足部安全的防护用品',
+          'Status': 'Inactive'
         }
       ]
       
@@ -339,7 +339,7 @@ const ItemCategoryManagement: React.FC = () => {
       XLSX.utils.book_append_sheet(workbook, worksheet, t('itemCategory.importTemplate'))
       
       // 生成文件名并下载
-      const fileName = '物品分类导入模板.xlsx'
+      const fileName = 'ItemCategory_Import_Template.xlsx'
       XLSX.writeFile(workbook, fileName)
       
       message.success(t('itemCategory.templateDownloaded'))
@@ -384,8 +384,8 @@ const ItemCategoryManagement: React.FC = () => {
           }
         })
         
-        // 验证必填字段
-        if (!rowData[t('itemCategory.categoryName')]) {
+          // 验证必填字段
+        if (!rowData['Name']) {
           errors.push(`第${i + 2}行：${t('itemCategory.categoryName')}不能为空`)
           continue
         }
@@ -454,12 +454,12 @@ const ItemCategoryManagement: React.FC = () => {
       
       for (const categoryData of importedCategories) {
         try {
-          // 准备导入数据
+          // 准备导入数据 - 使用英文字段映射
           const importData = {
-            code: String(categoryData[t('itemCategory.categoryCode')] || '').trim() || undefined,
-            name: String(categoryData[t('itemCategory.categoryName')] || '').trim(),
-            description: String(categoryData[t('itemCategory.descriptionLabel')] || '').trim(),
-            status: categoryData[t('itemCategory.status')] === t('itemCategory.inactive') ? 'INACTIVE' : 'ACTIVE'
+            code: String(categoryData['Code'] || '').trim() || undefined,
+            name: String(categoryData['Name'] || '').trim(),
+            description: String(categoryData['Description'] || '').trim(),
+            status: categoryData['Status'] === 'Inactive' ? 'INACTIVE' : 'ACTIVE'
           }
           
           // 检查是否已存在相同名称的分类
@@ -485,7 +485,7 @@ const ItemCategoryManagement: React.FC = () => {
           
         } catch (error: any) {
           const errorMessage = error?.response?.data?.message || '创建失败'
-          errors.push(`${categoryData[t('itemCategory.categoryName')]}: ${errorMessage}`)
+          errors.push(`${categoryData['Name'] || 'Unknown'}: ${errorMessage}`)
         }
       }
       
