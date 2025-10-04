@@ -1,4 +1,5 @@
 # WhatsApp QR码发送功能实现文档
+# WHATSAPP_QRCODE_FEATURE
 
 ## 功能概述
 此功能允许系统通过YCloud API将工人的QR码图片发送到工人的WhatsApp账号中。实现了：

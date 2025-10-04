@@ -1,4 +1,5 @@
 # Guard页面物品借用功能完善总结
+# GUARD_BORROW_FEATURE_SUMMARY
 
 ## 完成的功能
 
