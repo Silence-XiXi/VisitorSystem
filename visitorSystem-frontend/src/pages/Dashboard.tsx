@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Space, Typography, Button, message, Select } from 'antd'
+import { Layout, Menu, Dropdown, Space, Typography, Button, Select } from 'antd'
 import {
   UserOutlined,
   TeamOutlined,
@@ -80,16 +80,10 @@ const Dashboard: React.FC = () => {
     return 'reports'
   }
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-      message.success(t('login.logoutSuccess'))
-      navigate('/login')
-    } catch (error) {
-      console.error('Logout error:', error)
-      message.error(t('login.logoutFailed'))
-    }
-  }
+  // 登出功能 - 直接调用 useAuth 的 logout 方法
+  const handleLogout = () => {
+    logout();
+  };
 
   const handleMenuClick = (key: string) => {
     switch (key) {

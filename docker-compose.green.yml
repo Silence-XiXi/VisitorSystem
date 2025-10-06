@@ -1,0 +1,60 @@
+# 绿环境应用配置
+# version: '3.8'
+
+services:
+  # 绿环境后端服务
+  backend-green:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: visitor-backend-green
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/visitor_system
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - WHATSAPP_API_KEY=${WHATSAPP_API_KEY}
+      - WHATSAPP_PHONE_NUMBER=${WHATSAPP_PHONE_NUMBER}
+    ports:
+      - "3003:3000"
+    networks:
+      - visitor-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 绿环境前端服务
+  frontend-green:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: visitor-frontend-green
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost/api
+    ports:
+      - "3004:80"
+    networks:
+      - visitor-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  visitor-network:
+    external: true

@@ -14,6 +14,7 @@ import { SystemConfigModule } from './system-config/system-config.module';
 import { EmailModule } from './email/email.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { WorkerRegistrationModule } from './worker-registration/worker-registration.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { WorkerRegistrationModule } from './worker-registration/worker-registrat
     EmailModule,
     WhatsAppModule,
     WorkerRegistrationModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

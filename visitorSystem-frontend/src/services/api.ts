@@ -4,15 +4,23 @@ const API_BASE_URL = (() => {
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
   if (envUrl) return envUrl;
 
-  // 如果没有环境变量，使用当前主机的地址（替换前端端口3001为后端端口3000）
+  // 如果没有环境变量，使用当前主机的地址（替换前端端口3002为后端端口3001）
   const currentHost = window.location.hostname;
   // 如果是本地开发环境，使用localhost
   if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-    return 'http://localhost:3000';
+    return 'http://localhost:3001';
   } 
   // 否则使用当前访问的主机名+后端端口
-  return `http://${currentHost}:3000`;
+  return `http://${currentHost}:3001`;
 })();
+
+// 全局登出函数引用，用于 token 过期时自动登出
+let globalLogoutFunction: (() => void) | null = null;
+
+// 设置全局登出函数
+export const setGlobalLogoutFunction = (logoutFn: () => void) => {
+  globalLogoutFunction = logoutFn;
+};
 
 export interface LoginRequest {
   username: string;
@@ -287,7 +295,12 @@ class ApiService {
             errorMessage = errorData?.message || '请求参数错误';
             break;
           case 401:
-            errorMessage = '用户名或密码错误，或账户已被禁用';
+            // 检测到 token 过期，自动登出
+            if (globalLogoutFunction) {
+              console.log('检测到 token 过期，自动登出');
+              globalLogoutFunction();
+            }
+            errorMessage = '登录已过期，请重新登录';
             break;
           case 403:
             errorMessage = '没有权限访问此资源';
@@ -1409,7 +1422,7 @@ class ApiService {
     password: string;
     loginUrl: string;
     language?: string;
-  }): Promise<{ success: boolean; message: string; error?: string; details?: any; step?: string }> {
+  }): Promise<{ success: boolean; message: string; error?: string; details?: any; step?: string; stack?: string }> {
     try {
       // 打印更详细的调试信息
       console.log('发送请求到 /email/send-distributor-account API端点');
@@ -1420,7 +1433,7 @@ class ApiService {
       console.log('开始发送邮件请求...');
       
       // 发送邮件
-      const response = await this.requestWithRetry('/email/send-distributor-account', {
+      const response = await this.requestWithRetry<{ success: boolean; message: string; error?: string; details?: any; step?: string; stack?: string }>('/email/send-distributor-account', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

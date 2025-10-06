@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Layout, Button, Avatar, Dropdown, Typography, message } from 'antd'
+import { Layout, Button, Dropdown, Typography, message } from 'antd'
 import { UserOutlined, LogoutOutlined, ClockCircleOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -14,7 +14,18 @@ const { Text } = Typography
 
 const DistributorLayout: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(dayjs())
-  const [distributorInfo, setDistributorInfo] = useState<any>(null)
+  const [distributorInfo, setDistributorInfo] = useState<{
+    id: string;
+    distributorId: string;
+    name: string;
+    contactName?: string;
+    phone?: string;
+    email?: string;
+    whatsapp?: string;
+    accountUsername?: string;
+    accountStatus?: 'active' | 'disabled';
+    siteIds?: string[];
+  } | null>(null)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { setLocale, t, locale } = useLocale()
@@ -73,17 +84,10 @@ const DistributorLayout: React.FC = () => {
   }, [user])
 
 
-  // 处理退出登录
-  const handleLogout = async () => {
-    try {
-      await logout()
-      message.success(t('login.logoutSuccess'))
-      navigate('/login')
-    } catch (error) {
-      console.error('Logout error:', error)
-      message.error(t('login.logoutFailed'))
-    }
-  }
+  // 处理退出登录 - 直接调用 useAuth 的 logout 方法
+  const handleLogout = () => {
+    logout();
+  };
 
   // 语言切换处理函数
   const handleLanguageChange = (newLocale: string) => {
@@ -124,7 +128,7 @@ const DistributorLayout: React.FC = () => {
       ]
     },
     {
-      type: 'divider'
+      type: 'divider' as const
     },
     {
       key: 'logout',

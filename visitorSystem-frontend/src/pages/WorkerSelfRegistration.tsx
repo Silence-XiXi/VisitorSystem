@@ -33,7 +33,7 @@ const WorkerSelfRegistration: React.FC = () => {
       return (import.meta as any).env.VITE_API_BASE_URL;
     }
     // 自动使用当前窗口的主机名
-    return `${window.location.protocol}//${window.location.hostname}:3000`;
+    return `${window.location.protocol}//${window.location.hostname}:3001`;
   };
   
   const apiBaseUrl = getApiBaseUrl();

@@ -1648,17 +1648,10 @@ const Guard: React.FC = () => {
     setCurrentView('main')
   }
 
-  // 登出功能
-  const handleLogout = async () => {
-    try {
-      await logout()
-      message.success(t('login.logoutSuccess'))
-      navigate('/login')
-    } catch (error) {
-      // console.error('Logout error:', error)
-      message.error(t('login.logoutFailed'))
-    }
-  }
+  // 登出功能 - 直接调用 useAuth 的 logout 方法
+  const handleLogout = () => {
+    logout();
+  };
 
   // 用户中心相关处理函数
   const handleUserCenterClick = () => {
