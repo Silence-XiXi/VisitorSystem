@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  username      String         @unique
+  password      String
+  role          UserRole
+  status        UserStatus     @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  distributor   Distributor?
+  guard         Guard?
+  systemConfigs SystemConfig[]
+
+  @@map("users")
+}
+
+model Distributor {
+  id            String            @id @default(cuid())
+  name          String
+  contactName   String?
+  phone         String?
+  email         String?
+  whatsapp      String?
+  status        DistributorStatus @default(ACTIVE)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  userId        String            @unique
+  distributorId String            @unique
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sites         SiteDistributor[]
+  workers       Worker[]
+
+  @@map("distributors")
+}
+
+model Site {
+  id                String             @id @default(cuid())
+  name              String
+  address           String
+  code              String?            @unique
+  manager           String?
+  phone             String?
+  status            SiteStatus         @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  guards            Guard[]
+  itemBorrowRecords ItemBorrowRecord[]
+  distributors      SiteDistributor[]
+  visitorRecords    VisitorRecord[]
+  workers           Worker[]
+
+  @@map("sites")
+}
+
+model SiteDistributor {
+  id            String      @id @default(cuid())
+  siteId        String
+  distributorId String
+  createdAt     DateTime    @default(now())
+  distributor   Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  site          Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, distributorId])
+  @@map("site_distributors")
+}
+
+model Guard {
+  id                String             @id @default(cuid())
+  guardId           String             @unique
+  name              String
+  phone             String
+  email             String?
+  whatsapp          String?
+  status            GuardStatus        @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  siteId            String
+  userId            String             @unique
+  site              Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemBorrowRecords ItemBorrowRecord[]
+  returnRecords     ItemBorrowRecord[] @relation("ReturnHandler")
+  visitorRecords    VisitorRecord[]
+
+  @@map("guards")
+}
+
+model Worker {
+  id                String             @id @default(cuid())
+  workerId          String             @unique
+  name              String
+  gender            Gender
+  region            String?
+  phone             String
+  email             String?
+  whatsapp          String?
+  birthDate         DateTime?
+  status            WorkerStatus       @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  distributorId     String
+  siteId            String
+  idNumber          String             @unique
+  idType            IdType             @default(ID_CARD)
+  itemBorrowRecords ItemBorrowRecord[]
+  visitorRecords    VisitorRecord[]
+  distributor       Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  site              Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@map("workers")
+}
+
+model ItemCategory {
+  id          String             @id @default(cuid())
+  name        String             @unique
+  description String?
+  status      ItemCategoryStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  code        String             @unique
+  items       Item[]
+
+  @@map("item_categories")
+}
+
+model Item {
+  id                String             @id @default(cuid())
+  itemCode          String             @unique
+  name              String
+  description       String?
+  status            ItemStatus         @default(AVAILABLE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  categoryId        String
+  itemBorrowRecords ItemBorrowRecord[]
+  category          ItemCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@map("items")
+}
+
+model ItemBorrowRecord {
+  id              String         @id @default(cuid())
+  borrowDate      DateTime
+  borrowTime      String
+  returnDate      DateTime?
+  returnTime      String?
+  status          BorrowStatus   @default(BORROWED)
+  borrowDuration  Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  workerId        String
+  siteId          String
+  itemId          String
+  borrowHandlerId String?
+  returnHandlerId String?
+  notes           String?
+  visitorRecordId String?
+  borrowHandler   Guard?         @relation(fields: [borrowHandlerId], references: [id])
+  item            Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  returnHandler   Guard?         @relation("ReturnHandler", fields: [returnHandlerId], references: [id])
+  site            Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  visitorRecord   VisitorRecord? @relation(fields: [visitorRecordId], references: [id])
+  worker          Worker         @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@map("item_borrow_records")
+}
+
+model VisitorRecord {
+  id             String             @id @default(cuid())
+  workerId       String
+  siteId         String
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  status         VisitorStatus      @default(ON_SITE)
+  idNumber       String
+  physicalCardId String?
+  registrarId    String?
+  phone          String?            // 添加电话号码字段
+  notes          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  idType         IdType
+  borrowRecords  ItemBorrowRecord[]
+  registrar      Guard?             @relation(fields: [registrarId], references: [id])
+  site           Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  worker         Worker             @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@map("visitor_records")
+}
+
+enum UserRole {
+  ADMIN
+  DISTRIBUTOR
+  GUARD
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum DistributorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SiteStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum GuardStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum WorkerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ItemCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ItemStatus {
+  AVAILABLE
+  BORROWED
+  MAINTENANCE
+  LOST
+}
+
+enum BorrowStatus {
+  BORROWED
+  RETURNED
+  OVERDUE
+}
+
+enum VisitorStatus {
+  ON_SITE
+  LEFT
+  PENDING
+}
+
+enum IdType {
+  ID_CARD
+  PASSPORT
+  DRIVER_LICENSE
+  OTHER
+}
+
+model SystemConfig {
+  id          Int      @id @default(autoincrement())
+  config_key  String   @unique
+  config_value String
+  description String?
+  is_encrypted Boolean @default(false)
+  updated_by  String
+  updated_at  DateTime @updatedAt
+  user        User     @relation(fields: [updated_by], references: [id])
+
+  @@map("system_configs")
+}
