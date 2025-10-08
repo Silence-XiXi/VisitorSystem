@@ -13,6 +13,9 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/visitor_system
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}
       - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
       - EMAIL_HOST=${EMAIL_HOST}
       - EMAIL_PORT=${EMAIL_PORT:-587}
@@ -21,7 +24,7 @@ services:
       - WHATSAPP_API_KEY=${WHATSAPP_API_KEY}
       - WHATSAPP_PHONE_NUMBER=${WHATSAPP_PHONE_NUMBER}
     ports:
-      - "3001:3000"
+      - "3001:3001"
     networks:
       - visitor-network
     depends_on:
@@ -30,7 +33,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3

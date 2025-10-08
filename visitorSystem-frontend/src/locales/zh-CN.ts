@@ -836,7 +836,7 @@ export default {
     guardIdLabel: '门卫编号',
     siteIdLabel: '所属工地',
     // 表单占位符
-    whatsAppPlaceholder: 'WhatsApp号码（例如: +86 13800138000）',
+    whatsAppPlaceholder: 'WhatsApp号码（例如: +85201234567）',
     initialPasswordPlaceholder: '初始密码（留空则使用 Pass@123）',
     guardIdPlaceholder: '请输入门卫编号（如: G001）',
     guardNamePlaceholder: '请输入门卫姓名',

@@ -16,9 +16,7 @@ services:
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
     networks:
       - visitor-network
-    depends_on:
-      - backend-blue
-      - frontend-blue
+    # depends_on 将在运行时动态检查服务可用性
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
