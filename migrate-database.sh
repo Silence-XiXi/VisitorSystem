@@ -86,24 +86,24 @@ run_migration() {
     fi
 }
 
-# 生成Prisma客户端
-generate_client() {
-    log_info "生成Prisma客户端..."
+# 执行种子数据
+run_seed_data() {
+    log_info "执行种子数据..."
     
-    # 在后端容器内生成
-    if docker exec visitor-backend-blue sh -c "cd /app && npx prisma generate" 2>/dev/null; then
-        log_success "Prisma客户端生成完成"
+    # 在后端容器内执行种子数据
+    if docker exec visitor-backend-blue sh -c "cd /app && npm run prisma:seed" 2>/dev/null; then
+        log_success "种子数据执行完成"
     else
-        log_warning "容器内生成失败，尝试宿主机生成..."
+        log_warning "容器内种子数据执行失败，尝试宿主机执行..."
         
-        # 在宿主机生成
+        # 在宿主机执行
         cd visitorSystem-backend
         export DATABASE_URL="postgresql://postgres:postgres123@localhost:5432/visitor_system"
         
-        if npx prisma generate; then
-            log_success "宿主机Prisma客户端生成完成"
+        if npm run prisma:seed; then
+            log_success "宿主机种子数据执行完成"
         else
-            log_error "Prisma客户端生成失败"
+            log_error "种子数据执行失败"
             exit 1
         fi
         
@@ -150,17 +150,21 @@ main() {
     check_database
     check_backend
     run_migration
-    generate_client
+    run_seed_data
     verify_migration
     restart_backend
     
     echo ""
     log_success "🎉 数据库迁移完成！"
     echo ""
-    echo -e "${GREEN}📋 后续步骤:${NC}"
-    echo -e "  1. 检查系统访问: ${BLUE}curl http://localhost:8086${NC}"
-    echo -e "  2. 检查API状态: ${BLUE}curl http://localhost:8086/api${NC}"
-    echo -e "  3. 检查数据库管理: ${BLUE}http://localhost:8089${NC}"
+    echo -e "${GREEN}📋 默认登录账号:${NC}"
+    echo -e "  管理员: ${BLUE}admin / admin123${NC}"
+    echo -e "  分判商: ${BLUE}bjadmin / dist123${NC}"
+    echo -e "  分判商: ${BLUE}shadmin / dist123${NC}"
+    echo -e "  分判商: ${BLUE}gzadmin / dist123${NC}"
+    echo -e "  门卫: ${BLUE}guard001 / guard123${NC}"
+    echo -e "  门卫: ${BLUE}guard002 / guard123${NC}"
+    echo -e "  门卫: ${BLUE}guard003 / guard123${NC}"
     echo ""
 }
 
