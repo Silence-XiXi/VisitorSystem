@@ -90,24 +90,27 @@ run_migration() {
 run_seed_data() {
     log_info "执行种子数据..."
     
-    # 在后端容器内执行种子数据
-    if docker exec visitor-backend-blue sh -c "cd /app && npm run prisma:seed" 2>/dev/null; then
+    # 在后端容器内直接执行种子数据
+    if docker exec visitor-backend-blue sh -c "cd /app && npx ts-node prisma/seed.ts" 2>/dev/null; then
         log_success "种子数据执行完成"
     else
-        log_warning "容器内种子数据执行失败，尝试宿主机执行..."
+        log_warning "ts-node执行失败，尝试使用node执行..."
         
-        # 在宿主机执行
-        cd visitorSystem-backend
-        export DATABASE_URL="postgresql://postgres:postgres123@localhost:5432/visitor_system"
-        
-        if npm run prisma:seed; then
-            log_success "宿主机种子数据执行完成"
+        # 尝试使用node直接执行
+        if docker exec visitor-backend-blue sh -c "cd /app && node -r ts-node/register prisma/seed.ts" 2>/dev/null; then
+            log_success "种子数据执行完成"
         else
-            log_error "种子数据执行失败"
-            exit 1
+            log_warning "node执行失败，尝试编译后执行..."
+            
+            # 尝试编译后执行
+            if docker exec visitor-backend-blue sh -c "cd /app && npx tsc prisma/seed.ts --outDir temp && node temp/prisma/seed.js" 2>/dev/null; then
+                log_success "种子数据执行完成"
+            else
+                log_error "种子数据执行失败，请手动执行"
+                log_info "手动执行命令: docker exec -it visitor-backend-blue sh -c 'cd /app && npx ts-node prisma/seed.ts'"
+                return 1
+            fi
         fi
-        
-        cd ..
     fi
 }
 
