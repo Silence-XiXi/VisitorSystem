@@ -1,4 +1,0 @@
-姓名,性别,身份证号,手机号,邮箱,WhatsApp,出生日期,地区,工地ID,状态,工人编号
-张三,男,123456789012345678,13800138000,zhangsan@example.com,13800138000,1990-01-01,mainland,site1,ACTIVE,W001
-李四,女,123456789012345679,13800138001,lisi@example.com,13800138001,1991-02-02,mainland,site1,ACTIVE,W002
-王五,男,123456789012345680,13800138002,wangwu@example.com,13800138002,1992-03-03,mainland,site1,ACTIVE,W003

@@ -44,11 +44,13 @@ services:
 
   # 数据库管理工具 (可选)
   adminer:
-    image: adminer:latest
+    build:
+      context: .
+      dockerfile: docker/adminer/Dockerfile
     container_name: visitor-adminer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8090:8090"
     networks:
       - visitor-network
     depends_on:

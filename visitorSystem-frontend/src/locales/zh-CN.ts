@@ -710,6 +710,7 @@ export default {
     siteAdded: '工地已新增',
     siteDeleted: '工地已删除',
     // 分判商管理
+    emailLabel: '邮箱',
     distributorManagement: '分判商管理',
     distributorId: '分判商ID',
     distributorName: '名称',

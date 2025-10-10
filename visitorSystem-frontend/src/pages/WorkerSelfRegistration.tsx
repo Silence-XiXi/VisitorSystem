@@ -32,8 +32,27 @@ const WorkerSelfRegistration: React.FC = () => {
     if ((import.meta as any).env?.VITE_API_BASE_URL) {
       return (import.meta as any).env.VITE_API_BASE_URL;
     }
-    // 自动使用当前窗口的主机名
-    return `${window.location.protocol}//${window.location.hostname}:3001`;
+    
+    // 自动使用当前窗口的主机名和端口
+    const currentHost = window.location.hostname;
+    const currentPort = window.location.port;
+    const currentProtocol = window.location.protocol;
+    
+    // 如果是本地开发环境，使用localhost:3001
+    if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
+    
+    // 检测是否通过nginx代理访问（支持多种端口）
+    const proxyPorts = ['80', '443', '8080', '8081', '8082', '3000', '3001'];
+    if (proxyPorts.includes(currentPort) || !currentPort) {
+      // 如果是默认端口（80/443）或没有端口，直接使用当前地址
+      const baseUrl = currentPort ? `${currentProtocol}//${currentHost}:${currentPort}` : `${currentProtocol}//${currentHost}`;
+      return `${baseUrl}/api`;
+    }
+    
+    // 否则使用当前访问的主机名+后端端口
+    return `${currentProtocol}//${currentHost}:3001`;
   };
   
   const apiBaseUrl = getApiBaseUrl();

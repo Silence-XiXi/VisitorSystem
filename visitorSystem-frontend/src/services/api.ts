@@ -1,17 +1,42 @@
-// 支持通过window.location获取当前主机地址，使跨设备访问时能自动连接到正确的API服务器
+// 使用相对路径API配置，让Nginx代理处理路由
 const API_BASE_URL = (() => {
   // 首先尝试使用环境变量
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
-  if (envUrl) return envUrl;
+  if (envUrl) {
+    console.log('[API Config] Using environment variable:', envUrl);
+    return envUrl;
+  }
 
-  // 如果没有环境变量，使用当前主机的地址（替换前端端口3002为后端端口3001）
+  // 检测当前访问环境
   const currentHost = window.location.hostname;
-  // 如果是本地开发环境，使用localhost
+  const currentPort = window.location.port;
+  
+  console.log('[API Config] Current location:', {
+    hostname: currentHost,
+    port: currentPort,
+    href: window.location.href
+  });
+  
+  // 检测是否通过nginx代理访问（端口9017、8081、8082等）
+  const proxyPorts = ['80', '443', '9017', '8081', '8082'];
+  if (proxyPorts.includes(currentPort) || !currentPort) {
+    // 使用相对路径，让Nginx代理处理
+    const url = '/api';
+    console.log('[API Config] Using relative path for Nginx proxy:', url);
+    return url;
+  }
+  
+  // 如果是本地开发环境（直接访问容器端口），使用localhost:3001
   if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-    return 'http://localhost:3001';
+    const url = 'http://localhost:3001';
+    console.log('[API Config] Local development detected, using:', url);
+    return url;
   } 
-  // 否则使用当前访问的主机名+后端端口
-  return `http://${currentHost}:3001`;
+  
+  // 其他情况：使用相对路径，让Nginx代理处理
+  const url = '/api';
+  console.log('[API Config] Using relative path:', url);
+  return url;
 })();
 
 // 全局登出函数引用，用于 token 过期时自动登出

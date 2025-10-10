@@ -41,6 +41,7 @@ RUN npm ci --only=production && npm cache clean --force
 # 复制构建产物
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/health-check.js ./health-check.js
 
 # 生成 Prisma client
 RUN npx prisma generate
@@ -53,7 +54,7 @@ EXPOSE 3000
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node dist/src/health-check.js || exit 1
+  CMD node health-check.js || exit 1
 
 # 启动应用
 ENTRYPOINT ["dumb-init", "--"]

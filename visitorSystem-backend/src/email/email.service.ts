@@ -31,6 +31,8 @@ export class EmailService {
   private transporter: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null = null;
   private transporterExpireTime: number = 0;
   private readonly TRANSPORTER_TTL = 3600 * 1000; // 传输器1小时有效期
+  private lastConfigUpdateTime: Date | null = null;
+  private configLoadingPromise: Promise<void> | null = null;
 
   constructor(private readonly systemConfigService: SystemConfigService) {}
 
@@ -118,9 +120,56 @@ export class EmailService {
     };
   }
 
+  // 检查邮箱配置是否需要重新加载
+  private async shouldReloadEmailConfig(): Promise<boolean> {
+    if (!this.lastConfigUpdateTime) {
+      return true; // 首次加载
+    }
+
+    try {
+      // 检查邮箱配置的更新时间（检查EMAIL_PASSWORD作为代表）
+      const emailConfig = await this.systemConfigService.findByKeySafe('EMAIL_PASSWORD');
+      
+      if (!emailConfig) {
+        this.logger.warn('未找到邮箱配置，需要重新加载');
+        return true;
+      }
+
+      // 如果数据库中的更新时间晚于上次加载时间，则需要重新加载
+      const dbUpdateTime = new Date(emailConfig.updated_at);
+      const needsReload = dbUpdateTime > this.lastConfigUpdateTime;
+      
+      if (needsReload) {
+        this.logger.log(`检测到邮箱配置更新，数据库时间: ${dbUpdateTime.toISOString()}, 上次加载时间: ${this.lastConfigUpdateTime.toISOString()}`);
+      }
+      
+      return needsReload;
+    } catch (error) {
+      this.logger.warn('检查邮箱配置更新时间失败，强制重新加载:', error);
+      return true;
+    }
+  }
+
+  // 强制刷新邮箱配置
+  public async refreshEmailConfig(): Promise<void> {
+    this.logger.log('手动刷新邮箱配置...');
+    this.lastConfigUpdateTime = null;
+    this.transporter = null; // 清除transporter缓存
+    this.transporterExpireTime = 0;
+  }
+
   // 获取并校验邮件配置
   private async getEmailConfig() {
     try {
+      // 检查是否需要重新加载配置
+      const needsReload = await this.shouldReloadEmailConfig();
+      
+      if (needsReload) {
+        this.logger.log('检测到邮箱配置更新，重新加载配置...');
+        this.transporter = null; // 清除transporter缓存
+        this.transporterExpireTime = 0;
+      }
+
       const [emailAddress, emailHost, emailPort, emailPassword] = await Promise.all([
         this.systemConfigService.getConfigValue('EMAIL_ADDRESS'),
         this.systemConfigService.getConfigValue('EMAIL_HOST'),
@@ -154,6 +203,9 @@ export class EmailService {
       if (emailHost.includes('163.com') && !['465', '587'].includes(emailPort)) {
         this.logger.warn(`163邮箱推荐使用465或587端口，当前配置为：${emailPort}`);
       }
+
+      // 更新配置加载时间
+      this.lastConfigUpdateTime = new Date();
 
       return {
         from: emailAddress,

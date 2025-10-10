@@ -33,7 +33,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "node", "health-check.js"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -44,16 +44,20 @@ services:
     build:
       context: .
       dockerfile: docker/frontend/Dockerfile
+      args:
+        # ✅ 使用相对路径，通过外部Nginx代理
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+        - NODE_ENV=${NODE_ENV:-production}
+        # ✅ 防缓存参数：每次构建都会变化
+        - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-$(date +%s)}
     container_name: visitor-frontend-blue
     restart: unless-stopped
-    environment:
-      - VITE_API_BASE_URL=http://localhost/api
     ports:
-      - "3002:80"
+      - "3002:3002"  # 映射到内部3002端口
     networks:
       - visitor-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -40,12 +40,14 @@ interface BatchSendResult {
 }
 
 @Injectable()
-export class WhatsAppService implements OnModuleInit {
+export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
   // 直接使用测试脚本中验证过的有效API密钥
   private apiKey: string = ''; // 这是测试中使用的有效API密钥
   private fromPhoneNumber: string = '';
   private configLoaded = false;
+  private configLoadingPromise: Promise<void> | null = null;
+  private lastConfigUpdateTime: Date | null = null;
 
   constructor(
     private configService: ConfigService,
@@ -54,10 +56,82 @@ export class WhatsAppService implements OnModuleInit {
     private systemConfigService: SystemConfigService
   ) {}
 
-  // NestJS生命周期钩子，确保服务初始化完成后才可用
-  async onModuleInit() {
-    await this.loadConfigFromDatabase();
+  /**
+   * 确保配置已加载（延迟初始化）
+   * 如果配置未加载，则立即加载
+   * 如果配置已过期，则重新加载
+   */
+  private async ensureConfigLoaded(): Promise<void> {
+    // 检查是否需要重新加载配置
+    const needsReload = await this.shouldReloadConfig();
+    
+    if (this.configLoaded && !needsReload) {
+      this.logger.debug('配置已加载且未过期，跳过重新加载');
+      return;
+    }
+
+    // 如果正在加载中，等待加载完成
+    if (this.configLoadingPromise) {
+      this.logger.debug('配置正在加载中，等待完成...');
+      await this.configLoadingPromise;
+      return;
+    }
+
+    // 开始加载配置
+    this.logger.log('开始加载WhatsApp配置...');
+    this.configLoadingPromise = this.loadConfigFromDatabase();
+    await this.configLoadingPromise;
     this.configLoaded = true;
+    this.configLoadingPromise = null;
+    this.lastConfigUpdateTime = new Date();
+    this.logger.log('配置加载完成');
+  }
+
+  /**
+   * 检查是否需要重新加载配置
+   * 通过比较数据库中的更新时间来判断
+   */
+  private async shouldReloadConfig(): Promise<boolean> {
+    if (!this.configLoaded || !this.lastConfigUpdateTime) {
+      return true; // 首次加载
+    }
+
+    try {
+      // 检查API密钥配置的更新时间
+      const apiKeyConfig = await this.prismaService.systemConfig.findUnique({
+        where: { config_key: 'WHATSAPP_API_TOKEN' },
+        select: { updated_at: true }
+      });
+
+      if (!apiKeyConfig) {
+        this.logger.warn('未找到API密钥配置，需要重新加载');
+        return true;
+      }
+
+      // 如果数据库中的更新时间晚于上次加载时间，则需要重新加载
+      const dbUpdateTime = new Date(apiKeyConfig.updated_at);
+      const needsReload = dbUpdateTime > this.lastConfigUpdateTime;
+      
+      if (needsReload) {
+        this.logger.log(`检测到配置更新，数据库时间: ${dbUpdateTime.toISOString()}, 上次加载时间: ${this.lastConfigUpdateTime.toISOString()}`);
+      }
+      
+      return needsReload;
+    } catch (error) {
+      this.logger.warn('检查配置更新时间失败，强制重新加载:', error);
+      return true;
+    }
+  }
+
+  /**
+   * 强制刷新配置
+   * 用于手动触发配置重新加载
+   */
+  public async refreshConfig(): Promise<void> {
+    this.logger.log('手动刷新WhatsApp配置...');
+    this.configLoaded = false;
+    this.lastConfigUpdateTime = null;
+    await this.ensureConfigLoaded();
   }
 
   /**
@@ -96,7 +170,7 @@ export class WhatsAppService implements OnModuleInit {
    */
   private async loadConfigFromDatabase(): Promise<void> {
     try {
-      this.logger.log('从数据库加载WhatsApp配置...');
+      this.logger.log('延迟加载WhatsApp配置...');
       
       // 使用SystemConfigService获取并自动解密配置
       try {
@@ -104,9 +178,12 @@ export class WhatsAppService implements OnModuleInit {
         if (apiKeyValue) {
           this.logger.log('成功从SystemConfigService获取API密钥');
           this.apiKey = apiKeyValue;
+          this.logger.log(`API密钥长度: ${this.apiKey.length}`);
+        } else {
+          this.logger.warn('SystemConfigService返回的API密钥为空');
         }
       } catch (e) {
-        this.logger.warn('无法从SystemConfigService获取API密钥，尝试直接从数据库获取');
+        this.logger.warn('无法从SystemConfigService获取API密钥，尝试直接从数据库获取', e);
         
         // 备选方案：直接从数据库获取并手动解密
         const apiKeyConfig = await this.prismaService.systemConfig.findUnique({
@@ -123,13 +200,14 @@ export class WhatsAppService implements OnModuleInit {
               this.logger.log('成功解密API密钥');
               this.apiKey = decryptedKey;
             } else {
-              this.logger.warn('API密钥解密失败，使用默认密钥');
-              // 保留默认值
+              this.logger.warn('API密钥解密失败');
             }
           } else {
             this.apiKey = apiKeyConfig.config_value;
             this.logger.log('从数据库加载了未加密的API密钥');
           }
+        } else {
+          this.logger.warn('数据库中未找到WHATSAPP_API_TOKEN配置');
         }
       }
       
@@ -155,11 +233,15 @@ export class WhatsAppService implements OnModuleInit {
         }
       }
 
-      // 验证配置
-      this.logger.log(`当前API密钥: ${this.apiKey.substring(0, 4)}...`);
-      this.logger.log(`当前发送方号码: ${this.fromPhoneNumber}`);
+      // 验证最终配置结果
+      this.logger.log(`延迟加载完成 - API密钥状态: ${this.apiKey ? '已配置' : '未配置'}`);
+      if (this.apiKey) {
+        this.logger.log(`API密钥长度: ${this.apiKey.length}`);
+        this.logger.log(`API密钥前四位: ${this.apiKey.substring(0, 4)}...`);
+      }
+      this.logger.log(`发送方号码: ${this.fromPhoneNumber}`);
     } catch (error) {
-      this.logger.error('加载WhatsApp配置失败，使用默认配置:', error);
+      this.logger.error('延迟加载WhatsApp配置失败:', error);
       // 保留默认值，不要覆盖
     }
   }
@@ -200,6 +282,9 @@ export class WhatsAppService implements OnModuleInit {
    */
   private async uploadMediaToYCloud(filePath: string): Promise<string> {
     try {
+      // 确保配置已加载
+      await this.ensureConfigLoaded();
+      
       // 直接使用axios而不是HttpService，完全复制测试脚本的行为
       const formData = new FormData();
       formData.append('file', fs.createReadStream(filePath));
@@ -247,6 +332,9 @@ export class WhatsAppService implements OnModuleInit {
    */
   private async sendWhatsAppMessage(toPhoneNumber: string, workerName: string, mediaId: string, language?: string): Promise<any> {
     try {
+      // 确保配置已加载
+      await this.ensureConfigLoaded();
+      
       const url = 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly';
       
       // 获取当前系统语言
@@ -321,13 +409,13 @@ export class WhatsAppService implements OnModuleInit {
    */
   async sendQRCode(workerWhatsApp: string, workerName: string, qrCodeDataUrl: string, language?: string): Promise<{ success: boolean; message: string }> {
     try {
-      // 确保配置已加载
-      if (!this.configLoaded) {
-        this.logger.warn('配置尚未完全加载，正在使用默认配置');
-      }
+      // 延迟初始化：确保配置已加载
+      this.logger.log('开始发送QRCode，检查配置状态...');
+      await this.ensureConfigLoaded();
       
       // 验证API密钥有效性
       if (!this.apiKey) {
+        this.logger.error('API密钥未配置，无法发送WhatsApp消息');
         return { 
           success: false, 
           message: '发送失败: API密钥未配置' 
