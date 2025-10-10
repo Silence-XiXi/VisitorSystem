@@ -90,12 +90,20 @@ run_migration() {
 generate_prisma_client() {
     log_info "生成Prisma客户端..."
     
+    # 先清理旧的Prisma客户端
+    log_info "清理旧的Prisma客户端..."
+    docker exec visitor-backend-blue sh -c "cd /app && rm -rf node_modules/.prisma/client" 2>/dev/null || true
+    
+    # 修复权限
+    log_info "修复文件权限..."
+    docker exec visitor-backend-blue sh -c "cd /app && chmod -R 755 node_modules/.prisma" 2>/dev/null || true
+    
     # 在后端容器内生成Prisma客户端
     if docker exec visitor-backend-blue sh -c "cd /app && npx prisma generate" 2>/dev/null; then
         log_success "Prisma客户端生成完成"
     else
         log_error "Prisma客户端生成失败"
-        log_info "请手动执行: docker exec -it visitor-backend-blue sh -c 'cd /app && npx prisma generate'"
+        log_info "请手动执行: docker exec -it visitor-backend-blue sh -c 'cd /app && rm -rf node_modules/.prisma/client && npx prisma generate'"
         return 1
     fi
 }
