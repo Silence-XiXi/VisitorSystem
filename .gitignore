@@ -83,7 +83,7 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv 环境变量文件
-.env
+# .env
 .env.test
 
 # parcel-bundler 缓存

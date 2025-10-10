@@ -1,5 +1,5 @@
 # 后端 Dockerfile
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -20,7 +20,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # 生产阶段
-FROM node:18-alpine
+FROM node:20-alpine
 
 # 安装必要的系统依赖
 RUN apk add --no-cache dumb-init
