@@ -86,29 +86,53 @@ run_migration() {
     fi
 }
 
+# 生成Prisma客户端
+generate_prisma_client() {
+    log_info "生成Prisma客户端..."
+    
+    # 在后端容器内生成Prisma客户端
+    if docker exec visitor-backend-blue sh -c "cd /app && npx prisma generate" 2>/dev/null; then
+        log_success "Prisma客户端生成完成"
+    else
+        log_error "Prisma客户端生成失败"
+        log_info "请手动执行: docker exec -it visitor-backend-blue sh -c 'cd /app && npx prisma generate'"
+        return 1
+    fi
+}
+
 # 执行种子数据
 run_seed_data() {
     log_info "执行种子数据..."
     
-    # 在后端容器内直接执行种子数据
-    if docker exec visitor-backend-blue sh -c "cd /app && npx ts-node prisma/seed.ts" 2>/dev/null; then
+    # 在后端容器内使用ts-node执行种子数据
+    if docker exec visitor-backend-blue sh -c "cd /app && npx ts-node --esm prisma/seed.ts" 2>/dev/null; then
         log_success "种子数据执行完成"
     else
-        log_warning "ts-node执行失败，尝试使用node执行..."
+        log_warning "ts-node --esm执行失败，尝试使用tsx..."
         
-        # 尝试使用node直接执行
-        if docker exec visitor-backend-blue sh -c "cd /app && node -r ts-node/register prisma/seed.ts" 2>/dev/null; then
+        # 尝试使用tsx执行
+        if docker exec visitor-backend-blue sh -c "cd /app && npx tsx prisma/seed.ts" 2>/dev/null; then
             log_success "种子数据执行完成"
         else
-            log_warning "node执行失败，尝试编译后执行..."
+            log_warning "tsx执行失败，尝试编译后执行..."
             
             # 尝试编译后执行
-            if docker exec visitor-backend-blue sh -c "cd /app && npx tsc prisma/seed.ts --outDir temp && node temp/prisma/seed.js" 2>/dev/null; then
+            if docker exec visitor-backend-blue sh -c "cd /app && npx tsc prisma/seed.ts --outDir temp --target es2020 --module commonjs && node temp/prisma/seed.js" 2>/dev/null; then
                 log_success "种子数据执行完成"
             else
-                log_error "种子数据执行失败，请手动执行"
-                log_info "手动执行命令: docker exec -it visitor-backend-blue sh -c 'cd /app && npx ts-node prisma/seed.ts'"
-                return 1
+                log_warning "编译执行失败，尝试使用prisma db seed..."
+                
+                # 尝试使用prisma的db seed命令
+                if docker exec visitor-backend-blue sh -c "cd /app && npx prisma db seed" 2>/dev/null; then
+                    log_success "种子数据执行完成"
+                else
+                    log_error "所有种子数据执行方式都失败了"
+                    log_info "请手动执行以下命令之一:"
+                    log_info "1. docker exec -it visitor-backend-blue sh -c 'cd /app && npx ts-node --esm prisma/seed.ts'"
+                    log_info "2. docker exec -it visitor-backend-blue sh -c 'cd /app && npx tsx prisma/seed.ts'"
+                    log_info "3. docker exec -it visitor-backend-blue sh -c 'cd /app && npx prisma db seed'"
+                    return 1
+                fi
             fi
         fi
     fi
@@ -153,6 +177,7 @@ main() {
     check_database
     check_backend
     run_migration
+    generate_prisma_client
     run_seed_data
     verify_migration
     restart_backend
