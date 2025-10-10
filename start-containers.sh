@@ -42,11 +42,11 @@ check_docker() {
 # 创建网络
 create_network() {
     log_info "检查Docker网络..."
-    if ! docker network ls | grep -q "visitorsystem_visitor-network"; then
-        log_info "创建Docker网络: visitorsystem_visitor-network"
-        docker network create visitorsystem_visitor-network
+    if ! docker network ls | grep -q "visitorsystem-network"; then
+        log_info "创建Docker网络: visitorsystem-network"
+        docker network create visitorsystem-network
     else
-        log_success "网络已存在: visitorsystem_visitor-network"
+        log_success "网络已存在: visitorsystem-network"
     fi
 }
 
@@ -59,7 +59,7 @@ start_base_services() {
         log_info "启动PostgreSQL数据库..."
         docker run -d \
             --name visitor-postgres \
-            --network visitorsystem_visitor-network \
+            --network visitorsystem-network \
             -p 5432:5432 \
             -e POSTGRES_DB=visitor_system \
             -e POSTGRES_USER=postgres \
@@ -76,7 +76,7 @@ start_base_services() {
         log_info "启动Redis缓存..."
         docker run -d \
             --name visitor-redis \
-            --network visitorsystem_visitor-network \
+            --network visitorsystem-network \
             -p 6379:6379 \
             -e REDIS_PASSWORD=redis123 \
             redis:7-alpine redis-server --requirepass redis123
@@ -90,7 +90,7 @@ start_base_services() {
         log_info "启动Adminer数据库管理..."
         docker run -d \
             --name visitor-adminer \
-            --network visitorsystem_visitor-network \
+            --network visitorsystem-network \
             -p 8089:8089 \
             adminer:latest
         log_success "Adminer启动成功"
@@ -131,7 +131,7 @@ start_app_services() {
         log_info "启动后端服务..."
         docker run -d \
             --name visitor-backend-blue \
-            --network visitorsystem_visitor-network \
+            --network visitorsystem-network \
             -p 3001:3000 \
             -e NODE_ENV=production \
             -e DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/visitor_system \
@@ -157,7 +157,7 @@ start_app_services() {
         log_info "启动前端服务..."
         docker run -d \
             --name visitor-frontend-blue \
-            --network visitorsystem_visitor-network \
+            --network visitorsystem-network \
             -p 3002:80 \
             visitor-frontend-blue
         log_success "前端服务启动成功"
@@ -170,7 +170,7 @@ start_app_services() {
         log_info "启动Nginx负载均衡器..."
         docker run -d \
             --name visitor-nginx \
-            --network visitorsystem_visitor-network \
+            --network visitorsystem-network \
             -p 8086:80 \
             -v $(pwd)/docker/nginx/nginx.blue.conf:/etc/nginx/nginx.conf \
             nginx:alpine

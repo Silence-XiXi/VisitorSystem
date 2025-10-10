@@ -54,7 +54,7 @@ check_dependencies() {
 # 创建网络
 create_network() {
     log_info "创建 Docker 网络..."
-    docker network create visitor-network 2>/dev/null || log_warning "网络已存在"
+    docker network create visitorsystem-network 2>/dev/null || log_warning "网络已存在"
 }
 
 # 启动基础服务
@@ -171,7 +171,7 @@ cleanup() {
     $COMPOSE_CMD -f docker-compose.green.yml down 2>/dev/null || true
     $COMPOSE_CMD -f docker-compose.nginx.yml down 2>/dev/null || true
     $COMPOSE_CMD -f docker-compose.base.yml down 2>/dev/null || true
-    docker network rm visitor-network 2>/dev/null || true
+    docker network rm visitorsystem-network 2>/dev/null || true
     log_success "清理完成"
 }
 
