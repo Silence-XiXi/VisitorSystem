@@ -50,7 +50,7 @@ services:
     container_name: visitor-adminer
     restart: unless-stopped
     ports:
-      - "8090:8090"
+      - "8089:8089"
     networks:
       - visitor-network
     depends_on:

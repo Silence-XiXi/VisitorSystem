@@ -11,7 +11,7 @@ services:
     container_name: visitor-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8086:80"
       - "443:443"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro

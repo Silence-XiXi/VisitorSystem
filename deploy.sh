@@ -79,7 +79,7 @@ deploy_blue() {
     sleep 30
     
     # 检查服务状态
-    if $COMPOSE_CMD -f docker-compose.blue.yml ps | grep -q "Up"; then
+    if $COMPOSE_CMD -f docker-compose.base.yml -f docker-compose.blue.yml ps | grep -q "Up"; then
         log_success "蓝环境部署成功"
     else
         log_error "蓝环境部署失败"
@@ -102,7 +102,7 @@ deploy_green() {
     sleep 30
     
     # 检查服务状态
-    if $COMPOSE_CMD -f docker-compose.green.yml ps | grep -q "Up"; then
+    if $COMPOSE_CMD -f docker-compose.base.yml -f docker-compose.green.yml ps | grep -q "Up"; then
         log_success "绿环境部署成功"
     else
         log_error "绿环境部署失败"

@@ -9,14 +9,14 @@ RUN apk add --no-cache gettext
 RUN echo '#!/bin/sh' > /usr/local/bin/start-adminer.sh && \
     echo 'export ADMINER_DEFAULT_SERVER="postgres"' >> /usr/local/bin/start-adminer.sh && \
     echo 'export ADMINER_DESIGN="pepa-linha-dark"' >> /usr/local/bin/start-adminer.sh && \
-    echo 'exec php -S 0.0.0.0:8090 -t /var/www/html' >> /usr/local/bin/start-adminer.sh && \
+    echo 'exec php -S 0.0.0.0:8089 -t /var/www/html' >> /usr/local/bin/start-adminer.sh && \
     chmod +x /usr/local/bin/start-adminer.sh
 
 # 切换到非root用户
 USER adminer
 
-# 暴露端口8090
-EXPOSE 8090
+# 暴露端口8089
+EXPOSE 8089
 
 # 使用自定义启动脚本
 CMD ["/usr/local/bin/start-adminer.sh"]

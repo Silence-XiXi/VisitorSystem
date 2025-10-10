@@ -91,7 +91,7 @@ start_base_services() {
         docker run -d \
             --name visitor-adminer \
             --network visitorsystem_visitor-network \
-            -p 8080:8080 \
+            -p 8089:8089 \
             adminer:latest
         log_success "Adminer启动成功"
     else
@@ -171,7 +171,7 @@ start_app_services() {
         docker run -d \
             --name visitor-nginx \
             --network visitorsystem_visitor-network \
-            -p 80:80 \
+            -p 8086:80 \
             -v $(pwd)/docker/nginx/nginx.blue.conf:/etc/nginx/nginx.conf \
             nginx:alpine
         log_success "Nginx负载均衡器启动成功"
@@ -196,8 +196,8 @@ show_access_info() {
     log_success "🎉 访客管理系统启动完成！"
     echo ""
     echo -e "${GREEN}📱 访问地址:${NC}"
-    echo -e "  主系统:     ${BLUE}http://localhost${NC}"
-    echo -e "  数据库管理: ${BLUE}http://localhost:8080${NC}"
+    echo -e "  主系统:     ${BLUE}http://localhost:8086${NC}"
+    echo -e "  数据库管理: ${BLUE}http://localhost:8089${NC}"
     echo -e "  前端直接:   ${BLUE}http://localhost:3002${NC}"
     echo -e "  后端API:    ${BLUE}http://localhost:3001/api${NC}"
     echo ""

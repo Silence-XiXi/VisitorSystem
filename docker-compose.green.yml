@@ -28,10 +28,8 @@ services:
     networks:
       - visitor-network
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     healthcheck:
       test: ["CMD", "node", "health-check.js"]
       interval: 30s
