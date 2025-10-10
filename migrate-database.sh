@@ -90,21 +90,52 @@ run_migration() {
 generate_prisma_client() {
     log_info "生成Prisma客户端..."
     
+    # 确定使用的用户权限
+    local docker_user=""
+    if [[ "$FORCE_ROOT" == "true" ]]; then
+        docker_user="--user root"
+        log_info "使用root权限执行Prisma操作"
+    fi
+    
     # 先清理旧的Prisma客户端
     log_info "清理旧的Prisma客户端..."
-    docker exec visitor-backend-blue sh -c "cd /app && rm -rf node_modules/.prisma/client" 2>/dev/null || true
+    if docker exec $docker_user visitor-backend-blue sh -c "cd /app && rm -rf node_modules/.prisma/client" 2>/dev/null; then
+        log_success "旧Prisma客户端清理完成"
+    else
+        if [[ "$FORCE_ROOT" != "true" ]]; then
+            log_warning "清理旧Prisma客户端时遇到权限问题，尝试使用root权限..."
+            if docker exec --user root visitor-backend-blue sh -c "cd /app && rm -rf node_modules/.prisma/client" 2>/dev/null; then
+                log_success "旧Prisma客户端清理完成（使用root权限）"
+            else
+                log_warning "清理失败，继续尝试生成..."
+            fi
+        else
+            log_warning "清理失败，继续尝试生成..."
+        fi
+    fi
     
-    # 修复权限
-    log_info "修复文件权限..."
-    docker exec visitor-backend-blue sh -c "cd /app && chmod -R 755 node_modules/.prisma" 2>/dev/null || true
-    
-    # 在后端容器内生成Prisma客户端
-    if docker exec visitor-backend-blue sh -c "cd /app && npx prisma generate" 2>/dev/null; then
+    # 生成Prisma客户端
+    if docker exec $docker_user visitor-backend-blue sh -c "cd /app && npx prisma generate" 2>/dev/null; then
         log_success "Prisma客户端生成完成"
     else
-        log_error "Prisma客户端生成失败"
-        log_info "请手动执行: docker exec -it visitor-backend-blue sh -c 'cd /app && rm -rf node_modules/.prisma/client && npx prisma generate'"
-        return 1
+        if [[ "$FORCE_ROOT" != "true" ]]; then
+            log_warning "普通权限生成失败，尝试使用root权限..."
+            
+            # 使用root权限重新生成
+            if docker exec --user root visitor-backend-blue sh -c "cd /app && npx prisma generate" 2>/dev/null; then
+                log_success "Prisma客户端生成完成（使用root权限）"
+            else
+                log_error "Prisma客户端生成失败"
+                log_info "请手动执行以下命令之一:"
+                log_info "1. docker exec -it --user root visitor-backend-blue sh -c 'cd /app && rm -rf node_modules/.prisma/client && npx prisma generate'"
+                log_info "2. docker exec -it visitor-backend-blue sh -c 'cd /app && npx prisma generate'"
+                return 1
+            fi
+        else
+            log_error "Prisma客户端生成失败"
+            log_info "请手动执行: docker exec -it --user root visitor-backend-blue sh -c 'cd /app && rm -rf node_modules/.prisma/client && npx prisma generate'"
+            return 1
+        fi
     fi
 }
 
@@ -177,18 +208,83 @@ restart_backend() {
     fi
 }
 
+# 显示帮助信息
+show_help() {
+    echo -e "${BLUE}数据库迁移脚本使用说明${NC}"
+    echo ""
+    echo -e "${YELLOW}用法:${NC}"
+    echo "  ./migrate-database.sh [选项]"
+    echo ""
+    echo -e "${YELLOW}选项:${NC}"
+    echo "  -h, --help     显示此帮助信息"
+    echo "  --skip-seed    跳过种子数据执行"
+    echo "  --skip-restart 跳过后端服务重启"
+    echo "  --force-root   强制使用root权限执行所有操作"
+    echo ""
+    echo -e "${YELLOW}示例:${NC}"
+    echo "  ./migrate-database.sh                    # 完整迁移"
+    echo "  ./migrate-database.sh --skip-seed         # 跳过种子数据"
+    echo "  ./migrate-database.sh --force-root        # 强制使用root权限"
+    echo ""
+}
+
 # 主函数
 main() {
+    # 解析命令行参数
+    SKIP_SEED=false
+    SKIP_RESTART=false
+    FORCE_ROOT=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            --skip-seed)
+                SKIP_SEED=true
+                shift
+                ;;
+            --skip-restart)
+                SKIP_RESTART=true
+                shift
+                ;;
+            --force-root)
+                FORCE_ROOT=true
+                shift
+                ;;
+            *)
+                log_error "未知参数: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
     echo -e "${BLUE}🗄️ 开始数据库迁移...${NC}"
+    if [[ "$FORCE_ROOT" == "true" ]]; then
+        log_info "强制使用root权限模式"
+    fi
     echo ""
     
     check_database
     check_backend
     run_migration
     generate_prisma_client
-    run_seed_data
+    
+    if [[ "$SKIP_SEED" != "true" ]]; then
+        run_seed_data
+    else
+        log_info "跳过种子数据执行"
+    fi
+    
     verify_migration
-    restart_backend
+    
+    if [[ "$SKIP_RESTART" != "true" ]]; then
+        restart_backend
+    else
+        log_info "跳过后端服务重启"
+    fi
     
     echo ""
     log_success "🎉 数据库迁移完成！"
