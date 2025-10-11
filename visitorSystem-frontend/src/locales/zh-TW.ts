@@ -604,7 +604,7 @@ export default {
     borrowTime: '借用時間',
     returnTime: '歸還時間',
     returnedStatus: '已歸還',
-    notReturnedStatus: '紅色: ❌ 未歸還',
+    notReturnedStatus: '未歸還',
     workerId: '工號',
     name: '姓名',
     checkIn: '進場時間',

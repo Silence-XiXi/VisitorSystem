@@ -14,7 +14,6 @@ import {
   Statistic,
   Tag,
   Form,
-  InputNumber,
   Divider,
   Layout,
   Avatar,
@@ -39,9 +38,9 @@ import {
   GlobalOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import { mockWorkers, mockSites, mockDistributors } from '../data/mockData'
+// 移除mockData导入，使用真实API数据
 import { useAuth } from '../hooks/useAuth'
-import { useNavigate } from 'react-router-dom'
+// import { useNavigate } from 'react-router-dom' // 暂时未使用
 import { useLocale } from '../contexts/LocaleContext'
 import { apiService } from '../services/api'
 import dayjs from 'dayjs'
@@ -97,7 +96,7 @@ interface AttendanceRecord {
 const Guard: React.FC = () => {
   // 认证和导航
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  // const navigate = useNavigate() // 暂时未使用
   const { locale, setLocale, t } = useLocale()
   
   // 状态管理
@@ -107,10 +106,10 @@ const Guard: React.FC = () => {
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null)
   const [physicalCardId, setPhysicalCardId] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
-  const [borrowModalVisible, setBorrowModalVisible] = useState(false)
-  const [exitModalVisible, setExitModalVisible] = useState(false)
+  // const [borrowModalVisible, setBorrowModalVisible] = useState(false) // 暂时未使用
+  // const [exitModalVisible, setExitModalVisible] = useState(false) // 暂时未使用
   const [selectedItemType, setSelectedItemType] = useState('')
-  const [itemId, setItemId] = useState('')
+  // const [itemId, setItemId] = useState('') // 暂时未使用
   const [itemNumber, setItemNumber] = useState('')
   const [borrowItemsList, setBorrowItemsList] = useState<Array<{
     itemType: string
@@ -126,12 +125,12 @@ const Guard: React.FC = () => {
     borrowTime: string
     remark: string
   }>>([])
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
+  // const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]) // 暂时未使用
   const [workers, setWorkers] = useState<Worker[]>([])
   const [selectedBorrowedItems, setSelectedBorrowedItems] = useState<string[]>([])
   const [unreturnedItemRemarks, setUnreturnedItemRemarks] = useState<{[key: string]: string}>({})
   const [physicalCardReturned, setPhysicalCardReturned] = useState(false)
-  const [borrowQueryId, setBorrowQueryId] = useState('')
+  // const [borrowQueryId, setBorrowQueryId] = useState('') // 暂时未使用
   const [userCenterModalVisible, setUserCenterModalVisible] = useState(false)
   const [passwordForm] = Form.useForm()
   const [pagination, setPagination] = useState({
@@ -186,23 +185,20 @@ const Guard: React.FC = () => {
     endDate?: string;
   }>({})
 
-  // 计算统计数据 - 使用API数据或回退到模拟数据
-  const currentOnSite = guardStats?.onSiteWorkers ?? workers.filter(w => w.status === 'in').length
-  const totalExitedToday = guardStats?.todayExited ?? workers.filter(w => w.status === 'out').length
+  // 计算统计数据 - 完全使用API数据，不再依赖mockData
+  const currentOnSite = guardStats?.onSiteWorkers ?? 0
+  const totalExitedToday = guardStats?.todayExited ?? 0
   const totalEnteredToday = guardStats?.todayEntered ?? 0
   
   // 统计今日借出物品的数量（需要从借用记录中筛选今日的）
   const [todayBorrowedItems, setTodayBorrowedItems] = useState<number>(0)
   
-  // 仍然使用guardStats中的总未归还物品数
-  const totalUnreturnedItems = guardStats?.borrowedItems ?? workers.reduce((total, worker) => {
-    const unreturnedItems = worker.borrowedItems?.filter(item => !item.returnTime) || []
-    return total + unreturnedItems.length
-  }, 0)
+  // 完全使用API数据中的总未归还物品数
+  const totalUnreturnedItems = guardStats?.borrowedItems ?? 0
 
   // 加载门卫统计数据
   const loadGuardStats = async () => {
-    if (!user || user.role !== 'GUARD') return
+    if (!user || user.role?.toLowerCase() !== 'guard') return
     
     try {
       setLoading(true)
@@ -251,7 +247,6 @@ const Guard: React.FC = () => {
   const enrichVisitorRecord = (record: any, borrowRecordsMap: Map<string, any[]>): any => {
     // 只有当记录有工人ID和记录ID时才处理
     if (!record.worker?.workerId || !record.id) {
-      // console.log('记录缺少工人ID或记录ID:', record);
       return {
         ...record,
         borrowedItems: 0,
@@ -261,16 +256,16 @@ const Guard: React.FC = () => {
     }
     
     const workerId = record.worker.workerId;
-    const visitorRecordId = record.id;
+    // const visitorRecordId = record.id; // 暂时未使用
     // console.log(`处理工人ID: ${workerId}, 访客记录ID: ${visitorRecordId}`);
     
     // 获取该工人所有借用记录（包括之前访客记录的）
     const workerKey = `worker_${workerId}`;
     const allWorkerRecords = borrowRecordsMap.get(workerKey) || [];
     
-    // 获取当前访客记录关联的借用记录
-    const visitorRecordKey = `visitor_${visitorRecordId}`;
-    const currentVisitorRecords = borrowRecordsMap.get(visitorRecordKey) || [];
+      // 获取当前访客记录关联的借用记录
+      // const visitorRecordKey = `visitor_${visitorRecordId}`; // 暂时未使用
+      // const currentVisitorRecords = borrowRecordsMap.get(visitorRecordKey) || []; // 暂时未使用
     
     // 计算该工人今日相关的物品数量（借用日期是今日的 + 当前所有未归还的 + 归还时间是今日的）
     const today = dayjs().format('YYYY-MM-DD');
@@ -328,7 +323,7 @@ const Guard: React.FC = () => {
     checkOutStartDate?: string;
     checkOutEndDate?: string;
   }) => {
-    if (!user || user.role !== 'GUARD') return
+    if (!user || user.role?.toLowerCase() !== 'guard') return
     
     try {
       setVisitorRecordsLoading(true)
@@ -345,8 +340,6 @@ const Guard: React.FC = () => {
         // 使用常规筛选
         records = await apiService.getGuardSiteVisitorRecords(filters);
       }
-      
-      // console.log('Loaded visitor records:', records) // 调试信息
       
       // 为每个访客记录单独获取借用记录（使用访客记录ID）
       const borrowRecordsMap = new Map() // 用于存储访客记录ID到借用记录的映射
@@ -392,26 +385,25 @@ const Guard: React.FC = () => {
       
       // 打印借用记录映射的内容
       // console.log("借用记录Map内容:");
-      for (const [recordKey, records] of borrowRecordsMap.entries()) {
-        // console.log(`访客记录Key: ${recordKey}, 借用记录数量: ${records.length}`);
-      }
+      // for (const [recordKey, records] of borrowRecordsMap.entries()) {
+      //   console.log(`访客记录Key: ${recordKey}, 借用记录数量: ${records.length}`);
+      // }
       
       // 2. 在记录中添加借用物品和归还物品的数量信息
       const enrichedRecords = records.map(record => enrichVisitorRecord(record, borrowRecordsMap));
       
       // 检查所有记录是否都有借用物品信息
-      let missingCount = 0;
-      enrichedRecords.forEach(record => {
-        if (record.borrowedItems === undefined) {
-          missingCount++;
-          // console.error("记录缺少borrowedItems:", record);
-        }
-      });
+      // let missingCount = 0;
+      // enrichedRecords.forEach(record => {
+      //   if (record.borrowedItems === undefined) {
+      //     missingCount++;
+      //     // console.error("记录缺少borrowedItems:", record);
+      //   }
+      // });
       // console.log(`总记录数: ${enrichedRecords.length}, 缺少借用物品信息的记录数: ${missingCount}`);
-      // console.log('Enriched visitor records:', enrichedRecords)
       setVisitorRecords(enrichedRecords)
     } catch (error) {
-      // console.error('Failed to load visitor records:', error)
+      console.error('Failed to load visitor records:', error)
       message.error('加载访客记录失败')
     } finally {
       setVisitorRecordsLoading(false)
@@ -503,7 +495,7 @@ const Guard: React.FC = () => {
 
   // 加载统计数据
   useEffect(() => {
-    if (user && user.role === 'GUARD') {
+    if (user && user.role?.toLowerCase() === 'guard') {
       const loadSiteInfo = async () => {
         try {
           // console.log('🔍 尝试通过门卫API获取工地信息...')
@@ -535,7 +527,7 @@ const Guard: React.FC = () => {
             // 这里可以尝试其他方式获取工地名称，比如从统计数据中获取
             // console.log('尝试从统计数据中获取工地信息...')
             try {
-              const stats = await apiService.getGuardStats()
+              // const stats = await apiService.getGuardStats() // 暂时未使用
               // console.log('门卫统计数据:', stats)
               // 如果统计数据中有工地信息，可以使用
             } catch (statsError) {
@@ -563,19 +555,14 @@ const Guard: React.FC = () => {
     }
   }, [user])
 
-  // 初始化数据
+  // 初始化数据 - 移除mockData，使用空数组初始化
   useEffect(() => {
-    // 模拟从API获取工人数据
-    const workerData: Worker[] = mockWorkers.map(worker => ({
-      ...worker,
-      idCard: (worker as any).idCard || worker.idNumber, // 确保idCard字段存在
-      status: 'out' as const,
-      borrowedItems: []
-    }))
-    setWorkers(workerData)
+    // 不再使用mockData，workers数组将通过API调用获取真实数据
+    setWorkers([])
     
     // 初始化空的考勤记录数组，等待API数据
     // 模拟数据已移除，现在使用空数组
+    // setAttendanceRecords([]) // 已注释掉attendanceRecords状态
     /*
     const mockRecords: AttendanceRecord[] = [
       {
@@ -878,7 +865,6 @@ const Guard: React.FC = () => {
       }
     ]
     */
-    setAttendanceRecords([])
   }, [])
 
   // 1. 入场登记功能
@@ -902,20 +888,20 @@ const Guard: React.FC = () => {
       const input = scannedWorkerId.trim()
       
       // 手机号正则表达式集合
-      const cnMainlandPhoneRegex = /^1[3-9]\d{9}$/  // 中国大陆手机号：1开头，11位
-      const hkPhoneRegex = /^[5689]\d{7}$/  // 香港手机号：5/6/8/9开头，8位
-      const generalPhoneRegex = /^\d{8,11}$/  // 一般手机号：8-11位纯数字
+      // const cnMainlandPhoneRegex = /^1[3-9]\d{9}$/  // 中国大陆手机号：1开头，11位
+      // const hkPhoneRegex = /^[5689]\d{7}$/  // 香港手机号：5/6/8/9开头，8位
+      // const generalPhoneRegex = /^\d{8,11}$/  // 一般手机号：8-11位纯数字
       
       // 工号正则表达式
-      const workerIdWithWKRegex = /^WK/i  // 以WK开头的工号
-      const workerIdWithLetterRegex = /[a-z]/i  // 包含字母的工号
+      // const workerIdWithWKRegex = /^WK/i  // 以WK开头的工号
+      // const workerIdWithLetterRegex = /[a-z]/i  // 包含字母的工号
       
       // 判断是否是工号
-      const isWorkerId = workerIdWithWKRegex.test(input) || workerIdWithLetterRegex.test(input)
+      // const isWorkerId = workerIdWithWKRegex.test(input) || workerIdWithLetterRegex.test(input) // 暂时未使用
       
       // 判断输入类型，用于日志记录或未来可能的逻辑分支
-      const isPhoneType = cnMainlandPhoneRegex.test(input) || hkPhoneRegex.test(input) || 
-                          (!isWorkerId && generalPhoneRegex.test(input))
+      // const isPhoneType = cnMainlandPhoneRegex.test(input) || hkPhoneRegex.test(input) || 
+      //                     (!isWorkerId && generalPhoneRegex.test(input)) // 暂时未使用
       
       // 根据输入内容查询
       let worker
@@ -991,7 +977,7 @@ const Guard: React.FC = () => {
       // console.log('修改后的电话号码:', phoneNumber.trim());
       
       // 调用后端API创建访客记录（使用门卫专用接口）
-      const visitorRecord = await apiService.createGuardVisitorRecord({
+      await apiService.createGuardVisitorRecord({
         workerId: selectedWorker.workerId, // 使用工人编号而不是数据库ID
         siteId: user?.guard?.siteId || '',
         checkInTime: new Date().toISOString(), // 自动设置入场时间为当前时间
@@ -1068,20 +1054,20 @@ const Guard: React.FC = () => {
       const input = scannedWorkerId.trim()
       
       // 手机号正则表达式集合
-      const cnMainlandPhoneRegex = /^1[3-9]\d{9}$/  // 中国大陆手机号：1开头，11位
-      const hkPhoneRegex = /^[5689]\d{7}$/  // 香港手机号：5/6/8/9开头，8位
-      const generalPhoneRegex = /^\d{8,11}$/  // 一般手机号：8-11位纯数字
+      // const cnMainlandPhoneRegex = /^1[3-9]\d{9}$/  // 中国大陆手机号：1开头，11位
+      // const hkPhoneRegex = /^[5689]\d{7}$/  // 香港手机号：5/6/8/9开头，8位
+      // const generalPhoneRegex = /^\d{8,11}$/  // 一般手机号：8-11位纯数字
       
       // 工号正则表达式
-      const workerIdWithWKRegex = /^WK/i  // 以WK开头的工号
-      const workerIdWithLetterRegex = /[a-z]/i  // 包含字母的工号
+      // const workerIdWithWKRegex = /^WK/i  // 以WK开头的工号
+      // const workerIdWithLetterRegex = /[a-z]/i  // 包含字母的工号
       
       // 判断是否是工号
-      const isWorkerId = workerIdWithWKRegex.test(input) || workerIdWithLetterRegex.test(input)
+      // const isWorkerId = workerIdWithWKRegex.test(input) || workerIdWithLetterRegex.test(input) // 暂时未使用
       
       // 判断输入类型，用于日志记录或未来可能的逻辑分支
-      const isPhoneType = cnMainlandPhoneRegex.test(input) || hkPhoneRegex.test(input) || 
-                          (!isWorkerId && generalPhoneRegex.test(input))
+      // const isPhoneType = cnMainlandPhoneRegex.test(input) || hkPhoneRegex.test(input) || 
+      //                     (!isWorkerId && generalPhoneRegex.test(input)) // 暂时未使用
       
       // 设置环境变量用于调试
       // console.log('Input type:', isPhoneType ? 'Phone' : 'Worker ID/Card ID')
@@ -1090,13 +1076,8 @@ const Guard: React.FC = () => {
       let worker
       
       try {
-        if (isPhoneType) {
-          // 如果是手机号格式，直接查询工人信息
-          worker = await apiService.getWorkerByIdentifier(input)
-        } else {
-          // 如果是工号或实体卡ID，也直接查询工人信息
-          worker = await apiService.getWorkerByIdentifier(input)
-        }
+        // 使用通用的标识符查询方法
+        worker = await apiService.getWorkerByIdentifier(input)
       } catch (error) {
         // 如果工人信息查询失败，显示错误并返回
         message.error(t('guard.workerNotFound') || '未找到工人信息')
@@ -1531,6 +1512,8 @@ const Guard: React.FC = () => {
   // 4. 报表功能
   const handleReports = () => {
     setCurrentView('reports')
+    // 重置状态筛选为全部
+    setStatusFilter('all')
     // 加载今日访客记录（未离场 + 今日离场的记录）
     loadVisitorRecords({
       showTodayRecords: true
@@ -1692,7 +1675,7 @@ const Guard: React.FC = () => {
     const totalPages = Math.ceil(totalRecords / pagination.pageSize)
     
     if (isNaN(pageNumber) || pageNumber < 1 || pageNumber > totalPages) {
-      message.error(`请输入1到${totalPages}之间的页码`)
+      message.error(`请输入 1 到 ${totalPages} 之间的页码`)
       return
     }
     
@@ -1932,28 +1915,31 @@ const Guard: React.FC = () => {
     return true
   }
 
-  // 借/还物品页面查询工人信息
-  const handleBorrowQuery = async () => {
-    if (!borrowQueryId.trim()) {
+  // 借/还物品页面查询工人信息 - 使用API查询而不是本地workers数组
+  const handleBorrowQuery = async (queryId: string) => {
+    if (!queryId.trim()) {
       message.error(t('guard.pleaseEnterQrCodeOrPhysicalCardForQuery'))
       return
     }
 
-    const worker = workers.find(w => 
-      w.workerId === borrowQueryId || w.physicalCardId === borrowQueryId
-    )
-
-    if (!worker) {
-      message.error(t('guard.workerNotFound'))
-      return
-    }
-
-    if (worker.status !== 'in') {
-      message.error(t('guard.workerNotOnSiteCannotBorrow'))
-      return
-    }
-
     try {
+      // 使用API查询工人信息
+      const worker = await apiService.getWorkerByIdentifier(queryId.trim())
+      
+      // 检查工人是否有入场记录
+      let isOnSite = false
+      try {
+        await apiService.checkWorkerEntryRecord(worker.workerId)
+        isOnSite = true
+      } catch (error) {
+        isOnSite = false
+      }
+
+      if (!isOnSite) {
+        message.error(t('guard.workerNotOnSiteCannotBorrow'))
+        return
+      }
+
       // 获取该工人的借用记录，只显示未归还的物品
       const borrowRecords = await apiService.getWorkerBorrowRecords(worker.workerId)
       
@@ -1970,17 +1956,20 @@ const Guard: React.FC = () => {
           remark: record.remark || ''
         }))
 
-      // 创建只包含未归还物品的工人对象
-      const workerWithUnreturnedItems = {
+      // 转换API返回的Worker类型为前端使用的Worker类型
+      const frontendWorker: Worker = {
         ...worker,
+        idCard: worker.idNumber, // 将idNumber映射到idCard
+        status: 'in' as const, // 有入场记录说明工人在场
         borrowedItems: unreturnedItems
       }
 
-      setSelectedWorker(workerWithUnreturnedItems)
+      setSelectedWorker(frontendWorker)
       message.success(t('guard.workerQuerySuccess'))
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取工人借用记录失败:', error)
-      message.error('获取工人借用记录失败')
+      const errorMessage = error?.message || '获取工人借用记录失败'
+      message.error(errorMessage)
     }
   }
 
@@ -3686,9 +3675,6 @@ const Guard: React.FC = () => {
 
     // 使用API数据，如果没有数据则显示空数组
     const records = visitorRecords
-    // console.log('Records for table:', records) // 调试信息
-    // console.log('visitorRecords length:', visitorRecords.length) // 调试信息
-    // console.log('visitorRecords content:', JSON.stringify(visitorRecords, null, 2)) // 调试信息
 
     // 根据状态筛选记录
     const filteredRecords = records.filter(record => {
@@ -3698,7 +3684,6 @@ const Guard: React.FC = () => {
       if (statusFilter === 'out') return record.status === 'LEFT'
       return true
     })
-    // console.log('Filtered records:', filteredRecords) // 调试信息
 
     // 客户端分页处理
     const startIndex = (pagination.current - 1) * pagination.pageSize
@@ -3906,7 +3891,7 @@ const Guard: React.FC = () => {
               <Table
                 columns={columns}
                 dataSource={paginatedRecords}
-                rowKey="id"
+                rowKey={(record) => record.id || record.worker?.workerId || Math.random()}
                 pagination={false}
                 scroll={{ x: 1000 }}
                 size="small"
