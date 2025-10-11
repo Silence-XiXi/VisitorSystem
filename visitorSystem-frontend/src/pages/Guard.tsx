@@ -2454,7 +2454,7 @@ const Guard: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
                     <Statistic
-                      title={t('guard.borrowedItems') + ' (今日)'}
+                      title={t('guard.borrowedItems')}
                       value={todayBorrowedItems}
                       prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 

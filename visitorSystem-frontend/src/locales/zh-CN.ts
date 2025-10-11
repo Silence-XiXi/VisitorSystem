@@ -675,6 +675,7 @@ export default {
     importTip3: '所有分判商默认密码为 Pass@123',
     importWarnings: '导入警告',
     // 工人导出相关
+    guardAddedSuccess: '门卫已新增成功！',
     noSiteSelectedForExport: '请先选择工地再导出数据',
     exportWorkersTitle: '导出工人数据',
     exportWorkersDescription: '请选择要导出的工人数据范围: ',

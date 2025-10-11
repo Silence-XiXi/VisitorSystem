@@ -675,6 +675,7 @@ export default {
     importTip3: 'All subcontractors will have default password Pass@123',
     importWarnings: 'Import Warnings',
     // 工人导出相关
+    guardAddedSuccess: 'Guard added successfully!',
     noSiteSelectedForExport: 'No site selected for export',
     exportWorkersTitle: 'Export Workers',
     exportWorkersDescription: 'Export workers data for selected site',

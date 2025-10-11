@@ -309,8 +309,8 @@ export default {
     entryRegistration: '入場登記',
     borrowReturn: '物品借用',
     exitRegistration: '離場登記',
-    reports: '報告',
-    reportsView: '報告查看',
+    reports: '報表查看',
+    reportsView: '報表查看',
     itemBorrowing: '物品借用',
     back: '返回',
     todayVisitorRecords: '今日訪客記錄',
@@ -675,6 +675,7 @@ export default {
     importTip3: '所有分判商預設密碼為 Pass@123',
     importWarnings: '導入警告',
     // 工人导出相关
+    guardAddedSuccess: '門衛已新增成功！',
     noSiteSelectedForExport: '請先選擇工地再導出數據',
     exportWorkersTitle: '導出工人數據',
     exportWorkersDescription: '請選擇要導出的工人數據範圍: ',
