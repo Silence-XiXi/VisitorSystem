@@ -687,7 +687,7 @@ export default {
     allWorkersExported: '全部工人导出成功，共{count}条记录',
     // 其他管理功能
     siteManagement: '工地管理',
-    itemCategoryManagement: '借用物品分类管理',
+    itemCategoryManagement: '借用物品分类',
     itemBorrowRecords: '物品借用记录',
     visitorRecords: '访客记录统计',
     accountSettings: '账户设置',

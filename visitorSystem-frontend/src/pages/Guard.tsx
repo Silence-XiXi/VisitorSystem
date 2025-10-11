@@ -36,7 +36,8 @@ import {
   ClockCircleOutlined,
   ArrowLeftOutlined,
   QuestionCircleOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  ReloadOutlined
 } from '@ant-design/icons'
 import { mockWorkers, mockSites, mockDistributors } from '../data/mockData'
 import { useAuth } from '../hooks/useAuth'
@@ -2356,7 +2357,7 @@ const Guard: React.FC = () => {
           </Title>
           <Button 
             type="primary" 
-            icon={<BarChartOutlined />}
+            icon={<ReloadOutlined />}
             loading={loading}
             onClick={loadGuardStats}
             size="small"

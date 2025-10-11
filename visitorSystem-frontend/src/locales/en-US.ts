@@ -687,7 +687,7 @@ export default {
     allWorkersExported: 'All workers exported successfully, {count} records',
     // 其他管理功能
     siteManagement: 'Site Management',
-    itemCategoryManagement: 'Item Category Management',
+    itemCategoryManagement: 'Item Category',
     itemBorrowRecords: 'Item Borrow Records',
     visitorRecords: 'Visitor Records',
     accountSettings: 'Account Settings',

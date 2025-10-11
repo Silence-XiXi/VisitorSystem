@@ -1,6 +1,21 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Tabs, Upload } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, HomeOutlined, TeamOutlined, UploadOutlined, DownloadOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons'
+import { 
+  PlusOutlined, 
+  EditOutlined, 
+  DeleteOutlined, 
+  KeyOutlined, 
+  ExclamationCircleOutlined, 
+  CheckCircleOutlined, 
+  StopOutlined, 
+  HomeOutlined, 
+  TeamOutlined, 
+  UploadOutlined, 
+  DownloadOutlined, 
+  SendOutlined, 
+  CloseOutlined, 
+  ReloadOutlined 
+} from '@ant-design/icons'
 import { Site, Distributor, Guard } from '../types/worker'
 import { mockSites, mockDistributors, mockGuards } from '../data/mockData'
 import { 
@@ -2651,7 +2666,7 @@ const AdminSites: React.FC = () => {
         tabBarExtraContent={
           <Space>
             <Button 
-              icon={<DownloadOutlined />} 
+              icon={<ReloadOutlined />} 
               onClick={loadData}
               loading={loading}
               title={t('common.refresh')}
