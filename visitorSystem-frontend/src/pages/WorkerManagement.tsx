@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Card, Button, Space, Input, Select, Row, Col, message, Modal, Upload } from 'antd';
-import { PlusOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Card, Button, Space, Input, Select, message, Modal, Upload } from 'antd';
+import { PlusOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import Draggable from 'react-draggable';
 import WorkerForm, { WorkerFormRef } from '../components/WorkerForm';
 import WorkerTable from '../components/WorkerTable';
@@ -13,7 +13,6 @@ import apiService from '../services/api';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import { 
-  readWorkerExcelFile,
   generateImportTemplate
 } from '../utils/excelUtils';
 
@@ -699,117 +698,155 @@ const WorkerManagement: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* 页面标题和工地筛选 */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>
+    <div style={{ padding: '12px' }}>
+      {/* 页面标题和操作区域 */}
+      <div style={{ 
+        marginBottom: 12, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        {/* 左侧标题区域 */}
+        <div style={{ flex: '1 1 auto', minWidth: '300px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
             {t('worker.title')}
           </h2>
-          <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '14px' }}>
+          <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '13px' }}>
             {t('guard.totalWorkers').replace('{count}', workers.length.toString())}
           </p>
         </div>
-      </div>
 
-      {/* 操作栏 */}
-      <Card style={{ marginBottom: '24px' }}>
-        <Row gutter={16} align="middle">
-          <Col span={6}>
-            <Search
-              placeholder={t('worker.searchPlaceholder')}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col span={6}>
-            <Select
-              mode="multiple"
-              placeholder={t('worker.statusFilter')}
-              value={statusFilters}
-              onChange={(vals) => setStatusFilters(vals)}
-              style={{ width: '100%' }}
-              allowClear
+        {/* 右侧筛选和操作区域 */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end'
+        }}>
+          {/* 搜索框 */}
+          <Search
+            placeholder={t('worker.searchPlaceholder')}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            allowClear
+            style={{ 
+              minWidth: '200px',
+              maxWidth: '300px',
+              width: 'clamp(200px, 25vw, 300px)'
+            }}
+          />
+          
+          {/* 状态筛选 */}
+          <Select
+            mode="multiple"
+            placeholder={t('worker.statusFilter')}
+            value={statusFilters}
+            onChange={(vals) => setStatusFilters(vals)}
+            style={{ 
+              minWidth: '120px',
+              maxWidth: '150px',
+              width: 'clamp(120px, 15vw, 150px)'
+            }}
+            allowClear
+          >
+            <Option value="ACTIVE">{t('worker.active')}</Option>
+            <Option value="INACTIVE">{t('worker.inactive')}</Option>
+          </Select>
+
+          {/* 分判商筛选 */}
+          <Select
+            mode="multiple"
+            placeholder={t('worker.distributorFilter')}
+            value={distributorFilters}
+            onChange={(vals) => setDistributorFilters(vals)}
+            style={{ 
+              minWidth: '120px',
+              maxWidth: '150px',
+              width: 'clamp(120px, 15vw, 150px)'
+            }}
+            allowClear
+          >
+            {distributors.map(dist => (
+              <Option key={dist.id} value={dist.id}>{dist.name}</Option>
+            ))}
+          </Select>
+
+          {/* 操作按钮组 */}
+          <Space 
+            size="small"
+            style={{
+              flexWrap: 'wrap',
+              justifyContent: 'flex-end'
+            }}
+          >
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleDownloadTemplate}
+              size="small"
             >
-              <Option value="ACTIVE">{t('worker.active')}</Option>
-              <Option value="INACTIVE">{t('worker.inactive')}</Option>
-            </Select>
-          </Col>
-          <Col span={6}>
-            <Select
-              mode="multiple"
-              placeholder={t('worker.distributorFilter')}
-              value={distributorFilters}
-              onChange={(vals) => setDistributorFilters(vals)}
-              style={{ width: '100%' }}
-              allowClear
+              {t('guard.downloadTemplate')}
+            </Button>
+            <Upload
+              accept=".xlsx,.xls"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                handleImport(file)
+                return false
+              }}
             >
-              {distributors.map(dist => (
-                <Option key={dist.id} value={dist.id}>{dist.name}</Option>
-              ))}
-            </Select>
-          </Col>
-          <Col span={6}>
-            <Space wrap>
               <Button
-                icon={<DownloadOutlined />}
-                onClick={handleDownloadTemplate}
+                icon={<UploadOutlined />}
                 size="small"
               >
-                {t('guard.downloadTemplate')}
+                {t('worker.import')}
               </Button>
-              <Upload
-                accept=".xlsx,.xls"
-                showUploadList={false}
-                beforeUpload={(file) => {
-                  handleImport(file)
-                  return false
-                }}
-              >
-                <Button
-                  icon={<UploadOutlined />}
-                  size="small"
-                >
-                  {t('worker.import')}
-                </Button>
-              </Upload>
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={showWorkerExportOptions}
-                size="small"
-              >
-                {t('worker.export')}
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setFormVisible(true)}
-                size="small"
-              >
-                {t('guard.add')}
-              </Button>
-            </Space>
-          </Col>
-        </Row>
-      </Card>
+            </Upload>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={showWorkerExportOptions}
+              size="small"
+            >
+              {t('worker.export')}
+            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={loadData}
+              loading={loading}
+              size="small"
+            >
+              {t('common.refresh')}
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setFormVisible(true)}
+              size="small"
+            >
+              {t('guard.add')}
+            </Button>
+          </Space>
+        </div>
+      </div>
 
       {/* 筛选结果统计 */}
       {!loading && (searchText.trim() || statusFilters.length > 0 || distributorFilters.length > 0) && (
         <div style={{ 
-          marginBottom: 16, 
-          padding: '12px 16px', 
+          marginBottom: 8, 
+          padding: '8px 12px', 
           background: '#f5f5f5', 
-          borderRadius: '6px', 
+          borderRadius: '4px', 
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center' 
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ color: '#666', fontSize: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ color: '#666', fontSize: '13px' }}>
               {t('worker.filterResults').replace('{count}', filteredWorkers.length.toString())}
               {workers.length !== filteredWorkers.length && (
-                <span style={{ marginLeft: 8, color: '#999' }}>
+                <span style={{ marginLeft: 6, color: '#999' }}>
                   {t('worker.fromTotalRecords').replace('{total}', workers.length.toString())}
                 </span>
               )}
@@ -829,7 +866,21 @@ const WorkerManagement: React.FC = () => {
       )}
 
       {/* 工人表格 */}
-      <Card>
+      <Card style={{ 
+        margin: 0,
+        height: 'calc(100vh - 200px)', 
+        display: 'flex', 
+        flexDirection: 'column'
+      }}
+      styles={{
+        body: {
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 0, 
+          overflow: 'hidden'
+        }
+      }}>
         <WorkerTable
           workers={filteredWorkers}
           distributors={distributors}

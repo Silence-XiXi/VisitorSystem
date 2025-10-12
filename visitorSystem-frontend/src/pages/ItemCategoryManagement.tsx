@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Row, Col, Upload, Select } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Upload, Select, Pagination, Tooltip } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
 import { apiService } from '../services/api'
 import * as XLSX from 'xlsx'
@@ -11,7 +11,7 @@ interface ItemCategory {
   code: string
   name: string
   description: string
-  status: 'ACTIVE' | 'INACTIVE'
+  status: string
   createdAt: string
   updatedAt: string
 }
@@ -158,14 +158,35 @@ const ItemCategoryManagement: React.FC = () => {
 
   // 表格列定义
   const columns = [
-    { title: t('itemCategory.categoryCode'), dataIndex: 'code', key: 'code', width: 100 },
-    { title: t('itemCategory.categoryName'), dataIndex: 'name', key: 'name', width: 160 },
-    { title: t('itemCategory.descriptionLabel'), dataIndex: 'description', key: 'description' },
+    { 
+      title: t('itemCategory.categoryCode'), 
+      dataIndex: 'code', 
+      key: 'code', 
+      width: 120,
+      fixed: 'left' as const,
+      sorter: (a: ItemCategory, b: ItemCategory) => a.code.localeCompare(b.code)
+    },
+    { 
+      title: t('itemCategory.categoryName'), 
+      dataIndex: 'name', 
+      key: 'name', 
+      width: 120,
+      sorter: (a: ItemCategory, b: ItemCategory) => a.name.localeCompare(b.name)
+    },
+    { 
+      title: t('itemCategory.descriptionLabel'), 
+      dataIndex: 'description', 
+      key: 'description',
+      width: 240,
+      ellipsis: true,
+      render: (description: string) => description || '-'
+    },
     { 
       title: t('itemCategory.status'), 
       dataIndex: 'status', 
       key: 'status', 
-      width: 100, 
+      width: 100,
+      sorter: (a: ItemCategory, b: ItemCategory) => a.status.localeCompare(b.status),
       render: (status: string) => {
         const map: Record<string, { color: string; text: string }> = { 
           ACTIVE: { color: 'green', text: t('itemCategory.active') }, 
@@ -175,38 +196,56 @@ const ItemCategoryManagement: React.FC = () => {
         return <Tag color={cfg.color}>{cfg.text}</Tag>
       } 
     },
-    { title: t('itemCategory.createTime'), dataIndex: 'createdAt', key: 'createdAt', width: 180, render: (time: string) => new Date(time).toLocaleString() },
-    { title: t('itemCategory.updateTime'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (time: string) => new Date(time).toLocaleString() },
+    { 
+      title: t('itemCategory.createTime'), 
+      dataIndex: 'createdAt', 
+      key: 'createdAt', 
+      width: 160,
+      sorter: (a: ItemCategory, b: ItemCategory) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      render: (time: string) => new Date(time).toLocaleString() 
+    },
+    { 
+      title: t('itemCategory.updateTime'), 
+      dataIndex: 'updatedAt', 
+      key: 'updatedAt', 
+      width: 160,
+      sorter: (a: ItemCategory, b: ItemCategory) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+      render: (time: string) => new Date(time).toLocaleString() 
+    },
     { 
       title: t('common.actions'), 
       key: 'actions', 
-      width: 200, 
+      width: 120,
+      fixed: 'right' as const,
       render: (_: any, record: ItemCategory) => (
-        <Space>
-          <Button 
-            size="small" 
-            icon={<EditOutlined />} 
-            onClick={() => { 
-              setEditingCategory(record)
-              form.setFieldsValue(record)
-              setModalOpen(true) 
-            }}
-            title={t('common.edit')}
-          />
-          <Button 
-            size="small" 
-            icon={record.status === 'ACTIVE' ? <StopOutlined /> : <PlayCircleOutlined />}
-            type={record.status === 'ACTIVE' ? 'default' : 'primary'}
-            onClick={() => handleToggleStatus(record)}
-            title={record.status === 'ACTIVE' ? t('itemCategory.disable') : t('itemCategory.enable')}
-          />
-          <Button 
-            danger 
-            size="small" 
-            icon={<DeleteOutlined />} 
-            onClick={() => showDeleteConfirm(record)}
-            title={t('common.delete')}
-          />
+        <Space size="small">
+          <Tooltip title={t('common.edit')}>
+            <Button 
+              size="small" 
+              icon={<EditOutlined />} 
+              onClick={() => { 
+                setEditingCategory(record)
+                form.setFieldsValue(record)
+                setModalOpen(true) 
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={record.status === 'ACTIVE' ? t('itemCategory.disable') : t('itemCategory.enable')}>
+            <Button 
+              size="small" 
+              icon={record.status === 'ACTIVE' ? <StopOutlined /> : <PlayCircleOutlined />}
+              type={record.status === 'ACTIVE' ? 'default' : 'primary'}
+              onClick={() => handleToggleStatus(record)}
+            />
+          </Tooltip>
+          <Tooltip title={t('common.delete')}>
+            <Button 
+              danger 
+              size="small" 
+              icon={<DeleteOutlined />} 
+              onClick={() => showDeleteConfirm(record)}
+            />
+          </Tooltip>
         </Space>
       )
     }
@@ -490,7 +529,7 @@ const ItemCategoryManagement: React.FC = () => {
       }
       
       // 显示导入结果弹窗
-      showImportResultModal(successCount, skipCount, errors, 'itemCategory')
+      showImportResultModal(successCount, skipCount, errors)
     } catch (error) {
       console.error('Import processing failed:', error)
       message.error(t('itemCategory.importFailed'))
@@ -500,7 +539,7 @@ const ItemCategoryManagement: React.FC = () => {
   }
 
   // 显示导入结果弹窗
-  const showImportResultModal = (successCount: number, skipCount: number, errors: string[], type: 'itemCategory' = 'itemCategory') => {
+  const showImportResultModal = (successCount: number, skipCount: number, errors: string[]) => {
     const totalCount = successCount + skipCount + errors.length
     const title = t('itemCategory.importResultTitle')
     
@@ -659,166 +698,294 @@ const ItemCategoryManagement: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>
-          {t('itemCategory.title')}
-        </h2>
-        <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '14px' }}>
-          {t('itemCategory.description').replace('{count}', categories.length.toString())}
-        </p>
+    <div style={{ padding: '12px' }}>
+      {/* 页面标题和操作区域 */}
+      <div style={{ 
+        marginBottom: 12, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        {/* 左侧标题区域 */}
+        <div style={{ flex: '1 1 auto', minWidth: '300px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
+            {t('itemCategory.title')}
+          </h2>
+          <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '13px' }}>
+            {t('itemCategory.description').replace('{count}', categories.length.toString())}
+          </p>
+        </div>
+
+        {/* 右侧筛选和操作区域 */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end'
+        }}>
+          {/* 搜索框 */}
+          <Input 
+            placeholder={t('itemCategory.searchPlaceholder')} 
+            allowClear 
+            value={searchKeyword}
+            onChange={(e) => {
+              setSearchKeyword(e.target.value);
+              setPagination(prev => ({ ...prev, current: 1 }));
+            }}
+            style={{ 
+              minWidth: '200px',
+              maxWidth: '300px',
+              width: 'clamp(200px, 25vw, 300px)'
+            }}
+          />
+          
+          {/* 状态筛选 */}
+          <Select
+            placeholder={t('itemCategory.statusFilter')}
+            value={statusFilter}
+            onChange={(value) => {
+              setStatusFilter(value);
+              setPagination(prev => ({ ...prev, current: 1 }));
+            }}
+            style={{ 
+              minWidth: '120px',
+              maxWidth: '150px',
+              width: 'clamp(120px, 15vw, 150px)'
+            }}
+            allowClear
+          >
+            <Select.Option value="all">{t('itemCategory.allStatus')}</Select.Option>
+            <Select.Option value="ACTIVE">{t('itemCategory.active')}</Select.Option>
+            <Select.Option value="INACTIVE">{t('itemCategory.inactive')}</Select.Option>
+          </Select>
+
+          {/* 操作按钮组 */}
+          <Space 
+            size="small"
+            style={{
+              flexWrap: 'wrap',
+              justifyContent: 'flex-end'
+            }}
+          >
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={handleDownloadTemplate}
+              size="small"
+            >
+              {t('itemCategory.downloadTemplate')}
+            </Button>
+            <Upload 
+              accept=".xlsx,.xls" 
+              showUploadList={false}
+              beforeUpload={(file) => {
+                handleImport(file)
+                return false
+              }}
+            >
+              <Button 
+                icon={<UploadOutlined />}
+                size="small"
+              >
+                {t('itemCategory.importCategories')}
+              </Button>
+            </Upload>
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={() => handleExport(selectedCategoryIds.length === 0)}
+              size="small"
+            >
+              {selectedCategoryIds.length === 0 ? t('itemCategory.exportAll') : t('itemCategory.exportSelected').replace('{count}', selectedCategoryIds.length.toString())}
+            </Button>
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={loadCategories}
+              loading={loading}
+              size="small"
+            >
+              {t('common.refresh')}
+            </Button>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              onClick={() => { 
+                setEditingCategory(null)
+                form.resetFields()
+                // 新增时不设置code字段，让后端自动生成
+                setModalOpen(true) 
+              }}
+              size="small"
+            >
+              {t('itemCategory.addCategory')}
+            </Button>
+          </Space>
+        </div>
       </div>
 
-      <Card>
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Input 
-              placeholder={t('itemCategory.searchPlaceholder')} 
-              allowClear 
-              value={searchKeyword}
-              onChange={(e) => {
-                setSearchKeyword(e.target.value);
-                setPagination(prev => ({ ...prev, current: 1 }));
-              }}
-            />
-          </Col>
-          <Col span={4}>
-            <Select
-              placeholder={t('itemCategory.statusFilter')}
-              value={statusFilter}
-              onChange={(value) => {
-                setStatusFilter(value);
-                setPagination(prev => ({ ...prev, current: 1 }));
-              }}
-              style={{ width: '100%' }}
-              allowClear
-            >
-              <Select.Option value="all">{t('itemCategory.allStatus')}</Select.Option>
-              <Select.Option value="ACTIVE">{t('itemCategory.active')}</Select.Option>
-              <Select.Option value="INACTIVE">{t('itemCategory.inactive')}</Select.Option>
-            </Select>
-          </Col>
-          <Col span={14}>
-            <Space>
-              <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
-                {t('itemCategory.downloadTemplate')}
-              </Button>
-              <Upload 
-                accept=".xlsx,.xls" 
-                showUploadList={false}
-                beforeUpload={(file) => {
-                  handleImport(file)
-                  return false
-                }}
-              >
-                <Button icon={<UploadOutlined />}>{t('itemCategory.importCategories')}</Button>
-              </Upload>
-              <Button 
-                icon={<DownloadOutlined />} 
-                onClick={() => handleExport(selectedCategoryIds.length === 0)}
-              >
-                {selectedCategoryIds.length === 0 ? t('itemCategory.exportAll') : t('itemCategory.exportSelected').replace('{count}', selectedCategoryIds.length.toString())}
-              </Button>
-              <Button 
-                type="primary" 
-                icon={<PlusOutlined />} 
-                onClick={() => { 
-                  setEditingCategory(null)
-                  form.resetFields()
-                  // 新增时不设置code字段，让后端自动生成
-                  setModalOpen(true) 
-                }}
-              >
-                {t('itemCategory.addCategory')}
-              </Button>
-            </Space>
-          </Col>
-        </Row>
-        
-        {/* 筛选结果统计 */}
-        {!loading && (searchKeyword.trim() || statusFilter !== 'all') && (
-          <div style={{ 
-            marginBottom: 16, 
-            padding: '12px 16px', 
-            background: '#f5f5f5', 
-            borderRadius: '6px', 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center' 
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <span style={{ color: '#666', fontSize: '14px' }}>
-                {t('itemCategory.filterResults').replace('{count}', filteredCategories.length.toString())}
-                {categories.length !== filteredCategories.length && (
-                  <span style={{ marginLeft: 8, color: '#999' }}>
-                    {t('itemCategory.fromTotalRecords').replace('{total}', categories.length.toString())}
+      {/* 筛选结果统计 */}
+      {!loading && (searchKeyword.trim() || statusFilter !== 'all') && (
+        <div style={{ 
+          marginBottom: 8, 
+          padding: '8px 12px', 
+          background: '#f5f5f5', 
+          borderRadius: '4px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ color: '#666', fontSize: '13px' }}>
+              {t('itemCategory.filterResults').replace('{count}', filteredCategories.length.toString())}
+              {categories.length !== filteredCategories.length && (
+                <span style={{ marginLeft: 6, color: '#999' }}>
+                  {t('itemCategory.fromTotalRecords').replace('{total}', categories.length.toString())}
+                </span>
+              )}
+            </span>
+          </div>
+          <Button 
+            size="small" 
+            onClick={() => {
+              setSearchKeyword('')
+              setStatusFilter('all')
+              setPagination(prev => ({ ...prev, current: 1 }));
+            }}
+          >
+            {t('common.clearFilters')}
+          </Button>
+        </div>
+      )}
+
+      {/* 物品分类表格 */}
+      <Card style={{ 
+        margin: 0,
+        height: 'calc(100vh - 200px)', 
+        display: 'flex', 
+        flexDirection: 'column'
+      }}
+      styles={{
+        body: {
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 0, 
+          overflow: 'hidden'
+        }
+      }}>
+        <div style={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}>
+          {/* 选择状态显示 */}
+          {selectedCategoryIds.length > 0 && (
+            <div style={{ 
+              marginBottom: 8, 
+              padding: '8px 16px', 
+              backgroundColor: '#f6ffed', 
+              border: '1px solid #b7eb8f',
+              borderRadius: '4px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0
+            }}>
+              <span>
+                {t('itemCategory.selectedCategories').replace('{count}', selectedCategoryIds.length.toString())}
+                {selectedCategoryIds.length > 0 && (
+                  <span style={{ color: '#999', marginLeft: '8px' }}>
+                    / {t('itemCategory.totalCategories').replace('{count}', paginatedCategories.length.toString())}
                   </span>
                 )}
               </span>
+              <Button 
+                onClick={() => setSelectedCategoryIds([])}
+                size="small"
+              >
+                {t('itemCategory.clearSelection').replace('{count}', selectedCategoryIds.length.toString())}
+              </Button>
             </div>
-            <Button 
-              size="small" 
-              onClick={() => {
-                setSearchKeyword('')
-                setStatusFilter('all')
-                setPagination(prev => ({ ...prev, current: 1 }));
+          )}
+
+          {/* 表格容器 */}
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            minHeight: 0, 
+            padding: '8px 16px 0 16px', // 顶部添加8px间距
+            marginBottom: selectedCategoryIds.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
+          }}>
+            <Table 
+              rowKey="id" 
+              columns={columns} 
+              dataSource={paginatedCategories} 
+              loading={loading}
+              scroll={{ 
+                x: 1000,
+                y: selectedCategoryIds.length > 0 
+                  ? 'calc(100vh - 348px)' // 有批量操作栏时减少高度，考虑顶部间距
+                  : 'calc(100vh - 308px)' // 没有批量操作栏时正常高度，考虑顶部间距
               }}
-            >
-              {t('common.clearFilters')}
-            </Button>
+              pagination={false} // 禁用内置分页，使用自定义分页
+              size="middle"
+              tableLayout="fixed" // 固定表格布局，避免对齐延迟
+              style={{ 
+                fontSize: '14px',
+                height: '100%'
+              }}
+              rowSelection={{
+                selectedRowKeys: selectedCategoryIds,
+                onChange: (selectedRowKeys) => setSelectedCategoryIds(selectedRowKeys as string[]),
+                getCheckboxProps: (record) => ({
+                  name: record.name,
+                }),
+              }}
+            />
           </div>
-        )}
 
-        {/* 选择状态显示 */}
-        {selectedCategoryIds.length > 0 && (
-          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#666', fontSize: '14px' }}>
-              {t('itemCategory.selectedCategories').replace('{count}', selectedCategoryIds.length.toString())}
-            </span>
-            <Button 
-              size="small" 
-              onClick={() => setSelectedCategoryIds([])}
-            >
-              {t('itemCategory.clearSelection').replace('{count}', selectedCategoryIds.length.toString())}
-            </Button>
-          </div>
-        )}
-
-        <Table 
-          rowKey="id" 
-          columns={columns} 
-          dataSource={paginatedCategories} 
-          loading={loading}
-          pagination={{ 
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total, 
-            showSizeChanger: true,
-            showQuickJumper: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: (total, range) => t('itemCategory.paginationInfo')
-              .replace('{start}', range[0].toString())
-              .replace('{end}', range[1].toString())
-              .replace('{total}', total.toString()),
-            onChange: (page, size) => {
-              console.log('Pagination changed:', page, size);
-              // 如果页面大小变化，回到第一页
-              if (size !== pagination.pageSize) {
-                setPagination({ current: 1, pageSize: size, total: pagination.total });
-              } else {
-                setPagination({ current: page, pageSize: size, total: pagination.total });
+          {/* 外部分页栏 */}
+          <div style={{ 
+            padding: '12px 16px',
+            borderTop: '1px solid #f0f0f0',
+            backgroundColor: '#fafafa',
+            flexShrink: 0,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center'
+          }}>
+            {/* 分页 */}
+            <Pagination
+              current={pagination.current}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              showSizeChanger
+              showQuickJumper
+              showTotal={(total, range) => 
+                t('itemCategory.paginationInfo')
+                  .replace('{start}', range[0].toString())
+                  .replace('{end}', range[1].toString())
+                  .replace('{total}', total.toString())
               }
-            }
-          }}
-          rowSelection={{
-            selectedRowKeys: selectedCategoryIds,
-            onChange: (selectedRowKeys) => setSelectedCategoryIds(selectedRowKeys as string[]),
-            getCheckboxProps: (record) => ({
-              name: record.name,
-            }),
-          }}
-        />
+              pageSizeOptions={['10', '20', '50', '100']}
+              onChange={(page, size) => {
+                // 如果页面大小变化，回到第一页
+                if (size !== pagination.pageSize) {
+                  setPagination({ current: 1, pageSize: size, total: pagination.total });
+                } else {
+                  setPagination({ current: page, pageSize: size, total: pagination.total });
+                }
+              }}
+              size="small"
+              style={{ 
+                margin: 0
+              }}
+            />
+          </div>
+        </div>
       </Card>
 
       {/* 新增/编辑分类模态框 */}

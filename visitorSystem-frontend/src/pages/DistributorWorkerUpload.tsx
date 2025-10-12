@@ -212,7 +212,7 @@ const DistributorWorkerUpload: React.FC = () => {
 
   // 筛选状态
   const [statusFilters, setStatusFilters] = useState<string[]>([])
-  const [siteFilter, setSiteFilter] = useState<string>('')
+  const [siteFilter, setSiteFilter] = useState<string | undefined>(undefined)
   const [keyword, setKeyword] = useState<string>('')
   
   // 分页状态
@@ -263,6 +263,17 @@ const DistributorWorkerUpload: React.FC = () => {
       setLoading(false)
     }
   }, [t, currentDistributor.id])
+
+  // 刷新数据
+  const handleRefresh = useCallback(async () => {
+    try {
+      await Promise.all([loadWorkers(), loadSites()])
+      message.success(t('distributor.refreshSuccess'))
+    } catch (error) {
+      // console.error('刷新数据失败:', error)
+      message.error(t('distributor.refreshFailed'))
+    }
+  }, [loadWorkers, loadSites, t])
 
   // 组件挂载时加载数据
   useEffect(() => {
@@ -1600,9 +1611,9 @@ const DistributorWorkerUpload: React.FC = () => {
               />
               <Select
                 style={{ width: 150 }}
-                placeholder={t('worker.siteFilter')}
+                placeholder={t('distributor.siteFilter')}
                 value={siteFilter}
-                onChange={(value) => setSiteFilter(value)}
+                onChange={(value) => setSiteFilter(value || undefined)}
                 options={sites.map(site => ({ value: site.id, label: site.name }))}
                 allowClear
                 loading={sitesLoading}
@@ -1612,6 +1623,13 @@ const DistributorWorkerUpload: React.FC = () => {
             
             {/* 操作按钮 */}
             <Space>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={handleRefresh}
+                loading={loading || sitesLoading}
+              >
+                {t('distributor.refresh')}
+              </Button>
               <Button 
                 icon={<UploadOutlined />} 
                 onClick={() => setExcelModalOpen(true)}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Table, Button, Space, Modal, Tag, Tooltip, Row, Col, message, Timeline, Divider, Card, Statistic } from 'antd';
+import { Table, Button, Space, Modal, Tag, Tooltip, Row, Col, message, Timeline, Divider, Card, Statistic, Pagination } from 'antd';
 import { EditOutlined, DeleteOutlined, QrcodeOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Worker, Distributor, Site } from '../types/worker';
 import { VisitorRecord } from '../services/api';
@@ -144,10 +144,31 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   const [sendingEmailLoading, setSendingEmailLoading] = useState(false);
   const [sendingWhatsAppLoading, setSendingWhatsAppLoading] = useState(false);
   
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
   // 访客记录和借用物品记录相关状态
   const [visitorRecords, setVisitorRecords] = useState<VisitorRecord[]>([]);
   const [borrowRecords, setBorrowRecords] = useState<any[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
+
+  // 分页数据处理
+  const paginatedWorkers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return workers.slice(startIndex, endIndex);
+  }, [workers, currentPage, pageSize]);
+
+  // 分页变化处理
+  const handlePageChange = (page: number, size?: number) => {
+    setCurrentPage(page);
+    if (size) {
+      setPageSize(size);
+    }
+    // 清空选择状态
+    setSelectedRowKeys([]);
+  };
 
   // 获取分判商名称
   const getDistributorName = (distributorId: string) => {
@@ -315,7 +336,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       return;
     }
 
-    const selectedWorkers = workers.filter(worker => selectedRowKeys.includes(worker.id));
+    const selectedWorkers = paginatedWorkers.filter(worker => selectedRowKeys.includes(worker.id));
     
     // 针对电子邮件发送处理
     if (method === 'email') {
@@ -888,7 +909,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.gender'),
       dataIndex: 'gender',
       key: 'gender',
-      width: 80,
+      width: 60,
       sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender),
       render: (gender: string) => getGenderTag(gender),
     },
@@ -896,7 +917,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.birthDate'),
       dataIndex: 'birthDate',
       key: 'birthDate',
-      width: 120,
+      width: 110,
       sorter: (a: Worker, b: Worker) => (a.birthDate || '').localeCompare(b.birthDate || ''),
       render: (d?: string) => {
         if (!d) return '-';
@@ -911,7 +932,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.age'),
       dataIndex: 'age',
       key: 'age',
-      width: 80,
+      width: 60,
       sorter: (a: Worker, b: Worker) => {
         const ageA = calculateAge(a.birthDate);
         const ageB = calculateAge(b.birthDate);
@@ -928,7 +949,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.idType'),
       dataIndex: 'idType',
       key: 'idType',
-      width: 120,
+      width: 80,
       render: (idType: string) => {
         const typeMap: Record<string, string> = {
           'ID_CARD': t('worker.idCard'),
@@ -1007,14 +1028,14 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.status'),
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 80,
       sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status),
       render: (status: string) => getStatusTag(status),
     },
     {
       title: t('common.actions'),
       key: 'actions',
-      width: 200,
+      width: 160,
       fixed: 'right' as const,
       render: (_: unknown, record: Worker) => (
         <Space size="small">
@@ -1068,21 +1089,32 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   ];
 
   return (
-    <>
+    <div style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
       {/* 批量操作工具栏 */}
       {selectedRowKeys.length > 0 && (
         <div style={{ 
-          marginBottom: 16, 
-          padding: '12px 16px', 
+          marginBottom: 8, 
+          padding: '8px 16px', 
           backgroundColor: '#f6ffed', 
           border: '1px solid #b7eb8f',
-          borderRadius: '6px',
+          borderRadius: '4px',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          flexShrink: 0
         }}>
           <span>
             {t('worker.selectedWorkers').replace('{count}', selectedRowKeys.length.toString())}
+            {selectedRowKeys.length > 0 && (
+              <span style={{ color: '#999', marginLeft: '8px' }}>
+                / {t('worker.totalWorkers').replace('{count}', paginatedWorkers.length.toString())}
+              </span>
+            )}
           </span>
           <Space>
             <Button
@@ -1090,6 +1122,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               icon={<MailOutlined />}
               onClick={() => handleBatchSendQRCode('email')}
               loading={sendingEmailLoading}
+              size="small"
             >
               {t('worker.batchSendToEmail')} ({selectedRowKeys.length})
             </Button>
@@ -1098,11 +1131,13 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               icon={<WhatsAppOutlined />}
               onClick={() => handleBatchSendQRCode('whatsapp')}
               loading={sendingWhatsAppLoading}
+              size="small"
             >
               {t('worker.batchSendToWhatsApp')} ({selectedRowKeys.length})
             </Button>
             <Button
               onClick={() => setSelectedRowKeys([])}
+              size="small"
             >
               {t('worker.cancelSelection')}
             </Button>
@@ -1110,24 +1145,66 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         </div>
       )}
 
-      <Table
-        rowSelection={rowSelection}
-        columns={columns}
-        dataSource={workers}
-        rowKey="id"
-        loading={loading}
-        scroll={{ x: 1800 }}
-        pagination={{
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => 
-            t('pagination.showTotal').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString()),
-          pageSizeOptions: ['10', '20', '50', '100'],
-          defaultPageSize: 10,
-        }}
-        size="middle"
-        style={{ fontSize: '14px' }}
-      />
+      {/* 表格容器 */}
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: 0, 
+        padding: '8px 16px 0 16px', // 顶部添加8px间距
+        marginBottom: selectedRowKeys.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
+      }}>
+        <Table
+          rowSelection={rowSelection}
+          columns={columns}
+          dataSource={paginatedWorkers}
+          rowKey="id"
+          loading={loading}
+          scroll={{ 
+            x: 1800,
+            y: selectedRowKeys.length > 0 
+              ? 'calc(100vh - 348px)' // 有批量操作栏时减少高度，考虑顶部间距
+              : 'calc(100vh - 308px)' // 没有批量操作栏时正常高度，考虑顶部间距
+          }}
+          pagination={false} // 禁用内置分页，使用自定义分页
+          size="middle"
+          tableLayout="fixed" // 固定表格布局，避免对齐延迟
+          style={{ 
+            fontSize: '14px',
+            height: '100%'
+          }}
+        />
+      </div>
+
+      {/* 外部分页栏 */}
+      <div style={{ 
+        padding: '12px 16px',
+        borderTop: '1px solid #f0f0f0',
+        backgroundColor: '#fafafa',
+        flexShrink: 0,
+        display: 'flex',
+        justifyContent: 'flex-end',
+        alignItems: 'center'
+      }}>
+        {/* 分页 */}
+        <Pagination
+          current={currentPage}
+          pageSize={pageSize}
+          total={workers.length}
+          showSizeChanger
+          showQuickJumper
+          showTotal={(total, range) => 
+            t('pagination.showTotal').replace('{start}', range[0].toString()).replace('{end}', range[1].toString()).replace('{total}', total.toString())
+          }
+          pageSizeOptions={['10', '20', '50', '100']}
+          onChange={handlePageChange}
+          onShowSizeChange={handlePageChange}
+          size="small"
+          style={{ 
+            margin: 0
+          }}
+        />
+      </div>
 
       {/* 工人详情模态框 */}
       <Modal
@@ -1272,7 +1349,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           </div>
         )}
       </Modal>
-    </>
+    </div>
   );
 };
 

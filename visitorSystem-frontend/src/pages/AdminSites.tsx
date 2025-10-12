@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Tabs, Upload } from 'antd'
+import { Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Tabs, Upload, Pagination, Card } from 'antd'
 import { 
   PlusOutlined, 
   EditOutlined, 
@@ -509,7 +509,7 @@ const AdminSites: React.FC = () => {
     //     </div>
     //   )
     // } },
-    { title: t('common.actions'), key: 'actions', width: 180, render: (_: unknown, record: Site) => (
+    { title: t('common.actions'), key: 'actions', width: 120, fixed: 'right' as const, render: (_: unknown, record: Site) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -570,7 +570,7 @@ const AdminSites: React.FC = () => {
       const cfg = map[s || 'active'] || map['active']
       return <Tag color={cfg.color}>{cfg.text}</Tag>
     } },
-         { title: t('common.actions'), key: 'actions', width: 280, render: (_: unknown, record: Distributor) => (
+         { title: t('common.actions'), key: 'actions', width: 140, fixed: 'right' as const, render: (_: unknown, record: Distributor) => (
        <Space style={{ justifyContent: 'flex-end' }}>
          <Button 
            size="small" 
@@ -2209,7 +2209,7 @@ const AdminSites: React.FC = () => {
       ),
       sorter: (a: Guard, b: Guard) => (a.accountStatus || '').localeCompare(b.accountStatus || '')
     },
-    { title: t('common.actions'), key: 'actions', width: 200, render: (_: unknown, record: Guard) => (
+    { title: t('common.actions'), key: 'actions', width: 120, fixed: 'right' as const, render: (_: unknown, record: Guard) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -2279,195 +2279,300 @@ const AdminSites: React.FC = () => {
     setGuardPagination(prev => ({ ...prev, total: filteredGuards.length, current: 1 }))
   }, [filteredGuards])
 
+  // 分页数据切片
+  const paginatedSites = useMemo(() => {
+    const start = (sitePagination.current - 1) * sitePagination.pageSize
+    const end = start + sitePagination.pageSize
+    return filteredSites.slice(start, end)
+  }, [filteredSites, sitePagination.current, sitePagination.pageSize])
+
+  const paginatedDistributors = useMemo(() => {
+    const start = (distributorPagination.current - 1) * distributorPagination.pageSize
+    const end = start + distributorPagination.pageSize
+    return filteredDistributors.slice(start, end)
+  }, [filteredDistributors, distributorPagination.current, distributorPagination.pageSize])
+
+  const paginatedGuards = useMemo(() => {
+    const start = (guardPagination.current - 1) * guardPagination.pageSize
+    const end = start + guardPagination.pageSize
+    return filteredGuards.slice(start, end)
+  }, [filteredGuards, guardPagination.current, guardPagination.pageSize])
+
   // 工地管理标签页内容
   const siteManagementTab = (
-    <Card>
-      <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={5}>
-          <Input placeholder={t('admin.siteKeywordPlaceholder')} value={siteKeyword} onChange={e => setSiteKeyword(e.target.value)} allowClear />
-        </Col>
-        <Col span={5}>
-          <Select
-            mode="multiple"
-            style={{ width: '100%' }}
-            placeholder={t('admin.statusFilterPlaceholder')}
-            value={siteStatusFilters}
-            onChange={setSiteStatusFilters}
-            options={[{ value: 'active', label: t('admin.active') }, { value: 'suspended', label: t('admin.suspended') }, { value: 'inactive', label: t('admin.inactive') }]}
-            allowClear
-          />
-        </Col>
-        <Col span={5}>
-          <Select
-            mode="multiple"
-            style={{ width: '100%' }}
-            placeholder={t('admin.managerFilterPlaceholder')}
-            value={siteManagerFilters}
-            onChange={setSiteManagerFilters}
-            options={siteManagerOptions}
-            allowClear
-          />
-        </Col>
-        <Col span={9}>
-           <Space wrap>
-             <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadSiteTemplate}>{t('admin.downloadTemplate')}</Button>
-             <Upload
-               accept=".xlsx,.xls"
-               showUploadList={false}
-               beforeUpload={(file) => {
-                 handleSiteImport(file)
-                 return false
-               }}
-             >
-               <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
-             </Upload>
-             <Button 
-               size="small"
-               icon={<DownloadOutlined />} 
-               onClick={selectedSiteIds.length === 0 ? () => handleSiteExport(true) : () => handleSiteExport(false)}
-             >
-               {selectedSiteIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedSiteIds.length})`}
-             </Button>
-           </Space>
-         </Col>
-      </Row>
+    <div style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden',
+      padding: '16px'
+    }}>
+      {/* 筛选和操作区域 */}
+      <div style={{ 
+        marginBottom: 16, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '12px',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between'
+      }}>
+        <Row gutter={12} style={{ flex: 1 }}>
+          <Col span={5}>
+            <Input placeholder={t('admin.siteKeywordPlaceholder')} value={siteKeyword} onChange={e => setSiteKeyword(e.target.value)} allowClear />
+          </Col>
+          <Col span={5}>
+            <Select
+              mode="multiple"
+              style={{ width: '100%' }}
+              placeholder={t('admin.statusFilterPlaceholder')}
+              value={siteStatusFilters}
+              onChange={setSiteStatusFilters}
+              options={[{ value: 'active', label: t('admin.active') }, { value: 'suspended', label: t('admin.suspended') }, { value: 'inactive', label: t('admin.inactive') }]}
+              allowClear
+            />
+          </Col>
+          <Col span={5}>
+            <Select
+              mode="multiple"
+              style={{ width: '100%' }}
+              placeholder={t('admin.managerFilterPlaceholder')}
+              value={siteManagerFilters}
+              onChange={setSiteManagerFilters}
+              options={siteManagerOptions}
+              allowClear
+            />
+          </Col>
+          <Col span={9}>
+             <Space wrap>
+               <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadSiteTemplate}>{t('admin.downloadTemplate')}</Button>
+               <Upload
+                 accept=".xlsx,.xls"
+                 showUploadList={false}
+                 beforeUpload={(file) => {
+                   handleSiteImport(file)
+                   return false
+                 }}
+               >
+                 <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
+               </Upload>
+               <Button 
+                 size="small"
+                 icon={<DownloadOutlined />} 
+                 onClick={selectedSiteIds.length === 0 ? () => handleSiteExport(true) : () => handleSiteExport(false)}
+               >
+                 {selectedSiteIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedSiteIds.length})`}
+               </Button>
+             </Space>
+           </Col>
+        </Row>
+        
+        {/* 筛选结果统计 */}
+        {!loading && (siteStatusFilters.length > 0 || siteManagerFilters.length > 0 || siteKeyword.trim()) && (
+          <div style={{ 
+            padding: '8px 12px', 
+            background: '#f5f5f5', 
+            borderRadius: '4px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px'
+          }}>
+            <span style={{ color: '#666', fontSize: '12px' }}>
+              {t('admin.filterResults').replace('{count}', filteredSites.length.toString())}
+            </span>
+            <Button 
+              size="small" 
+              onClick={() => {
+                setSiteStatusFilters([])
+                setSiteManagerFilters([])
+                setSiteKeyword('')
+              }}
+            >
+              {t('admin.clearFilter')}
+            </Button>
+          </div>
+        )}
+      </div>
       
-      {/* 筛选结果统计 */}
-      {!loading && (siteStatusFilters.length > 0 || siteManagerFilters.length > 0 || siteKeyword.trim() || selectedSiteIds.length > 0) && (
-        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: '#666', fontSize: '14px' }}>
-            {t('admin.filterResults').replace('{count}', filteredSites.length.toString())}
-            {sites.length !== filteredSites.length && (
-              <span style={{ marginLeft: 8, color: '#999' }}>
-                {t('admin.fromTotalRecords').replace('{total}', sites.length.toString())}
+      {/* 选择状态显示 */}
+      {selectedSiteIds.length > 0 && (
+        <div style={{ 
+          marginBottom: 8, 
+          padding: '8px 16px', 
+          backgroundColor: '#f6ffed', 
+          border: '1px solid #b7eb8f',
+          borderRadius: '4px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0
+        }}>
+          <span>
+            {t('admin.selectedSites').replace('{count}', selectedSiteIds.length.toString())}
+            {selectedSiteIds.length > 0 && (
+              <span style={{ color: '#999', marginLeft: '8px' }}>
+                / {t('admin.totalSites').replace('{count}', filteredSites.length.toString())}
               </span>
             )}
           </span>
-                 <Space>
-           {(siteStatusFilters.length > 0 || siteManagerFilters.length > 0 || siteKeyword.trim()) && (
-             <Button 
-               size="small" 
-               onClick={() => {
-                 setSiteStatusFilters([])
-                 setSiteManagerFilters([])
-                 setSiteKeyword('')
-               }}
-             >
-               {t('admin.clearFilter')}
-             </Button>
-           )}
-           {selectedSiteIds.length > 0 && (
-             <Button 
-               size="small" 
-               onClick={() => setSelectedSiteIds([])}
-             >
-               {t('admin.clearSelection')}({selectedSiteIds.length})
-             </Button>
-           )}
-         </Space>
+          <Button 
+            onClick={() => setSelectedSiteIds([])}
+            size="small"
+          >
+            {t('admin.clearSelection')}({selectedSiteIds.length})
+          </Button>
         </div>
       )}
       
-      <Table 
-        rowKey="id" 
-        columns={siteColumns} 
-        dataSource={filteredSites} 
-        loading={loading}
-        pagination={{
-          current: sitePagination.current,
-          pageSize: sitePagination.pageSize,
-          total: sitePagination.total,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-          pageSizeOptions: ['10', '20', '50', '100'],
-          onChange: handleSitePaginationChange,
-          onShowSizeChange: handleSitePaginationChange
-        }}
-        rowSelection={{
-          selectedRowKeys: selectedSiteIds,
-          onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
-          getCheckboxProps: (record) => ({
-            name: record.name,
-          }),
-        }}
-      />
-    </Card>
+      {/* 表格容器 */}
+      <Card style={{ 
+        margin: 0,
+        flex: 1,
+        display: 'flex', 
+        flexDirection: 'column'
+      }}
+      styles={{
+        body: {
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 0, 
+          overflow: 'hidden'
+        }
+      }}>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minHeight: 0, 
+          padding: '8px 16px 0 16px'
+        }}>
+          <Table 
+            rowKey="id" 
+            columns={siteColumns} 
+            dataSource={paginatedSites} 
+            loading={loading}
+            scroll={{ 
+              x: 1200,
+              y: 'calc(100vh - 400px)'
+            }}
+            pagination={false} // 禁用内置分页，使用自定义分页
+            size="middle"
+            tableLayout="fixed" // 固定表格布局，避免对齐延迟
+            style={{ 
+              fontSize: '14px',
+              height: '100%'
+            }}
+          rowSelection={{
+            selectedRowKeys: selectedSiteIds,
+            onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
+            getCheckboxProps: (record) => ({
+              name: record.name,
+            }),
+          }}
+          />
+        </div>
+
+        {/* 外部分页栏 */}
+        <div style={{ 
+          padding: '12px 16px',
+          borderTop: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa',
+          flexShrink: 0,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center'
+        }}>
+          {/* 分页 */}
+          <Pagination
+            current={sitePagination.current}
+          pageSize={sitePagination.pageSize}
+          total={sitePagination.total}
+          showSizeChanger
+          showQuickJumper
+          showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
+          pageSizeOptions={['10', '20', '50', '100']}
+          onChange={handleSitePaginationChange}
+          onShowSizeChange={handleSitePaginationChange}
+          size="small"
+          style={{ 
+            margin: 0
+          }}
+        />
+        </div>
+      </Card>
+    </div>
   )
 
   // 分判商管理标签页内容
   const distributorManagementTab = (
-    <Card>
-      <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={8}>
-          <Input placeholder={t('admin.distributorKeywordPlaceholder')} value={distributorKeyword} onChange={e => setDistributorKeyword(e.target.value)} allowClear />
-        </Col>
-        <Col span={8}>
-          <Select
-            mode="multiple"
-            style={{ width: '100%' }}
-            placeholder={t('admin.accountStatusFilterPlaceholder')}
-            value={distributorStatusFilters}
-            onChange={setDistributorStatusFilters}
-            options={[{ value: 'active', label: t('admin.active') }, { value: 'disabled', label: t('admin.disabled') }]}
-            allowClear
-          />
-        </Col>
-        <Col span={8}>
-           <Space wrap>
-             <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadDistributorTemplate}>{t('admin.downloadTemplate')}</Button>
-             <Upload
-               accept=".xlsx,.xls"
-               showUploadList={false}
-               beforeUpload={(file) => {
-                 handleDistributorImport(file)
-                 return false
-               }}
-             >
-               <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
-             </Upload>
-             <Button 
-               size="small"
-               icon={<DownloadOutlined />} 
-               onClick={selectedDistributorIds.length === 0 ? showDistributorExportOptions : () => handleDistributorExport(false)}
-             >
-               {selectedDistributorIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedDistributorIds.length})`}
-             </Button>
-           </Space>
-         </Col>
-      </Row>
-      
-      {/* 筛选结果统计 */}
-      {!loading && (distributorStatusFilters.length > 0 || distributorKeyword.trim() || selectedDistributorIds.length > 0) && (
-        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ color: '#666', fontSize: '14px' }}>
-              {t('admin.filterResults').replace('{count}', filteredDistributors.length.toString())}
-              {globallyFilteredDistributors.length !== filteredDistributors.length && (
-                <span style={{ marginLeft: 8, color: '#999' }}>
-                  {t('admin.fromTotalRecords').replace('{total}', globallyFilteredDistributors.length.toString())}
-                </span>
-              )}
-            </span>
-          
-          {/* 批量发送按钮 */}
-          {selectedDistributorIds.length > 0 && (
-            <Space>
-              <Button 
-                size="small" 
-                type="primary"
-                icon={<SendOutlined />}
-                onClick={() => handleBatchSendEmail()}
-                title={t('admin.batchSendEmailTitle')}
-              >
-                {t('admin.batchSendEmail')}
-              </Button>
-            </Space>
-          )}
-        </div>
+    <div style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden',
+      padding: '16px'
+    }}>
+      {/* 筛选和操作区域 */}
+      <div style={{ 
+        marginBottom: 16, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '12px',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between'
+      }}>
+        <Row gutter={12} style={{ flex: 1 }}>
+          <Col span={8}>
+            <Input placeholder={t('admin.distributorKeywordPlaceholder')} value={distributorKeyword} onChange={e => setDistributorKeyword(e.target.value)} allowClear />
+          </Col>
+          <Col span={8}>
+            <Select
+              mode="multiple"
+              style={{ width: '100%' }}
+              placeholder={t('admin.accountStatusFilterPlaceholder')}
+              value={distributorStatusFilters}
+              onChange={setDistributorStatusFilters}
+              options={[{ value: 'active', label: t('admin.active') }, { value: 'disabled', label: t('admin.disabled') }]}
+              allowClear
+            />
+          </Col>
+          <Col span={8}>
+             <Space wrap>
+               <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadDistributorTemplate}>{t('admin.downloadTemplate')}</Button>
+               <Upload
+                 accept=".xlsx,.xls"
+                 showUploadList={false}
+                 beforeUpload={(file) => {
+                   handleDistributorImport(file)
+                   return false
+                 }}
+               >
+                 <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
+               </Upload>
+               <Button 
+                 size="small"
+                 icon={<DownloadOutlined />} 
+                 onClick={selectedDistributorIds.length === 0 ? showDistributorExportOptions : () => handleDistributorExport(false)}
+               >
+                 {selectedDistributorIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedDistributorIds.length})`}
+               </Button>
+             </Space>
+           </Col>
+        </Row>
         
-        <Space>
-          {(distributorStatusFilters.length > 0 || distributorKeyword.trim()) && (
+        {/* 筛选结果统计 */}
+        {!loading && (distributorStatusFilters.length > 0 || distributorKeyword.trim()) && (
+          <div style={{ 
+            padding: '8px 12px', 
+            background: '#f5f5f5', 
+            borderRadius: '4px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px'
+          }}>
+            <span style={{ color: '#666', fontSize: '12px' }}>
+              {t('admin.filterResults').replace('{count}', filteredDistributors.length.toString())}
+            </span>
             <Button 
               size="small" 
               onClick={() => {
@@ -2477,106 +2582,203 @@ const AdminSites: React.FC = () => {
             >
               {t('admin.clearFilter')}
             </Button>
-          )}
-          {selectedDistributorIds.length > 0 && (
+          </div>
+        )}
+      </div>
+      
+      {/* 选择状态显示 */}
+      {selectedDistributorIds.length > 0 && (
+        <div style={{ 
+          marginBottom: 8, 
+          padding: '8px 16px', 
+          backgroundColor: '#f6ffed', 
+          border: '1px solid #b7eb8f',
+          borderRadius: '4px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0
+        }}>
+          <span>
+            {t('admin.selectedDistributors').replace('{count}', selectedDistributorIds.length.toString())}
+            {selectedDistributorIds.length > 0 && (
+              <span style={{ color: '#999', marginLeft: '8px' }}>
+                / {t('admin.totalDistributors').replace('{count}', filteredDistributors.length.toString())}
+              </span>
+            )}
+          </span>
+          <Space>
             <Button 
               size="small" 
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={() => handleBatchSendEmail()}
+              title={t('admin.batchSendEmailTitle')}
+            >
+              {t('admin.batchSendEmail')}
+            </Button>
+            <Button 
               onClick={() => setSelectedDistributorIds([])}
+              size="small"
             >
               {t('admin.clearSelection')}({selectedDistributorIds.length})
             </Button>
-          )}
-        </Space>
+          </Space>
         </div>
       )}
       
-             <Table 
-         rowKey="id" 
-         columns={distributorColumns} 
-         dataSource={filteredDistributors} 
-         loading={loading}
-         pagination={{
-           current: distributorPagination.current,
-           pageSize: distributorPagination.pageSize,
-           total: distributorPagination.total,
-           showSizeChanger: true,
-           showQuickJumper: true,
-           showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-           pageSizeOptions: ['10', '20', '50', '100'],
-           onChange: handleDistributorPaginationChange,
-           onShowSizeChange: handleDistributorPaginationChange
-         }}
-         rowSelection={{
-           selectedRowKeys: selectedDistributorIds,
-           onChange: (selectedRowKeys) => setSelectedDistributorIds(selectedRowKeys as string[]),
-           getCheckboxProps: (record) => ({
-             name: record.name,
-           }),
-         }}
-       />
-    </Card>
+      {/* 表格容器 */}
+      <Card style={{ 
+        margin: 0,
+        flex: 1,
+        display: 'flex', 
+        flexDirection: 'column'
+      }}
+      styles={{
+        body: {
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 0, 
+          overflow: 'hidden'
+        }
+      }}>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minHeight: 0, 
+          padding: '8px 16px 0 16px'
+        }}>
+          <Table 
+            rowKey="id" 
+            columns={distributorColumns} 
+            dataSource={paginatedDistributors} 
+            loading={loading}
+            scroll={{ 
+              x: 1400,
+              y: 'calc(100vh - 400px)'
+            }}
+            pagination={false} // 禁用内置分页，使用自定义分页
+            size="middle"
+            tableLayout="fixed" // 固定表格布局，避免对齐延迟
+            style={{ 
+              fontSize: '14px',
+              height: '100%'
+            }}
+          rowSelection={{
+            selectedRowKeys: selectedDistributorIds,
+            onChange: (selectedRowKeys) => setSelectedDistributorIds(selectedRowKeys as string[]),
+            getCheckboxProps: (record) => ({
+              name: record.name,
+            }),
+          }}
+          />
+        </div>
+
+        {/* 外部分页栏 */}
+        <div style={{ 
+          padding: '12px 16px',
+          borderTop: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa',
+          flexShrink: 0,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center'
+        }}>
+          {/* 分页 */}
+          <Pagination
+            current={distributorPagination.current}
+          pageSize={distributorPagination.pageSize}
+          total={distributorPagination.total}
+          showSizeChanger
+          showQuickJumper
+          showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
+          pageSizeOptions={['10', '20', '50', '100']}
+          onChange={handleDistributorPaginationChange}
+          onShowSizeChange={handleDistributorPaginationChange}
+          size="small"
+          style={{ 
+            margin: 0
+          }}
+        />
+        </div>
+      </Card>
+    </div>
   )
 
   // 门卫管理标签页内容
   const guardManagementTab = (
-    <Card>
-      <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={8}>
-          <Input placeholder={t('admin.guardKeywordPlaceholder')} value={guardKeyword} onChange={e => setGuardKeyword(e.target.value)} allowClear />
-        </Col>
-        <Col span={8}>
-          <Select
-            mode="multiple"
-            placeholder={t('admin.guardStatusFilter')}
-            value={guardStatusFilters}
-            onChange={setGuardStatusFilters}
-            style={{ width: '100%' }}
-            allowClear
-          >
-            <Select.Option value="active">{t('admin.distributorActive')}</Select.Option>
-            <Select.Option value="disabled">{t('admin.distributorDisabled')}</Select.Option>
-          </Select>
-        </Col>
-        <Col span={8}>
-          <Space wrap>
-            <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadGuardTemplate}>{t('admin.downloadTemplate')}</Button>
-            <Upload
-              accept=".xlsx,.xls"
-              showUploadList={false}
-              beforeUpload={(file) => {
-                handleGuardImport(file)
-                return false
-              }}
+    <div style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden',
+      padding: '16px'
+    }}>
+      {/* 筛选和操作区域 */}
+      <div style={{ 
+        marginBottom: 16, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '12px',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between'
+      }}>
+        <Row gutter={12} style={{ flex: 1 }}>
+          <Col span={8}>
+            <Input placeholder={t('admin.guardKeywordPlaceholder')} value={guardKeyword} onChange={e => setGuardKeyword(e.target.value)} allowClear />
+          </Col>
+          <Col span={8}>
+            <Select
+              mode="multiple"
+              placeholder={t('admin.guardStatusFilter')}
+              value={guardStatusFilters}
+              onChange={setGuardStatusFilters}
+              style={{ width: '100%' }}
+              allowClear
             >
-              <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
-            </Upload>
-            <Button 
-              size="small" 
-              icon={<DownloadOutlined />} 
-              onClick={selectedGuardIds.length === 0 ? showGuardExportOptions : () => handleGuardExport(false)}
-            >
-              {selectedGuardIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedGuardIds.length})`}
-            </Button>
-          </Space>
-        </Col>
-      </Row>
-      
-      {/* 筛选结果统计 */}
-      {!loading && (guardStatusFilters.length > 0 || guardKeyword.trim() || selectedGuardIds.length > 0) && (
-        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ color: '#666', fontSize: '14px' }}>
-              {t('admin.filterResults').replace('{count}', filteredGuards.length.toString())}
-              {globallyFilteredGuards.length !== filteredGuards.length && (
-                <span style={{ marginLeft: 8, color: '#999' }}>
-                  {t('admin.fromTotalRecords').replace('{total}', globallyFilteredGuards.length.toString())}
-                </span>
-              )}
-            </span>
-          </div>
+              <Select.Option value="active">{t('admin.distributorActive')}</Select.Option>
+              <Select.Option value="disabled">{t('admin.distributorDisabled')}</Select.Option>
+            </Select>
+          </Col>
+          <Col span={8}>
+            <Space wrap>
+              <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadGuardTemplate}>{t('admin.downloadTemplate')}</Button>
+              <Upload
+                accept=".xlsx,.xls"
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  handleGuardImport(file)
+                  return false
+                }}
+              >
+                <Button size="small" icon={<UploadOutlined />}>{t('admin.importExcel')}</Button>
+              </Upload>
+              <Button 
+                size="small" 
+                icon={<DownloadOutlined />} 
+                onClick={selectedGuardIds.length === 0 ? showGuardExportOptions : () => handleGuardExport(false)}
+              >
+                {selectedGuardIds.length === 0 ? t('admin.exportAll') : `${t('admin.exportSelected')}(${selectedGuardIds.length})`}
+              </Button>
+            </Space>
+          </Col>
+        </Row>
         
-        <Space>
-          {(guardStatusFilters.length > 0 || guardKeyword.trim()) && (
+        {/* 筛选结果统计 */}
+        {!loading && (guardStatusFilters.length > 0 || guardKeyword.trim()) && (
+          <div style={{ 
+            padding: '8px 12px', 
+            background: '#f5f5f5', 
+            borderRadius: '4px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px'
+          }}>
+            <span style={{ color: '#666', fontSize: '12px' }}>
+              {t('admin.filterResults').replace('{count}', filteredGuards.length.toString())}
+            </span>
             <Button 
               size="small" 
               onClick={() => {
@@ -2586,44 +2788,118 @@ const AdminSites: React.FC = () => {
             >
               {t('admin.clearFilter')}
             </Button>
-          )}
-          {selectedGuardIds.length > 0 && (
-            <Button 
-              size="small" 
-              onClick={() => setSelectedGuardIds([])}
-            >
-              {t('admin.clearSelection')}({selectedGuardIds.length})
-            </Button>
-          )}
-        </Space>
+          </div>
+        )}
+      </div>
+      
+      {/* 选择状态显示 */}
+      {selectedGuardIds.length > 0 && (
+        <div style={{ 
+          marginBottom: 8, 
+          padding: '8px 16px', 
+          backgroundColor: '#f6ffed', 
+          border: '1px solid #b7eb8f',
+          borderRadius: '4px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0
+        }}>
+          <span>
+            {t('admin.selectedGuards').replace('{count}', selectedGuardIds.length.toString())}
+            {selectedGuardIds.length > 0 && (
+              <span style={{ color: '#999', marginLeft: '8px' }}>
+                / {t('admin.totalGuards').replace('{count}', filteredGuards.length.toString())}
+              </span>
+            )}
+          </span>
+          <Button 
+            onClick={() => setSelectedGuardIds([])}
+            size="small"
+          >
+            {t('admin.clearSelection')}({selectedGuardIds.length})
+          </Button>
         </div>
       )}
       
-      <Table 
-        rowKey="id" 
-        columns={guardColumns} 
-        dataSource={filteredGuards} 
-        loading={loading}
-        pagination={{
-          current: guardPagination.current,
-          pageSize: guardPagination.pageSize,
-          total: guardPagination.total,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-          pageSizeOptions: ['10', '20', '50', '100'],
-          onChange: handleGuardPaginationChange,
-          onShowSizeChange: handleGuardPaginationChange
-        }}
-        rowSelection={{
-          selectedRowKeys: selectedGuardIds,
-          onChange: (selectedRowKeys) => setSelectedGuardIds(selectedRowKeys as string[]),
-          getCheckboxProps: (record) => ({
-            name: record.name,
-          }),
-        }}
-      />
-    </Card>
+      {/* 表格容器 */}
+      <Card style={{ 
+        margin: 0,
+        flex: 1,
+        display: 'flex', 
+        flexDirection: 'column'
+      }}
+      styles={{
+        body: {
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 0, 
+          overflow: 'hidden'
+        }
+      }}>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minHeight: 0, 
+          padding: '8px 16px 0 16px'
+        }}>
+          <Table 
+            rowKey="id" 
+            columns={guardColumns} 
+            dataSource={paginatedGuards} 
+            loading={loading}
+            scroll={{ 
+              x: 1200,
+              y: 'calc(100vh - 400px)'
+            }}
+            pagination={false} // 禁用内置分页，使用自定义分页
+            size="middle"
+            tableLayout="fixed" // 固定表格布局，避免对齐延迟
+            style={{ 
+              fontSize: '14px',
+              height: '100%'
+            }}
+          rowSelection={{
+            selectedRowKeys: selectedGuardIds,
+            onChange: (selectedRowKeys) => setSelectedGuardIds(selectedRowKeys as string[]),
+            getCheckboxProps: (record) => ({
+              name: record.name,
+            }),
+          }}
+          />
+        </div>
+
+        {/* 外部分页栏 */}
+        <div style={{ 
+          padding: '12px 16px',
+          borderTop: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa',
+          flexShrink: 0,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center'
+        }}>
+          {/* 分页 */}
+          <Pagination
+            current={guardPagination.current}
+          pageSize={guardPagination.pageSize}
+          total={guardPagination.total}
+          showSizeChanger
+          showQuickJumper
+          showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
+          pageSizeOptions={['10', '20', '50', '100']}
+          onChange={handleGuardPaginationChange}
+          onShowSizeChange={handleGuardPaginationChange}
+          size="small"
+          style={{ 
+            margin: 0
+          }}
+        />
+        </div>
+      </Card>
+    </div>
   )
 
   return (
