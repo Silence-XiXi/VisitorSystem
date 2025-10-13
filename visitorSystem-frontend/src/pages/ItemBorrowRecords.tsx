@@ -23,7 +23,7 @@ interface ItemBorrowRecord {
   returnDate?: string
   returnTime?: string
   status: 'BORROWED' | 'RETURNED'
-  borrowDuration?: number // 借用时长（小时）
+  borrowDuration?: number // 借用时长（分钟）
   borrowHandlerId?: string // 借用经办人ID
   borrowHandlerName?: string // 借用经办人姓名
   returnHandlerName?: string // 归还经办人姓名
@@ -95,7 +95,7 @@ const transformBorrowRecord = (record: any): ItemBorrowRecord => {
 }
 
 const ItemBorrowRecords: React.FC = () => {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const { selectedSiteId } = useSiteFilter()
   const { user } = useAuth()
   const [searchKeyword, setSearchKeyword] = useState<string>('')
@@ -120,6 +120,56 @@ const ItemBorrowRecords: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [distributors, setDistributors] = useState<any[]>([])
   const [itemCategories, setItemCategories] = useState<any[]>([])
+
+  // 格式化借用时长（将分钟转换为友好的显示格式，支持多语言）
+  const formatBorrowDuration = (minutes: number | null | undefined): string => {
+    // 检查空值
+    if (minutes === null || minutes === undefined) return '-'
+    
+    // 确保传入的是有效数字
+    const totalMinutes = Number(minutes)
+    if (isNaN(totalMinutes) || totalMinutes < 0) return '-'
+    
+    // 计算小时和分钟
+    const hours = Math.floor(totalMinutes / 60)
+    const mins = Math.floor(totalMinutes % 60)
+    
+    // 根据语言选择单复数形式（英文需要区分单复数）
+    const hourUnit = locale === 'en-US' 
+      ? (hours === 1 ? t('common.hour') : t('common.hours'))
+      : t('common.hours')
+    
+    const minuteUnit = locale === 'en-US'
+      ? (mins === 1 ? t('common.minute') : t('common.minutes'))
+      : t('common.minutes')
+    
+    // 组合显示
+    if (hours > 0 && mins > 0) {
+      return `${hours} ${hourUnit} ${mins} ${minuteUnit}`
+    } else if (hours > 0) {
+      return `${hours} ${hourUnit}`
+    } else {
+      return `${mins} ${minuteUnit}`
+    }
+  }
+
+  // 格式化归还时间（如果不是同一天，显示日期+时间；如果是同一天，只显示时间）
+  const formatReturnTime = (record: ItemBorrowRecord): string => {
+    // 如果没有归还时间，返回 -
+    if (!record.returnDate || !record.returnTime) return '-'
+    
+    // 比较借用日期和归还日期
+    const borrowDate = record.borrowDate
+    const returnDate = record.returnDate
+    
+    // 如果是同一天，只显示时间
+    if (borrowDate === returnDate) {
+      return record.returnTime
+    }
+    
+    // 如果不是同一天，显示日期+时间
+    return `${returnDate} ${record.returnTime}`
+  }
 
   // 加载物品借用记录
   const loadBorrowRecords = async () => {
@@ -289,10 +339,9 @@ const ItemBorrowRecords: React.FC = () => {
         'ItemCode': record.itemCode,
         'BorrowTime': record.borrowTime,
         'Notes': record.notes || '-',
-        'ReturnDate': record.returnDate || '-',
-        'ReturnTime': record.returnTime || '-',
+        'ReturnTime': formatReturnTime(record),
         'Status': record.status === 'BORROWED' ? 'Not Returned' : 'Returned',
-        'BorrowDuration': record.borrowDuration ? `${record.borrowDuration} Hours` : '-',
+        'BorrowDuration': formatBorrowDuration(record.borrowDuration),
         'BorrowHandler': record.borrowHandlerName || '-'
       }))
       
@@ -310,10 +359,10 @@ const ItemBorrowRecords: React.FC = () => {
         { wch: 15 }, // 物品类型
         { wch: 15 }, // 物品编号
         { wch: 10 }, // 借用时间
-        { wch: 12 }, // 归还日期
-        { wch: 10 }, // 归还时间
+        { wch: 20 }, // 备注
+        { wch: 20 }, // 归还时间（可能包含日期）
         { wch: 10 }, // 状态
-        { wch: 12 }, // 借用时长
+        { wch: 15 }, // 借用时长
         { wch: 15 }  // 借用经办人
       ]
       worksheet['!cols'] = colWidths
@@ -411,15 +460,19 @@ const ItemBorrowRecords: React.FC = () => {
       title: t('itemBorrowRecords.returnTime'), 
       dataIndex: 'returnTime', 
       key: 'returnTime', 
-      width: 100,
-      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.returnTime || '').localeCompare(b.returnTime || ''),
-      render: (time: string) => time || '-'
+      width: 160,
+      sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => {
+        const aTime = a.returnDate ? `${a.returnDate} ${a.returnTime || ''}` : ''
+        const bTime = b.returnDate ? `${b.returnDate} ${b.returnTime || ''}` : ''
+        return aTime.localeCompare(bTime)
+      },
+      render: (_: string, record: ItemBorrowRecord) => formatReturnTime(record)
     },
     { 
       title: t('itemBorrowRecords.status'), 
       dataIndex: 'status', 
       key: 'status', 
-      width: 100,
+      width: 80,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => a.status.localeCompare(b.status),
       render: (status: string) => (
         <Tag color={status === 'RETURNED' ? 'green' : 'orange'}>
@@ -431,9 +484,9 @@ const ItemBorrowRecords: React.FC = () => {
       title: t('itemBorrowRecords.borrowDuration'), 
       dataIndex: 'borrowDuration', 
       key: 'borrowDuration', 
-      width: 100,
+      width: 120,
       sorter: (a: ItemBorrowRecord, b: ItemBorrowRecord) => (a.borrowDuration || 0) - (b.borrowDuration || 0),
-      render: (duration: number) => duration ? `${duration}${t('itemBorrowRecords.hours')}` : '-'
+      render: (duration: number) => formatBorrowDuration(duration)
     },
     {
       title: t('itemBorrowRecords.actions'),
@@ -827,14 +880,9 @@ const ItemBorrowRecords: React.FC = () => {
                   <strong>{t('itemBorrowRecords.borrowHandlerLabel')}</strong>{selectedRecord.borrowHandlerName || t('itemBorrowRecords.notSpecified')}
                 </Col>
                 {selectedRecord.returnDate && (
-                  <>
-                    <Col span={12} style={{ marginTop: 8 }}>
-                      <strong>{t('itemBorrowRecords.returnDateLabel')}</strong>{selectedRecord.returnDate}
-                    </Col>
-                    <Col span={12} style={{ marginTop: 8 }}>
-                      <strong>{t('itemBorrowRecords.returnTimeLabel')}</strong>{selectedRecord.returnTime}
-                    </Col>
-                  </>
+                  <Col span={12} style={{ marginTop: 8 }}>
+                    <strong>{t('itemBorrowRecords.returnTimeLabel')}</strong>{formatReturnTime(selectedRecord)}
+                  </Col>
                 )}
                 <Col span={12} style={{ marginTop: 8 }}>
                   <strong>{t('itemBorrowRecords.statusLabel')}</strong>
@@ -844,7 +892,7 @@ const ItemBorrowRecords: React.FC = () => {
                 </Col>
                 {selectedRecord.borrowDuration && (
                   <Col span={12} style={{ marginTop: 8 }}>
-                    <strong>{t('itemBorrowRecords.borrowDurationLabel')}</strong>{selectedRecord.borrowDuration}{t('itemBorrowRecords.hours')}
+                    <strong>{t('itemBorrowRecords.borrowDurationLabel')}</strong>{formatBorrowDuration(selectedRecord.borrowDuration)}
                   </Col>
                 )}
                 {selectedRecord.notes && (

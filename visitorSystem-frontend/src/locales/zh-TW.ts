@@ -43,6 +43,11 @@ export default {
     enable: '啟用',
     disable: '停用',
     processing: '處理中',
+    // 时间单位
+    hour: '小時',
+    hours: '小時',
+    minute: '分鐘',
+    minutes: '分鐘',
   },
   worker: {
     phoneNumberExists: '手機號已存在，請檢查您的輸入',
@@ -323,7 +328,8 @@ export default {
     exited: '已離場',
     notExited: '未離場',
     borrowedItems: '借出物品',
-    pendingReturn: '待歸還物品',
+    returnedItems: '已歸還',
+    pendingReturn: '未歸還',
     onSite: '在場',
     qrCodeInput: '輸入二維碼編號/實體卡編號',
     qrCodePlaceholder: '請輸入二維碼編號或實體卡編號（必填）',
@@ -427,6 +433,7 @@ export default {
     // 表格标题
     borrowTime: '借用時間',
     returnTime: '歸還時間',
+    borrowDuration: '借用時長',
     borrowTimeLabel: '借用時間: ',
     notesLabel: '備註: ',
     // 选择操作

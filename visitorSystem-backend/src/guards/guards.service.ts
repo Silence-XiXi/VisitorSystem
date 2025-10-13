@@ -635,6 +635,21 @@ export class GuardsService {
     const returnDate = isSameDay ? borrowDate : now;
     const returnTime = now.toTimeString().split(' ')[0]; // 格式: HH:mm:ss
     
+    // 计算借用时长（分钟）
+    // 将借用日期和时间组合成完整的 DateTime
+    const borrowDateTime = new Date(record.borrowDate);
+    const [borrowHour, borrowMinute, borrowSecond] = record.borrowTime.split(':').map(Number);
+    borrowDateTime.setHours(borrowHour, borrowMinute, borrowSecond || 0, 0);
+    
+    // 将归还日期和时间组合成完整的 DateTime
+    const returnDateTime = new Date(returnDate);
+    const [returnHour, returnMinute, returnSecond] = returnTime.split(':').map(Number);
+    returnDateTime.setHours(returnHour, returnMinute, returnSecond || 0, 0);
+    
+    // 计算时间差（毫秒），然后转换为分钟
+    const borrowDurationMs = returnDateTime.getTime() - borrowDateTime.getTime();
+    const borrowDurationMinutes = Math.round(borrowDurationMs / (1000 * 60)); // 四舍五入到最接近的分钟
+    
     // 更新借用记录
     const updatedRecord = await this.prisma.itemBorrowRecord.update({
       where: { id: recordId },
@@ -642,7 +657,8 @@ export class GuardsService {
         status: 'RETURNED',
         returnDate: returnDate,
         returnTime: returnTime,
-        returnHandlerId: guard.id
+        returnHandlerId: guard.id,
+        borrowDuration: borrowDurationMinutes
       },
       include: {
         worker: {

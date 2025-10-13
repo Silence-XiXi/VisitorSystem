@@ -149,6 +149,7 @@ const Guard: React.FC = () => {
     itemId: string
     borrowTime: string
     returnTime: string | null
+    borrowDuration: number | null
     status: string
     remark?: string
   }>>([])
@@ -193,6 +194,9 @@ const Guard: React.FC = () => {
   // 统计今日借出物品的数量（需要从借用记录中筛选今日的）
   const [todayBorrowedItems, setTodayBorrowedItems] = useState<number>(0)
   
+  // 统计今日归还物品的数量
+  const [todayReturnedItems, setTodayReturnedItems] = useState<number>(0)
+  
   // 完全使用API数据中的总未归还物品数
   const totalUnreturnedItems = guardStats?.borrowedItems ?? 0
 
@@ -223,10 +227,21 @@ const Guard: React.FC = () => {
       
       // 设置今日借出物品的数量
       setTodayBorrowedItems(todayBorrows.length)
-      // console.log(`今日借出物品数量: ${todayBorrows.length}`)
+      
+      // 筛选今日归还的物品记录
+      const todayReturns = allBorrowRecords.filter(record => {
+        // 确保returnDate存在且是今日，并且状态是已归还
+        if (record.returnDate && record.status === 'RETURNED') {
+          const returnDate = dayjs(record.returnDate).format('YYYY-MM-DD')
+          return returnDate === today
+        }
+        return false
+      })
+      
+      // 设置今日归还物品的数量
+      setTodayReturnedItems(todayReturns.length)
       
     } catch (error) {
-      // console.error('Failed to load guard stats:', error)
       message.error('加载统计数据失败')
     } finally {
       setLoading(false)
@@ -239,7 +254,6 @@ const Guard: React.FC = () => {
       const categories = await apiService.getAllItemCategories()
       setItemCategories(categories)
     } catch (error) {
-      // console.error('加载物品类型数据失败:', error)
     }
   }
 
@@ -256,8 +270,6 @@ const Guard: React.FC = () => {
     }
     
     const workerId = record.worker.workerId;
-    // const visitorRecordId = record.id; // 暂时未使用
-    // console.log(`处理工人ID: ${workerId}, 访客记录ID: ${visitorRecordId}`);
     
     // 获取该工人所有借用记录（包括之前访客记录的）
     const workerKey = `worker_${workerId}`;
@@ -302,8 +314,6 @@ const Guard: React.FC = () => {
       const returnDate = dayjs(item.returnDate).format('YYYY-MM-DD');
       return returnDate === today;
     }).length;
-    
-    // console.log(`工人 ${workerId} - 今日相关物品: ${totalTodayRelatedItems}, 今日归还: ${totalTodayReturnedItems}`);
 
     // 保留原始记录的所有字段，借用物品列显示今日相关物品数量，已归还物品列显示今日归还数量
     return {
@@ -359,7 +369,6 @@ const Guard: React.FC = () => {
             const visitorRecordKey = `visitor_${visitorRecordId}`;
             borrowRecordsMap.set(visitorRecordKey, visitorBorrowRecords);
           } catch (error) {
-            // console.error(`获取访客记录 ${visitorRecordId} 的借用记录失败:`, error);
             const visitorRecordKey = `visitor_${visitorRecordId}`;
             borrowRecordsMap.set(visitorRecordKey, []);
           }
@@ -374,7 +383,6 @@ const Guard: React.FC = () => {
           const workerKey = `worker_${workerId}`;
           borrowRecordsMap.set(workerKey, allWorkerBorrowRecords);
         } catch (error) {
-          // console.error(`获取工人 ${workerId} 的所有借用记录失败:`, error);
           const workerKey = `worker_${workerId}`;
           borrowRecordsMap.set(workerKey, []);
         }
@@ -383,27 +391,11 @@ const Guard: React.FC = () => {
       // 等待所有借用记录获取完成
       await Promise.all([...borrowRecordPromises, ...workerBorrowRecordPromises]);
       
-      // 打印借用记录映射的内容
-      // console.log("借用记录Map内容:");
-      // for (const [recordKey, records] of borrowRecordsMap.entries()) {
-      //   console.log(`访客记录Key: ${recordKey}, 借用记录数量: ${records.length}`);
-      // }
-      
-      // 2. 在记录中添加借用物品和归还物品的数量信息
+      // 在记录中添加借用物品和归还物品的数量信息
       const enrichedRecords = records.map(record => enrichVisitorRecord(record, borrowRecordsMap));
       
-      // 检查所有记录是否都有借用物品信息
-      // let missingCount = 0;
-      // enrichedRecords.forEach(record => {
-      //   if (record.borrowedItems === undefined) {
-      //     missingCount++;
-      //     // console.error("记录缺少borrowedItems:", record);
-      //   }
-      // });
-      // console.log(`总记录数: ${enrichedRecords.length}, 缺少借用物品信息的记录数: ${missingCount}`);
       setVisitorRecords(enrichedRecords)
     } catch (error) {
-      console.error('Failed to load visitor records:', error)
       message.error('加载访客记录失败')
     } finally {
       setVisitorRecordsLoading(false)
@@ -433,64 +425,30 @@ const Guard: React.FC = () => {
   // 更新工地名称
   useEffect(() => {
     const getSiteName = () => {
-      // console.log('=== 开始获取工地名称 ===')
-      // console.log('完整用户信息:', user)
-      // console.log('当前siteInfo:', siteInfo)
-      
       if (!user) {
-        // console.warn('用户信息未加载')
         return t('navigation.system')
       }
 
-      // console.log('用户基本信息:', {
-      //   id: user.id,
-      //   username: user.username,
-      //   role: user.role,
-      //   siteId: user.siteId,
-      //   siteName: user.siteName
-      // })
-
-      // console.log('门卫信息:', user.guard)
-
       // 优先使用从API获取的工地信息
       if (siteInfo?.name) {
-        // console.log('✅ 使用从API获取的工地名称:', siteInfo.name)
         return siteInfo.name
       }
 
       // 优先从用户直接属性获取
       if (user.siteName) {
-        // console.log('✅ 从user.siteName获取工地名称:', user.siteName)
         return user.siteName
       }
 
       // 从门卫信息获取
       if (user.guard?.siteName) {
-        // console.log('✅ 从user.guard.siteName获取工地名称:', user.guard.siteName)
         return user.guard.siteName
       }
 
-      // 如果都没有，记录警告并返回默认值
-      // console.warn('❌ 未找到工地名称，用户信息详情:', {
-      //   userId: user.id,
-      //   username: user.username,
-      //   role: user.role,
-      //   siteId: user.siteId,
-      //   siteName: user.siteName,
-      //   guardInfo: user.guard,
-      //   guardSiteName: user.guard?.siteName,
-      //   guardSiteId: user.guard?.siteId,
-      //   siteInfo: siteInfo
-      // })
-      
-      // console.log('使用默认系统标题:', t('navigation.system'))
       return t('navigation.system')
     }
 
     const currentSiteName = getSiteName()
     setSiteName(currentSiteName)
-    // console.log('工地名称已更新:', currentSiteName)
-    // console.log('=== 工地名称获取完成 ===')
   }, [user, siteInfo, t])
 
   // 加载统计数据
@@ -498,47 +456,20 @@ const Guard: React.FC = () => {
     if (user && user.role?.toLowerCase() === 'guard') {
       const loadSiteInfo = async () => {
         try {
-          // console.log('🔍 尝试通过门卫API获取工地信息...')
-          
           // 使用门卫专用的API获取门卫详细信息
           const guardProfile = await apiService.getGuardProfile()
-          // console.log('门卫详细信息:', guardProfile)
           
           if (guardProfile && guardProfile.siteId) {
-            // console.log('从门卫信息获取到siteId:', guardProfile.siteId)
-            
             // 尝试通过门卫信息中的siteId获取工地名称
             // 如果guardProfile中有site信息，直接使用
             if (guardProfile.site) {
-              // console.log('✅ 从门卫信息中获取到工地信息:', guardProfile.site)
               setSiteInfo(guardProfile.site)
               setSiteName(guardProfile.site.name)
               return
             }
-            
-            // 如果没有site信息，但有siteId，尝试通过其他方式获取
-            // console.log('门卫信息中没有site详情，尝试其他方式获取工地名称')
           }
-          
-          // 如果门卫API没有返回工地信息，尝试从用户信息中获取
-          const siteId = user.siteId || user.guard?.siteId
-          if (siteId) {
-            // console.log('使用用户信息中的siteId:', siteId)
-            // 这里可以尝试其他方式获取工地名称，比如从统计数据中获取
-            // console.log('尝试从统计数据中获取工地信息...')
-            try {
-              // const stats = await apiService.getGuardStats() // 暂时未使用
-              // console.log('门卫统计数据:', stats)
-              // 如果统计数据中有工地信息，可以使用
-            } catch (statsError) {
-              // console.warn('获取统计数据失败:', statsError)
-            }
-          }
-          
-          // console.warn('❌ 无法通过API获取工地信息')
           
         } catch (error) {
-          // console.error('❌ 获取工地信息失败:', error)
         }
       }
 
@@ -932,10 +863,8 @@ const Guard: React.FC = () => {
         // 如果没有找到入场记录，说明工人未入场，可以继续登记
         if (entryError?.statusCode === 400) {
           // 工人未入场，可以继续
-          // console.log('工人未入场，可以继续登记')
         } else {
           // 其他错误，可能是网络问题等
-          // console.warn('检查入场记录时出现错误:', entryError)
         }
       }
 
@@ -950,8 +879,6 @@ const Guard: React.FC = () => {
       setPhoneNumber(worker.phone)
       message.success(t('guard.workerQuerySuccess') || '工人信息查询成功')
     } catch (error: any) {
-      // console.error('查询工人信息失败:', error)
-      // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound') || '未找到工人信息'
       message.error(errorMessage)
       setSelectedWorker(null)
@@ -972,10 +899,6 @@ const Guard: React.FC = () => {
     }
 
     try {
-      // 调试日志：记录修改前后的电话号码
-      // console.log('工人原始电话号码:', selectedWorker.phone);
-      // console.log('修改后的电话号码:', phoneNumber.trim());
-      
       // 调用后端API创建访客记录（使用门卫专用接口）
       await apiService.createGuardVisitorRecord({
         workerId: selectedWorker.workerId, // 使用工人编号而不是数据库ID
@@ -990,7 +913,6 @@ const Guard: React.FC = () => {
         notes: `入场登记 - ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`
       })
 
-      // console.log('创建访客记录成功:', visitorRecord)
       message.success(t('guard.entryCompleted'))
       
       // 刷新统计数据
@@ -1002,13 +924,6 @@ const Guard: React.FC = () => {
       setPhysicalCardId('')
       setPhoneNumber('')
     } catch (error: any) {
-      // console.error('创建访客记录失败:', error)
-      // console.log('错误详情:', {
-      //   message: error?.message,
-      //   statusCode: error?.statusCode,
-      //   originalResponse: error?.originalResponse
-      // })
-      
       // 根据不同的错误类型显示不同的错误信息
       let errorMessage = '入场登记失败，请重试'
       
@@ -1069,9 +984,6 @@ const Guard: React.FC = () => {
       // const isPhoneType = cnMainlandPhoneRegex.test(input) || hkPhoneRegex.test(input) || 
       //                     (!isWorkerId && generalPhoneRegex.test(input)) // 暂时未使用
       
-      // 设置环境变量用于调试
-      // console.log('Input type:', isPhoneType ? 'Phone' : 'Worker ID/Card ID')
-      
       // 获取工人信息
       let worker
       
@@ -1111,10 +1023,8 @@ const Guard: React.FC = () => {
       
       // 使用工人ID获取借用物品列表
       const workerId = worker.workerId;
-      // console.log('使用工人ID查询借用物品:', workerId);
       
       const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
-      // console.log('Worker borrow records:', borrowRecords);
       
       // 过滤出未归还的物品
       const unreturnedItems = borrowRecords
@@ -1132,8 +1042,6 @@ const Guard: React.FC = () => {
       
       message.success(t('guard.workerQuerySuccess'))
     } catch (error: any) {
-      // console.error('查询工人入场记录失败:', error)
-      // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound')
       message.error(errorMessage)
       setSelectedWorker(null)
@@ -1233,7 +1141,6 @@ const Guard: React.FC = () => {
       loadGuardStats()
       
     } catch (error: any) {
-      // console.error('归还物品失败:', error)
       const errorMessage = error?.message || '归还物品失败，请重试'
       message.error(errorMessage)
     } finally {
@@ -1257,14 +1164,9 @@ const Guard: React.FC = () => {
       
       // 首先检查工人是否有有效的入场记录
       try {
-        // console.log('借用物品前检查工人入场状态:', {
-        //   workerId: selectedWorker.workerId,
-        //   workerInfo: selectedWorker
-        // });
         // 这个API会验证工人是否有有效的入场记录，如果没有会抛出错误
         await apiService.checkWorkerEntryRecord(selectedWorker.workerId)
       } catch (error: any) {
-        // console.error('工人入场验证失败:', error);
         message.error(t('guard.workerNotOnSiteCannotBorrow'))
         setLoading(false)
         return
@@ -1278,12 +1180,6 @@ const Guard: React.FC = () => {
         }
 
         // 创建物品借用记录
-        // console.log('创建借用记录，物品信息:', {
-        //   itemType: item.itemType,
-        //   itemId: item.itemId,
-        //   category
-        // });
-        
         const borrowRecord = {
           workerId: selectedWorker.workerId, // 使用workerId而不是id，确保后端能正确找到工人
           categoryId: item.itemType, // 物品类型ID
@@ -1299,8 +1195,6 @@ const Guard: React.FC = () => {
           }
           // visitorRecordId 会由后端自动关联到当前有效的访客记录
         }
-        
-        // console.log('发送借用记录数据:', borrowRecord);
 
         return await apiService.createBorrowRecord(borrowRecord as any)
       })
@@ -1341,7 +1235,6 @@ const Guard: React.FC = () => {
       setCurrentBorrowedItems([])
       setSelectedReturnItems([])
     } catch (error: any) {
-      // console.error('创建物品借用记录失败:', error)
       const errorMessage = error?.message || '创建物品借用记录失败'
       message.error(errorMessage)
     } finally {
@@ -1402,10 +1295,8 @@ const Guard: React.FC = () => {
       
       // 使用工人ID获取借用物品列表
       const workerId = result.worker.workerId;
-      // console.log('使用工人ID查询借用物品:', workerId);
       
       const borrowRecords = await apiService.getWorkerBorrowRecords(workerId);
-      // console.log('Worker borrow records:', borrowRecords);
       
       // 过滤出未归还的物品
       const unreturnedItems = borrowRecords
@@ -1438,8 +1329,6 @@ const Guard: React.FC = () => {
       
       message.success(t('guard.workerQuerySuccess'))
     } catch (error: any) {
-      // console.error('查询工人入场记录失败:', error)
-      // 显示后端返回的具体错误信息
       const errorMessage = error?.message || t('guard.workerNotFound')
       message.error(errorMessage)
       setSelectedWorker(null)
@@ -1502,7 +1391,6 @@ const Guard: React.FC = () => {
       setUnreturnedItemRemarks({})
       setPhysicalCardReturned(false)
     } catch (error) {
-      // console.error('离场登记失败:', error)
       message.error(t('guard.exitFailed'))
     } finally {
       setLoading(false)
@@ -1694,7 +1582,6 @@ const Guard: React.FC = () => {
     try {
       // 检查必要的信息
       if (!record.worker?.workerId) {
-        // console.error('无法获取工人ID')
         return
       }
       
@@ -1742,13 +1629,13 @@ const Guard: React.FC = () => {
         itemId: item.item?.itemCode || item.itemCode || '未知编号',
         borrowTime: item.borrowDate ? dayjs(item.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '-',
         returnTime: item.returnDate ? dayjs(item.returnDate).format('YYYY-MM-DD HH:mm:ss') : null,
+        borrowDuration: item.borrowDuration || null,
         status: item.status === 'RETURNED' ? 'returned' : 'borrowed',
         remark: item.notes || ''
       }))
       
       setItemBorrowRecords(formattedRecords)
     } catch (error) {
-      // console.error(`获取工人 ${record.workerId} 的未归还物品记录失败:`, error)
       message.error('获取今日相关物品记录失败')
     } finally {
       setItemRecordsLoading(false)
@@ -1766,7 +1653,6 @@ const Guard: React.FC = () => {
     try {
       // 检查必要的信息
       if (!record.worker?.workerId) {
-        // console.error('无法获取工人ID')
         return
       }
       
@@ -1790,13 +1676,13 @@ const Guard: React.FC = () => {
         itemId: item.item?.itemCode || item.itemCode || '未知编号',
         borrowTime: item.borrowDate ? dayjs(item.borrowDate).format('YYYY-MM-DD HH:mm:ss') : '-',
         returnTime: item.returnDate ? dayjs(item.returnDate).format('YYYY-MM-DD HH:mm:ss') : null,
+        borrowDuration: item.borrowDuration || null,
         status: 'returned',
         remark: item.notes || ''
       }))
       
       setItemBorrowRecords(formattedRecords)
     } catch (error) {
-      // console.error(`获取工人 ${record.workerId} 的今日归还物品记录失败:`, error)
       message.error('获取今日归还物品记录失败')
     } finally {
       setItemRecordsLoading(false)
@@ -1890,7 +1776,6 @@ const Guard: React.FC = () => {
       // 刷新统计数据
       loadGuardStats()
     } catch (error) {
-      // console.error('归还物品失败:', error)
       message.error(t('guard.returnItemsFailed'))
     } finally {
       setLoading(false)
@@ -1967,7 +1852,6 @@ const Guard: React.FC = () => {
       setSelectedWorker(frontendWorker)
       message.success(t('guard.workerQuerySuccess'))
     } catch (error: any) {
-      console.error('获取工人借用记录失败:', error)
       const errorMessage = error?.message || '获取工人借用记录失败'
       message.error(errorMessage)
     }
@@ -2137,6 +2021,38 @@ const Guard: React.FC = () => {
   }
 
   // 物品借用记录Modal
+  // 格式化借用时长（将分钟转换为友好的显示格式，支持多语言）
+  const formatBorrowDuration = (minutes: number | null): string => {
+    // 检查空值
+    if (minutes === null || minutes === undefined) return '-'
+    
+    // 确保传入的是有效数字
+    const totalMinutes = Number(minutes)
+    if (isNaN(totalMinutes) || totalMinutes < 0) return '-'
+    
+    // 计算小时和分钟
+    const hours = Math.floor(totalMinutes / 60)
+    const mins = Math.floor(totalMinutes % 60)
+    
+    // 根据语言选择单复数形式（英文需要区分单复数）
+    const hourUnit = locale === 'en-US' 
+      ? (hours === 1 ? t('common.hour') : t('common.hours'))
+      : t('common.hours')
+    
+    const minuteUnit = locale === 'en-US'
+      ? (mins === 1 ? t('common.minute') : t('common.minutes'))
+      : t('common.minutes')
+    
+    // 组合显示
+    if (hours > 0 && mins > 0) {
+      return `${hours} ${hourUnit} ${mins} ${minuteUnit}`
+    } else if (hours > 0) {
+      return `${hours} ${hourUnit}`
+    } else {
+      return `${mins} ${minuteUnit}`
+    }
+  }
+
   const renderItemRecordsModal = () => {
     if (!selectedRecord) return null
 
@@ -2161,6 +2077,12 @@ const Guard: React.FC = () => {
         dataIndex: 'returnTime',
         key: 'returnTime',
         render: (value: string | null) => value || '-',
+      },
+      {
+        title: t('guard.borrowDuration'),
+        dataIndex: 'borrowDuration',
+        key: 'borrowDuration',
+        render: (minutes: number | null) => formatBorrowDuration(minutes),
       },
       {
         title: t('guard.visitorStatus'),
@@ -2378,7 +2300,7 @@ const Guard: React.FC = () => {
                       value={totalEnteredToday}
                       prefix={<UserAddOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
-                        color: '#52c41a',
+                        color: '#1890ff',
                         fontSize: 'clamp(20px, 4vw, 28px)',
                         fontWeight: 'bold'
                       }}
@@ -2403,7 +2325,7 @@ const Guard: React.FC = () => {
                       value={totalExitedToday}
                       prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
                       valueStyle={{ 
-                        color: '#1890ff',
+                        color: '#52c41a',
                         fontSize: 'clamp(20px, 4vw, 28px)',
                         fontWeight: 'bold'
                       }}
@@ -2442,27 +2364,40 @@ const Guard: React.FC = () => {
             <Card style={{ height: '140px' }}>
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
+                  <div style={{ flex: 1, textAlign: 'center', padding: '0 2px' }}>
                     <Statistic
                       title={t('guard.borrowedItems')}
                       value={todayBorrowedItems}
-                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }} />}
                       valueStyle={{ 
                         color: '#1890ff',
-                        fontSize: 'clamp(20px, 4vw, 28px)',
+                        fontSize: 'clamp(18px, 3.5vw, 26px)',
                         fontWeight: 'bold'
                       }}
                     />
                   </div>
-                  <div style={{ width: '1px', height: '50px', background: '#f0f0f0', margin: '0 6px' }}></div>
-                  <div style={{ flex: 1, textAlign: 'center', padding: '0 4px' }}>
+                  <div style={{ width: '1px', height: '50px', background: '#f0f0f0', margin: '0 4px' }}></div>
+                  <div style={{ flex: 1, textAlign: 'center', padding: '0 2px' }}>
+                    <Statistic
+                      title={t('guard.returnedItems')}
+                      value={todayReturnedItems}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }} />}
+                      valueStyle={{ 
+                        color: '#52c41a',
+                        fontSize: 'clamp(18px, 3.5vw, 26px)',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </div>
+                  <div style={{ width: '1px', height: '50px', background: '#f0f0f0', margin: '0 4px' }}></div>
+                  <div style={{ flex: 1, textAlign: 'center', padding: '0 2px' }}>
                     <Statistic
                       title={t('guard.pendingReturn')}
                       value={totalUnreturnedItems}
-                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }} />}
                       valueStyle={{ 
                         color: '#ff4d4f',
-                        fontSize: 'clamp(20px, 4vw, 28px)',
+                        fontSize: 'clamp(18px, 3.5vw, 26px)',
                         fontWeight: 'bold'
                       }}
                     />
@@ -3517,8 +3452,6 @@ const Guard: React.FC = () => {
         key: 'borrowedItems',
         width: 100,
         render: (value: number, record: AttendanceRecord) => {
-          // console.log("借用物品列渲染，值为:", value, "记录:", record);
-          
           // 统一显示蓝色样式
           const color = '#1890ff'
           const backgroundColor = '#e6f7ff'
@@ -3582,9 +3515,6 @@ const Guard: React.FC = () => {
         key: 'returnedItems',
         width: 100,
         render: (value: number, record: AttendanceRecord) => {
-          // 移除调试日志
-          // console.log("已归还列渲染，值为:", value, "记录:", record);
-          
           // 当借用物品数量为0时，无论已归还数量如何都显示绿色（没有需要归还的物品）
           if (record.borrowedItems === 0) {
             // 绿色 - 没有需要归还的物品

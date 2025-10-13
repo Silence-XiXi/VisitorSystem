@@ -43,6 +43,11 @@ export default {
     enable: 'Enable',
     disable: 'Disable',
     processing: 'Processing',
+    // Time units
+    hour: 'hour',
+    hours: 'hours',
+    minute: 'minute',
+    minutes: 'minutes',
   },
   worker: {
     phoneNumberExists: 'Phone number already exists, please check your input',
@@ -323,7 +328,8 @@ export default {
     exited: 'Exited',
     notExited: 'Not Exited',
     borrowedItems: 'Borrowed Items',
-    pendingReturn: 'Pending Return',
+    returnedItems: 'Returned',
+    pendingReturn: 'Unreturned',
     onSite: 'On Site',
     qrCodeInput: 'Enter QR Code/Physical Card ID',
     qrCodePlaceholder: 'Please enter QR code or physical card ID (required)',
@@ -427,6 +433,7 @@ export default {
     // 表格标题
     borrowTime: 'Borrow Time',
     returnTime: 'Return Time',
+    borrowDuration: 'Borrow Duration',
     borrowTimeLabel: 'Borrow Time: ',
     notesLabel: 'Notes: ',
     // 选择操作
