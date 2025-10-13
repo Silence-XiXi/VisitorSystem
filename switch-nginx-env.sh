@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 访客管理系统 - Nginx环境切换脚本
-# 使用方法: ./switch-nginx-env.sh [blue|green]
+# 访客管理系统 - Docker Nginx环境切换脚本
+# 使用方法: ./switch-nginx-env.sh [blue|green|status]
 
 set -e
 
@@ -29,13 +29,39 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查Nginx是否运行
-check_nginx() {
-    if ! systemctl is-active --quiet nginx; then
-        log_error "Nginx服务未运行，请先启动Nginx"
+# 检测 Docker Compose 命令
+detect_compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        COMPOSE_CMD="docker-compose"
+    elif docker compose version &> /dev/null; then
+        COMPOSE_CMD="docker compose"
+    else
+        log_error "Docker Compose 未安装"
         exit 1
     fi
-    log_success "Nginx服务运行正常"
+}
+
+# 检查 Docker Nginx 容器是否运行
+check_nginx() {
+    if ! docker ps --format '{{.Names}}' | grep -q "^visitor-nginx$"; then
+        log_warning "Docker Nginx容器未运行，正在启动..."
+        start_nginx
+    else
+        log_success "Docker Nginx容器运行正常"
+    fi
+}
+
+# 启动 Docker Nginx 容器
+start_nginx() {
+    log_info "启动 Docker Nginx 容器..."
+    $COMPOSE_CMD -f docker-compose.nginx.yml up -d
+    sleep 3
+    if docker ps --format '{{.Names}}' | grep -q "^visitor-nginx$"; then
+        log_success "Nginx 容器启动成功"
+    else
+        log_error "Nginx 容器启动失败"
+        exit 1
+    fi
 }
 
 # 切换到蓝环境
@@ -43,54 +69,34 @@ switch_to_blue() {
     log_info "切换到蓝环境..."
     
     # 备份当前配置
-    sudo cp /etc/nginx/sites-available/visitor-system /etc/nginx/sites-available/visitor-system.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+    if [ -f "docker/nginx/nginx.conf" ]; then
+        cp docker/nginx/nginx.conf docker/nginx/nginx.conf.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+        log_info "已备份当前配置"
+    fi
     
-    # 创建蓝环境配置
-    sudo tee /etc/nginx/sites-available/visitor-system > /dev/null << 'EOF'
-server {
-    listen 8086;
-    server_name localhost;
+    # 复制蓝环境配置到主配置文件
+    if [ ! -f "docker/nginx/nginx.blue.conf" ]; then
+        log_error "蓝环境配置文件 docker/nginx/nginx.blue.conf 不存在"
+        exit 1
+    fi
     
-    # 前端代理到蓝环境
-    location / {
-        proxy_pass http://localhost:3002;  # 蓝环境前端端口
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+    cp docker/nginx/nginx.blue.conf docker/nginx/nginx.conf
+    log_info "已更新配置文件指向蓝环境"
     
-    # API代理到蓝环境
-    location /api/ {
-        proxy_pass http://localhost:3001/api/;  # 蓝环境后端端口
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_read_timeout 300s;
-        proxy_connect_timeout 75s;
-    }
-    
-    # 健康检查
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-}
-EOF
-    
-    # 测试配置
-    if sudo nginx -t; then
-        # 重新加载Nginx（零停机）
-        sudo systemctl reload nginx
-        log_success "已切换到蓝环境"
+    # 重新加载 Nginx 配置（零停机）
+    log_info "重新加载 Nginx 配置..."
+    if docker exec visitor-nginx nginx -t 2>&1; then
+        docker exec visitor-nginx nginx -s reload
+        log_success "✅ 已切换到蓝环境 (前端: visitor-frontend-blue:3002, 后端: visitor-backend-blue:3001)"
     else
-        log_error "Nginx配置测试失败"
+        log_error "Nginx 配置测试失败，正在回滚..."
+        # 如果有备份，恢复备份
+        LATEST_BACKUP=$(ls -t docker/nginx/nginx.conf.backup.* 2>/dev/null | head -1)
+        if [ -n "$LATEST_BACKUP" ]; then
+            cp "$LATEST_BACKUP" docker/nginx/nginx.conf
+            docker exec visitor-nginx nginx -s reload
+            log_warning "已回滚到之前的配置"
+        fi
         exit 1
     fi
 }
@@ -100,106 +106,179 @@ switch_to_green() {
     log_info "切换到绿环境..."
     
     # 备份当前配置
-    sudo cp /etc/nginx/sites-available/visitor-system /etc/nginx/sites-available/visitor-system.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+    if [ -f "docker/nginx/nginx.conf" ]; then
+        cp docker/nginx/nginx.conf docker/nginx/nginx.conf.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+        log_info "已备份当前配置"
+    fi
     
-    # 创建绿环境配置
-    sudo tee /etc/nginx/sites-available/visitor-system > /dev/null << 'EOF'
-server {
-    listen 8086;
-    server_name localhost;
+    # 复制绿环境配置到主配置文件
+    if [ ! -f "docker/nginx/nginx.green.conf" ]; then
+        log_error "绿环境配置文件 docker/nginx/nginx.green.conf 不存在"
+        exit 1
+    fi
     
-    # 前端代理到绿环境
-    location / {
-        proxy_pass http://localhost:3004;  # 绿环境前端端口
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+    cp docker/nginx/nginx.green.conf docker/nginx/nginx.conf
+    log_info "已更新配置文件指向绿环境"
     
-    # API代理到绿环境
-    location /api/ {
-        proxy_pass http://localhost:3003/api/;  # 绿环境后端端口
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_read_timeout 300s;
-        proxy_connect_timeout 75s;
-    }
-    
-    # 健康检查
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-}
-EOF
-    
-    # 测试配置
-    if sudo nginx -t; then
-        # 重新加载Nginx（零停机）
-        sudo systemctl reload nginx
-        log_success "已切换到绿环境"
+    # 重新加载 Nginx 配置（零停机）
+    log_info "重新加载 Nginx 配置..."
+    if docker exec visitor-nginx nginx -t 2>&1; then
+        docker exec visitor-nginx nginx -s reload
+        log_success "✅ 已切换到绿环境 (前端: visitor-frontend-green:3002, 后端: visitor-backend-green:3001)"
     else
-        log_error "Nginx配置测试失败"
+        log_error "Nginx 配置测试失败，正在回滚..."
+        # 如果有备份，恢复备份
+        LATEST_BACKUP=$(ls -t docker/nginx/nginx.conf.backup.* 2>/dev/null | head -1)
+        if [ -n "$LATEST_BACKUP" ]; then
+            cp "$LATEST_BACKUP" docker/nginx/nginx.conf
+            docker exec visitor-nginx nginx -s reload
+            log_warning "已回滚到之前的配置"
+        fi
         exit 1
     fi
 }
 
 # 显示当前状态
 show_status() {
-    log_info "当前Nginx配置状态:"
+    log_info "系统状态检查:"
     echo ""
     
-    # 检查当前配置指向哪个环境
-    if grep -q "localhost:3002" /etc/nginx/sites-available/visitor-system 2>/dev/null; then
-        echo -e "当前环境: ${BLUE}蓝环境${NC} (前端:3002, 后端:3001)"
-    elif grep -q "localhost:3004" /etc/nginx/sites-available/visitor-system 2>/dev/null; then
-        echo -e "当前环境: ${GREEN}绿环境${NC} (前端:3004, 后端:3003)"
+    # 检查 Nginx 容器状态
+    if docker ps --format '{{.Names}}\t{{.Status}}' | grep -q "visitor-nginx"; then
+        echo -e "${GREEN}✓${NC} Nginx 容器: $(docker ps --format '{{.Status}}' --filter name=visitor-nginx)"
     else
-        echo -e "当前环境: ${YELLOW}未知${NC}"
+        echo -e "${RED}✗${NC} Nginx 容器: 未运行"
     fi
     
     echo ""
-    echo "Nginx服务状态:"
-    sudo systemctl status nginx --no-pager -l
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # 检查当前配置指向哪个环境
+    if [ -f "docker/nginx/nginx.conf" ]; then
+        if grep -q "visitor-frontend-blue" docker/nginx/nginx.conf 2>/dev/null; then
+            echo -e "📍 当前环境: ${BLUE}蓝环境 (BLUE)${NC}"
+            echo "   前端: visitor-frontend-blue:3002"
+            echo "   后端: visitor-backend-blue:3001"
+        elif grep -q "visitor-frontend-green" docker/nginx/nginx.conf 2>/dev/null; then
+            echo -e "📍 当前环境: ${GREEN}绿环境 (GREEN)${NC}"
+            echo "   前端: visitor-frontend-green:3002"
+            echo "   后端: visitor-backend-green:3001"
+        else
+            echo -e "📍 当前环境: ${YELLOW}未知${NC}"
+        fi
+    else
+        echo -e "📍 当前环境: ${RED}配置文件不存在${NC}"
+    fi
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # 检查蓝环境容器状态
+    echo "🔵 蓝环境容器状态:"
+    if docker ps --format '{{.Names}}' | grep -q "visitor-backend-blue"; then
+        echo -e "   ${GREEN}✓${NC} visitor-backend-blue: $(docker ps --format '{{.Status}}' --filter name=visitor-backend-blue)"
+    else
+        echo -e "   ${RED}✗${NC} visitor-backend-blue: 未运行"
+    fi
+    
+    if docker ps --format '{{.Names}}' | grep -q "visitor-frontend-blue"; then
+        echo -e "   ${GREEN}✓${NC} visitor-frontend-blue: $(docker ps --format '{{.Status}}' --filter name=visitor-frontend-blue)"
+    else
+        echo -e "   ${RED}✗${NC} visitor-frontend-blue: 未运行"
+    fi
+    
+    echo ""
+    
+    # 检查绿环境容器状态
+    echo "🟢 绿环境容器状态:"
+    if docker ps --format '{{.Names}}' | grep -q "visitor-backend-green"; then
+        echo -e "   ${GREEN}✓${NC} visitor-backend-green: $(docker ps --format '{{.Status}}' --filter name=visitor-backend-green)"
+    else
+        echo -e "   ${RED}✗${NC} visitor-backend-green: 未运行"
+    fi
+    
+    if docker ps --format '{{.Names}}' | grep -q "visitor-frontend-green"; then
+        echo -e "   ${GREEN}✓${NC} visitor-frontend-green: $(docker ps --format '{{.Status}}' --filter name=visitor-frontend-green)"
+    else
+        echo -e "   ${RED}✗${NC} visitor-frontend-green: 未运行"
+    fi
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # 检查基础服务状态
+    echo "🔧 基础服务状态:"
+    if docker ps --format '{{.Names}}' | grep -q "visitor-postgres"; then
+        echo -e "   ${GREEN}✓${NC} visitor-postgres: $(docker ps --format '{{.Status}}' --filter name=visitor-postgres)"
+    else
+        echo -e "   ${RED}✗${NC} visitor-postgres: 未运行"
+    fi
+    
+    if docker ps --format '{{.Names}}' | grep -q "visitor-redis"; then
+        echo -e "   ${GREEN}✓${NC} visitor-redis: $(docker ps --format '{{.Status}}' --filter name=visitor-redis)"
+    else
+        echo -e "   ${RED}✗${NC} visitor-redis: 未运行"
+    fi
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # 访问地址提示
+    echo "🌐 访问地址:"
+    echo "   主入口 (通过Nginx): http://localhost:8086"
+    echo "   蓝环境前端直连: http://localhost:3002"
+    echo "   蓝环境后端直连: http://localhost:3001"
+    echo "   绿环境前端直连: http://localhost:3004"
+    echo "   绿环境后端直连: http://localhost:3003"
+    echo ""
 }
 
 # 主函数
 main() {
+    detect_compose_cmd
+    
     case "${1:-help}" in
         "blue")
             check_nginx
             switch_to_blue
+            echo ""
             show_status
             ;;
         "green")
             check_nginx
             switch_to_green
+            echo ""
             show_status
             ;;
         "status")
             show_status
             ;;
         "help"|*)
-            echo "访客管理系统 Nginx 环境切换脚本"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  访客管理系统 - Docker Nginx 环境切换脚本"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
             echo "使用方法:"
-            echo "  $0 blue                    # 切换到蓝环境"
-            echo "  $0 green                   # 切换到绿环境"
-            echo "  $0 status                  # 显示当前状态"
-            echo "  $0 help                    # 显示帮助信息"
+            echo "  $0 blue        切换到蓝环境"
+            echo "  $0 green       切换到绿环境"
+            echo "  $0 status      显示当前状态"
+            echo "  $0 help        显示帮助信息"
             echo ""
             echo "示例:"
-            echo "  $0 blue                    # 切换到蓝环境"
-            echo "  $0 green                   # 切换到绿环境"
-            echo "  $0 status                  # 查看当前状态"
+            echo "  $0 green       # 切换流量到绿环境（零停机）"
+            echo "  $0 blue        # 回滚到蓝环境"
+            echo "  $0 status      # 查看当前环境和容器状态"
+            echo ""
+            echo "说明:"
+            echo "  - 脚本会自动备份当前配置"
+            echo "  - 使用 nginx -s reload 实现零停机切换"
+            echo "  - 配置测试失败会自动回滚"
+            echo "  - 如果 Nginx 容器未运行，会自动启动"
+            echo ""
             ;;
     esac
 }
