@@ -525,7 +525,7 @@ const ItemBorrowRecords: React.FC = () => {
             {t('itemBorrowRecords.title')}
           </h2>
           <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '13px' }}>
-            {t('itemBorrowRecords.description')}
+            {t('itemBorrowRecords.description').replace('{count}', borrowRecords.length.toString())}
           </p>
         </div>
 

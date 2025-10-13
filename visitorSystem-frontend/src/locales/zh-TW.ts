@@ -525,7 +525,7 @@ export default {
     unreturnedItemsTooltip: '顯示該工人所有未歸還的物品數量',
     includesPreviousRecords: '包括之前訪客記錄的未歸還物品',
     // 缺失的键
-    totalWorkers: '總工人數',
+    totalWorkers: '查看和管理工人信息，共 {count} 條工人記錄',
     downloadTemplate: '下載模板',
     import: '導入',
     export: '導出',
@@ -966,7 +966,7 @@ export default {
   },
   itemCategory: {
     title: '物品分類管理',
-    description: '管理物品分類信息，共 {count} 個分類',
+    description: '查看和管理物品分類信息，共 {count} 個分類',
     categoryId: '分類ID',
     categoryCode: '分類編號',
     categoryName: '分類名稱',
@@ -1042,7 +1042,7 @@ export default {
   },
   itemBorrowRecords: {
     title: '借用物品記錄管理',
-    description: '查看和管理所有物品借用記錄',
+    description: '查看和管理所有物品借用記錄，共 {count} 條記錄',
     borrowDate: '借用日期',
     workerName: '工人姓名',
     physicalCardId: '實體卡ID',

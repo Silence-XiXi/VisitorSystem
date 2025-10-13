@@ -2426,7 +2426,7 @@ const AdminSites: React.FC = () => {
       {/* 表格容器 */}
       <Card style={{ 
         margin: 0,
-        flex: 1,
+        height: 'calc(100vh - 300px)', // 进一步减少高度，完全消除滚动条
         display: 'flex', 
         flexDirection: 'column'
       }}
@@ -2440,64 +2440,75 @@ const AdminSites: React.FC = () => {
         }
       }}>
         <div style={{ 
-          flex: 1, 
+          height: '100%', 
           display: 'flex', 
-          flexDirection: 'column', 
-          minHeight: 0, 
-          padding: '8px 16px 0 16px'
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
-          <Table 
-            rowKey="id" 
-            columns={siteColumns} 
-            dataSource={paginatedSites} 
-            loading={loading}
-            scroll={{ 
-              x: 1200,
-              y: 'calc(100vh - 400px)'
-            }}
-            pagination={false} // 禁用内置分页，使用自定义分页
-            size="middle"
-            tableLayout="fixed" // 固定表格布局，避免对齐延迟
-            style={{ 
-              fontSize: '14px',
-              height: '100%'
-            }}
-          rowSelection={{
-            selectedRowKeys: selectedSiteIds,
-            onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
-            getCheckboxProps: (record) => ({
-              name: record.name,
-            }),
-          }}
-          />
-        </div>
+          {/* 表格容器 */}
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            minHeight: 0, 
+            padding: '8px 16px 0 16px', // 顶部添加8px间距
+            marginBottom: selectedSiteIds.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
+          }}>
+            <Table 
+              rowKey="id" 
+              columns={siteColumns} 
+              dataSource={paginatedSites} 
+              loading={loading}
+              scroll={{ 
+                x: 1200,
+                y: selectedSiteIds.length > 0 
+                  ? 'calc(100vh - 448px)' // 有批量操作栏时减少高度，完全适配
+                  : 'calc(100vh - 408px)' // 没有批量操作栏时正常高度，完全适配
+              }}
+              pagination={false} // 禁用内置分页，使用自定义分页
+              size="middle"
+              tableLayout="fixed" // 固定表格布局，避免对齐延迟
+              style={{ 
+                fontSize: '14px',
+                height: '100%'
+              }}
+              rowSelection={{
+                selectedRowKeys: selectedSiteIds,
+                onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
+                getCheckboxProps: (record) => ({
+                  name: record.name,
+                }),
+              }}
+            />
+          </div>
 
-        {/* 外部分页栏 */}
-        <div style={{ 
-          padding: '12px 16px',
-          borderTop: '1px solid #f0f0f0',
-          backgroundColor: '#fafafa',
-          flexShrink: 0,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center'
-        }}>
-          {/* 分页 */}
-          <Pagination
-            current={sitePagination.current}
-          pageSize={sitePagination.pageSize}
-          total={sitePagination.total}
-          showSizeChanger
-          showQuickJumper
-          showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
-          pageSizeOptions={['10', '20', '50', '100']}
-          onChange={handleSitePaginationChange}
-          onShowSizeChange={handleSitePaginationChange}
-          size="small"
-          style={{ 
-            margin: 0
-          }}
-        />
+          {/* 外部分页栏 */}
+          <div style={{ 
+            padding: '12px 16px',
+            borderTop: '1px solid #f0f0f0',
+            backgroundColor: '#fafafa',
+            flexShrink: 0,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center'
+          }}>
+            {/* 分页 */}
+            <Pagination
+              current={sitePagination.current}
+              pageSize={sitePagination.pageSize}
+              total={sitePagination.total}
+              showSizeChanger
+              showQuickJumper
+              showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
+              pageSizeOptions={['10', '20', '50', '100']}
+              onChange={handleSitePaginationChange}
+              onShowSizeChange={handleSitePaginationChange}
+              size="small"
+              style={{ 
+                margin: 0
+              }}
+            />
+          </div>
         </div>
       </Card>
     </div>
@@ -2630,7 +2641,7 @@ const AdminSites: React.FC = () => {
       {/* 表格容器 */}
       <Card style={{ 
         margin: 0,
-        flex: 1,
+        height: 'calc(100vh - 300px)', // 进一步减少高度，完全消除滚动条
         display: 'flex', 
         flexDirection: 'column'
       }}
@@ -2644,64 +2655,75 @@ const AdminSites: React.FC = () => {
         }
       }}>
         <div style={{ 
-          flex: 1, 
+          height: '100%', 
           display: 'flex', 
-          flexDirection: 'column', 
-          minHeight: 0, 
-          padding: '8px 16px 0 16px'
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
-          <Table 
-            rowKey="id" 
-            columns={distributorColumns} 
-            dataSource={paginatedDistributors} 
-            loading={loading}
-            scroll={{ 
-              x: 1400,
-              y: 'calc(100vh - 400px)'
-            }}
-            pagination={false} // 禁用内置分页，使用自定义分页
-            size="middle"
-            tableLayout="fixed" // 固定表格布局，避免对齐延迟
-            style={{ 
-              fontSize: '14px',
-              height: '100%'
-            }}
-          rowSelection={{
-            selectedRowKeys: selectedDistributorIds,
-            onChange: (selectedRowKeys) => setSelectedDistributorIds(selectedRowKeys as string[]),
-            getCheckboxProps: (record) => ({
-              name: record.name,
-            }),
-          }}
-          />
-        </div>
+          {/* 表格容器 */}
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            minHeight: 0, 
+            padding: '8px 16px 0 16px', // 顶部添加8px间距
+            marginBottom: selectedDistributorIds.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
+          }}>
+            <Table 
+              rowKey="id" 
+              columns={distributorColumns} 
+              dataSource={paginatedDistributors} 
+              loading={loading}
+              scroll={{ 
+                x: 1400,
+                y: selectedDistributorIds.length > 0 
+                  ? 'calc(100vh - 448px)' // 有批量操作栏时减少高度，完全适配
+                  : 'calc(100vh - 408px)' // 没有批量操作栏时正常高度，完全适配
+              }}
+              pagination={false} // 禁用内置分页，使用自定义分页
+              size="middle"
+              tableLayout="fixed" // 固定表格布局，避免对齐延迟
+              style={{ 
+                fontSize: '14px',
+                height: '100%'
+              }}
+              rowSelection={{
+                selectedRowKeys: selectedDistributorIds,
+                onChange: (selectedRowKeys) => setSelectedDistributorIds(selectedRowKeys as string[]),
+                getCheckboxProps: (record) => ({
+                  name: record.name,
+                }),
+              }}
+            />
+          </div>
 
-        {/* 外部分页栏 */}
-        <div style={{ 
-          padding: '12px 16px',
-          borderTop: '1px solid #f0f0f0',
-          backgroundColor: '#fafafa',
-          flexShrink: 0,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center'
-        }}>
-          {/* 分页 */}
-          <Pagination
-            current={distributorPagination.current}
-          pageSize={distributorPagination.pageSize}
-          total={distributorPagination.total}
-          showSizeChanger
-          showQuickJumper
-          showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
-          pageSizeOptions={['10', '20', '50', '100']}
-          onChange={handleDistributorPaginationChange}
-          onShowSizeChange={handleDistributorPaginationChange}
-          size="small"
-          style={{ 
-            margin: 0
-          }}
-        />
+          {/* 外部分页栏 */}
+          <div style={{ 
+            padding: '12px 16px',
+            borderTop: '1px solid #f0f0f0',
+            backgroundColor: '#fafafa',
+            flexShrink: 0,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center'
+          }}>
+            {/* 分页 */}
+            <Pagination
+              current={distributorPagination.current}
+              pageSize={distributorPagination.pageSize}
+              total={distributorPagination.total}
+              showSizeChanger
+              showQuickJumper
+              showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
+              pageSizeOptions={['10', '20', '50', '100']}
+              onChange={handleDistributorPaginationChange}
+              onShowSizeChange={handleDistributorPaginationChange}
+              size="small"
+              style={{ 
+                margin: 0
+              }}
+            />
+          </div>
         </div>
       </Card>
     </div>
@@ -2825,7 +2847,7 @@ const AdminSites: React.FC = () => {
       {/* 表格容器 */}
       <Card style={{ 
         margin: 0,
-        flex: 1,
+        height: 'calc(100vh - 300px)', // 进一步减少高度，完全消除滚动条
         display: 'flex', 
         flexDirection: 'column'
       }}
@@ -2839,71 +2861,82 @@ const AdminSites: React.FC = () => {
         }
       }}>
         <div style={{ 
-          flex: 1, 
+          height: '100%', 
           display: 'flex', 
-          flexDirection: 'column', 
-          minHeight: 0, 
-          padding: '8px 16px 0 16px'
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
-          <Table 
-            rowKey="id" 
-            columns={guardColumns} 
-            dataSource={paginatedGuards} 
-            loading={loading}
-            scroll={{ 
-              x: 1200,
-              y: 'calc(100vh - 400px)'
-            }}
-            pagination={false} // 禁用内置分页，使用自定义分页
-            size="middle"
-            tableLayout="fixed" // 固定表格布局，避免对齐延迟
-            style={{ 
-              fontSize: '14px',
-              height: '100%'
-            }}
-          rowSelection={{
-            selectedRowKeys: selectedGuardIds,
-            onChange: (selectedRowKeys) => setSelectedGuardIds(selectedRowKeys as string[]),
-            getCheckboxProps: (record) => ({
-              name: record.name,
-            }),
-          }}
-          />
-        </div>
+          {/* 表格容器 */}
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            minHeight: 0, 
+            padding: '8px 16px 0 16px', // 顶部添加8px间距
+            marginBottom: selectedGuardIds.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
+          }}>
+            <Table 
+              rowKey="id" 
+              columns={guardColumns} 
+              dataSource={paginatedGuards} 
+              loading={loading}
+              scroll={{ 
+                x: 1200,
+                y: selectedGuardIds.length > 0 
+                  ? 'calc(100vh - 448px)' // 有批量操作栏时减少高度，完全适配
+                  : 'calc(100vh - 408px)' // 没有批量操作栏时正常高度，完全适配
+              }}
+              pagination={false} // 禁用内置分页，使用自定义分页
+              size="middle"
+              tableLayout="fixed" // 固定表格布局，避免对齐延迟
+              style={{ 
+                fontSize: '14px',
+                height: '100%'
+              }}
+              rowSelection={{
+                selectedRowKeys: selectedGuardIds,
+                onChange: (selectedRowKeys) => setSelectedGuardIds(selectedRowKeys as string[]),
+                getCheckboxProps: (record) => ({
+                  name: record.name,
+                }),
+              }}
+            />
+          </div>
 
-        {/* 外部分页栏 */}
-        <div style={{ 
-          padding: '12px 16px',
-          borderTop: '1px solid #f0f0f0',
-          backgroundColor: '#fafafa',
-          flexShrink: 0,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center'
-        }}>
-          {/* 分页 */}
-          <Pagination
-            current={guardPagination.current}
-          pageSize={guardPagination.pageSize}
-          total={guardPagination.total}
-          showSizeChanger
-          showQuickJumper
-          showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
-          pageSizeOptions={['10', '20', '50', '100']}
-          onChange={handleGuardPaginationChange}
-          onShowSizeChange={handleGuardPaginationChange}
-          size="small"
-          style={{ 
-            margin: 0
-          }}
-        />
+          {/* 外部分页栏 */}
+          <div style={{ 
+            padding: '12px 16px',
+            borderTop: '1px solid #f0f0f0',
+            backgroundColor: '#fafafa',
+            flexShrink: 0,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center'
+          }}>
+            {/* 分页 */}
+            <Pagination
+              current={guardPagination.current}
+              pageSize={guardPagination.pageSize}
+              total={guardPagination.total}
+              showSizeChanger
+              showQuickJumper
+              showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
+              pageSizeOptions={['10', '20', '50', '100']}
+              onChange={handleGuardPaginationChange}
+              onShowSizeChange={handleGuardPaginationChange}
+              size="small"
+              style={{ 
+                margin: 0
+              }}
+            />
+          </div>
         </div>
       </Card>
     </div>
   )
 
   return (
-    <div style={{ padding: '0 24px 24px 24px' }}>
+    <div style={{ padding: '0 12px 12px 12px' }}>
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}

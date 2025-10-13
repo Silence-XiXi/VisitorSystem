@@ -525,7 +525,7 @@ export default {
     unreturnedItemsTooltip: 'Display the number of unreturned items for this worker',
     includesPreviousRecords: 'Includes unreturned items from previous visitor records',
     // 缺失的键
-    totalWorkers: 'Total Workers',
+    totalWorkers: 'View and manage worker information, {count} records',
     downloadTemplate: 'Download Template',
     import: 'Import',
     export: 'Export',
@@ -966,7 +966,7 @@ export default {
   },
   itemCategory: {
     title: 'Item Category Management',
-    description: 'Manage item category information, total {count} categories',
+    description: 'View and manage item category information, total {count} categories',
     categoryId: 'Category ID',
     categoryCode: 'Category Code',
     categoryName: 'Category Name',
@@ -1042,7 +1042,7 @@ export default {
   },
   itemBorrowRecords: {
     title: 'Item Borrowing Records Management',
-    description: 'View and manage all item borrowing records',
+    description: 'View and manage all item borrowing records, {count} total',
     borrowDate: 'Borrow Date',
     workerName: 'Worker Name',
     physicalCardId: 'Physical Card ID',
