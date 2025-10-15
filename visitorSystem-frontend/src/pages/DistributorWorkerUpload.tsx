@@ -2,120 +2,12 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
 
 const { Option } = Select
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, CheckCircleOutlined, StopOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined } from '@ant-design/icons'
 
-// 失败项内容组件，支持选择和重新发送
-interface FailedItemsContentProps {
-  failedItems: Array<{
-    workerId: string;
-    workerName: string;
-    success: boolean;
-    message?: string;
-  }>;
-  onResend: (selectedItems: Array<{
-    workerId: string;
-    workerName: string;
-    success: boolean;
-    message?: string;
-  }>) => void;
-  t: (key: string, params?: Record<string, string>) => string;
-}
-
-const FailedItemsContent: React.FC<FailedItemsContentProps> = ({ failedItems, onResend, t }) => {
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-
-  // 表格行选择配置
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (selectedKeys: React.Key[]) => {
-      setSelectedRowKeys(selectedKeys);
-    }
-  };
-
-  // 处理重新发送
-  const handleResend = () => {
-    if (selectedRowKeys.length === 0) {
-      message.warning(t('worker.pleaseSelectItemsToResend'));
-      return;
-    }
-
-    const selectedItems = failedItems.filter(item => selectedRowKeys.includes(item.workerId));
-    onResend(selectedItems);
-  };
-
-  // 全选
-  const handleSelectAll = () => {
-    setSelectedRowKeys(failedItems.map(item => item.workerId));
-  };
-
-  // 取消全选
-  const handleDeselectAll = () => {
-    setSelectedRowKeys([]);
-  };
-
-  return (
-    <div>
-      <p>{t('worker.sendFailureExplanation')}</p>
-      
-      {/* 操作工具栏 */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Space>
-          <Button 
-            size="small" 
-            onClick={handleSelectAll}
-          >
-            {t('worker.selectAll')}
-          </Button>
-          <Button 
-            size="small" 
-            onClick={handleDeselectAll}
-          >
-            {t('worker.deselectAll')}
-          </Button>
-        </Space>
-
-        <Button 
-          type="primary" 
-          icon={<ReloadOutlined />} 
-          onClick={handleResend}
-          disabled={selectedRowKeys.length === 0}
-        >
-          {t('worker.resendSelected')} ({selectedRowKeys.length})
-        </Button>
-      </div>
-
-      <Table
-        rowSelection={rowSelection}
-        size="small"
-        dataSource={failedItems}
-        columns={[
-          {
-            title: t('worker.workerId'),
-            dataIndex: 'workerId',
-            key: 'workerId',
-          },
-          {
-            title: t('worker.name'),
-            dataIndex: 'workerName',
-            key: 'workerName',
-          },
-          {
-            title: t('common.error'),
-            dataIndex: 'message',
-            key: 'message',
-          }
-        ]}
-        pagination={false}
-        rowKey="workerId"
-      />
-    </div>
-  );
-};
-import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Site } from '../types/worker'
+import { Worker, Site, CreateWorkerRequest } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
 import { 
-  exportWorkersToExcel, 
-  readWorkerExcelFile
+  exportWorkersToExcel
 } from '../utils/excelUtils'
 import { useLocale } from '../contexts/LocaleContext'
 import { useAuth } from '../hooks/useAuth'
@@ -123,46 +15,7 @@ import apiService from '../services/api'
 import dayjs from 'dayjs'
 import ExcelImportExportModal from '../components/ExcelImportExportModal'
 import QRCodeModal from '../components/QRCodeModal'
-
-// 兼容性复制到剪贴板函数
-const fallbackCopyToClipboard = (text: string) => {
-  // 创建一个临时textarea元素
-  const textArea = document.createElement('textarea');
-  textArea.value = text;
-  
-  // 设置样式使其不可见
-  textArea.style.position = 'fixed';
-  textArea.style.top = '0';
-  textArea.style.left = '0';
-  textArea.style.width = '2em';
-  textArea.style.height = '2em';
-  textArea.style.padding = '0';
-  textArea.style.border = 'none';
-  textArea.style.outline = 'none';
-  textArea.style.boxShadow = 'none';
-  textArea.style.background = 'transparent';
-  
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-  
-  try {
-    // 尝试使用document.execCommand('copy')复制
-    const successful = document.execCommand('copy');
-    if (successful) {
-      message.success('分享链接已复制到剪贴板');
-    } else {
-      throw new Error('复制命令执行失败');
-    }
-  } catch (err) {
-    console.error('Fallback复制失败:', err);
-    message.error('复制链接失败，请手动复制');
-  }
-  
-  // 清理
-  document.body.removeChild(textArea);
-};
-
+import QuickInviteModal from '../components/QuickInviteModal'
 
 // 表格样式
 const tableStyles = `
@@ -203,12 +56,17 @@ const DistributorWorkerUpload: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [qrCodeModalOpen, setQrCodeModalOpen] = useState(false)
   const [selectedWorkerForQR, setSelectedWorkerForQR] = useState<Worker | null>(null)
-  const [sendingEmailLoading, setSendingEmailLoading] = useState(false)
-  const [sendingWhatsAppLoading, setSendingWhatsAppLoading] = useState(false)
+  const [sendingEmailLoading] = useState(false)
+  const [sendingWhatsAppLoading] = useState(false)
+  const [quickInviteModalOpen, setQuickInviteModalOpen] = useState(false)
+  const [sendingInviteLoading, setSendingInviteLoading] = useState(false)
   
   // 工地数据状态
   const [sites, setSites] = useState<Site[]>([])
   const [sitesLoading, setSitesLoading] = useState(false)
+  
+  // 分判商关联的工地信息
+  const [distributorSites, setDistributorSites] = useState<Site[]>([])
 
   // 筛选状态
   const [statusFilters, setStatusFilters] = useState<string[]>([])
@@ -233,6 +91,38 @@ const DistributorWorkerUpload: React.FC = () => {
     }
   }, [])
 
+  // 加载分判商关联的工地信息
+  const loadDistributorSites = useCallback(() => {
+    if (user?.distributor) {
+      const distributor = user.distributor
+      let sitesList: Site[] = []
+      
+      // 检查sites属性（通过site_distributors表关联的工地信息）
+      if ('sites' in distributor && Array.isArray(distributor.sites) && distributor.sites.length > 0) {
+        // 从site_distributors关联表中获取工地信息
+        sitesList = distributor.sites.map((siteDistributor: any) => {
+          const site = siteDistributor.site || siteDistributor
+          return {
+            id: site.id,
+            name: site.name,
+            address: site.address || '',
+            code: site.code || '',
+            manager: site.manager || '',
+            phone: site.phone || '',
+            status: site.status || 'active'
+          }
+        })
+      }
+      // 检查siteIds属性（工地ID数组）- 兼容旧格式
+      else if ('siteIds' in distributor && Array.isArray(distributor.siteIds) && distributor.siteIds.length > 0) {
+        // 从所有工地中查找对应的工地信息
+        sitesList = sites.filter(site => (distributor.siteIds as string[]).includes(site.id))
+      }
+      
+      setDistributorSites(sitesList)
+    }
+  }, [user?.distributor, sites])
+
   // 状态映射函数
   const mapWorkerStatus = (status: string) => {
     switch (status) {
@@ -248,10 +138,17 @@ const DistributorWorkerUpload: React.FC = () => {
     try {
       // 尝试从API获取数据
       const workersData = await apiService.getDistributorWorkers()
-      // 映射状态格式
+      // 映射状态格式，确保包含所有必需字段
       const mappedWorkers = workersData.map(worker => ({
         ...worker,
-        status: mapWorkerStatus(worker.status)
+        status: mapWorkerStatus(worker.status) as 'active' | 'inactive',
+        region: worker.region || '',
+        email: worker.email || '',
+        whatsapp: worker.whatsapp || '',
+        distributor: worker.distributor ? {
+          ...worker.distributor,
+          distributorId: worker.distributor.distributorId || worker.distributor.id
+        } : undefined
       }))
       setWorkers(mappedWorkers)
     } catch (error) {
@@ -280,6 +177,11 @@ const DistributorWorkerUpload: React.FC = () => {
     loadWorkers()
     loadSites()
   }, [loadWorkers, loadSites])
+
+  // 当工地数据或用户信息变化时，加载分判商关联的工地
+  useEffect(() => {
+    loadDistributorSites()
+  }, [loadDistributorSites])
 
   // 筛选后的工人数据
   const filteredWorkers = useMemo(() => {
@@ -316,8 +218,6 @@ const DistributorWorkerUpload: React.FC = () => {
   }
 
   // 工人表单提交 - 使用本地状态更新方式保持工人记录在表格中的位置
-  // 当使用loadWorkers()重新加载数据时，即使后端按创建时间排序，表格位置仍可能变化
-  // 通过直接更新本地状态，可以避免记录位置变化，提高用户体验
   const onWorkerSubmit = async () => {
     try {
       const values = await workerForm.validateFields()
@@ -325,8 +225,7 @@ const DistributorWorkerUpload: React.FC = () => {
       
       if (editingWorker) {
         // 编辑工人
-        // 调用API更新工人信息
-        await apiService.updateDistributorWorker(editingWorker.id, {
+        const updateData = {
           name: values.name,
           phone: values.phone,
           idType: values.idType,
@@ -338,7 +237,9 @@ const DistributorWorkerUpload: React.FC = () => {
           birthDate: values.birthDate ? values.birthDate.toISOString() : null,
           email: values.email || null,
           whatsapp: values.whatsapp || null
-        })
+        }
+        
+        await apiService.updateDistributorWorker(editingWorker.id, updateData)
         
         // 直接更新本地状态，保持工人在列表中的位置不变
         setWorkers(prev => prev.map(w => 
@@ -355,8 +256,8 @@ const DistributorWorkerUpload: React.FC = () => {
                 siteId: values.siteId,
                 site: w.site?.id === values.siteId ? w.site : sites.find(s => s.id === values.siteId),
                 birthDate: values.birthDate ? values.birthDate.toISOString() : null,
-                email: values.email || null,
-                whatsapp: values.whatsapp || null,
+                email: values.email || '',
+                whatsapp: values.whatsapp || '',
                 updatedAt: new Date().toISOString()
               }
             : w
@@ -365,11 +266,7 @@ const DistributorWorkerUpload: React.FC = () => {
         message.success(t('distributor.workerInfoUpdated'))
       } else {
         // 新增工人
-        // 使用表单中选择的工地
         const selectedSiteId = values.siteId
-        console.log('选择的工地ID:', selectedSiteId)
-        console.log('分判商工地列表:', user?.distributor?.sites)
-        console.log('分判商信息:', user?.distributor)
         
         if (!user?.distributor) {
           message.error('分判商信息获取失败，请重新登录')
@@ -388,7 +285,7 @@ const DistributorWorkerUpload: React.FC = () => {
           idNumber: values.idNumber,
           gender: values.gender?.toUpperCase() as 'MALE' | 'FEMALE',
           region: values.region || t('regions.mainland'),
-          siteId: selectedSiteId, // 使用表单中选择的工地
+          siteId: selectedSiteId,
           distributorId: currentDistributor?.id || 'default-distributor',
           status: (values.status?.toUpperCase() || 'ACTIVE') as 'ACTIVE' | 'INACTIVE',
           birthDate: values.birthDate ? values.birthDate.toISOString() : null,
@@ -399,39 +296,37 @@ const DistributorWorkerUpload: React.FC = () => {
         const newWorker = await apiService.createDistributorWorker(createData)
         message.success(t('distributor.workerInfoAdded'))
         
-        // 将新创建的工人添加到本地工人列表头部，而不是重新加载全部数据
-        // 确保新工人对象包含所有必要的Worker类型属性
+        // 将新创建的工人添加到本地工人列表头部
         const processedWorker = {
           ...newWorker,
-          status: mapWorkerStatus(newWorker.status),
-          // 确保这些可选字段存在，即使为null
-          region: newWorker.region || values.region || null,
-          email: newWorker.email || values.email || null,
-          whatsapp: newWorker.whatsapp || values.whatsapp || null
+          status: mapWorkerStatus(newWorker.status) as 'active' | 'inactive',
+          region: newWorker.region || values.region || '',
+          email: newWorker.email || values.email || '',
+          whatsapp: newWorker.whatsapp || values.whatsapp || '',
+          distributor: newWorker.distributor ? {
+            ...newWorker.distributor,
+            distributorId: newWorker.distributor.distributorId || newWorker.distributor.id
+          } : undefined
         };
         
         setWorkers(prev => [processedWorker, ...prev])
         
         // 显示二维码发送选项
-        // 使用处理后的完整工人对象，确保包含所有必要属性
         setSelectedWorkerForQR(processedWorker)
         setQrCodeModalOpen(true)
       }
       
-      // 不再重新加载数据，使用本地状态更新
       setWorkerModalOpen(false)
       setEditingWorker(null)
       workerForm.resetFields()
     } catch (error: unknown) {
       console.error('操作失败:', error)
       
-      // 尝试获取具体的错误信息
       let errorMessage = t('distributor.operationFailed')
       
       if (error && typeof error === 'object' && 'message' in error) {
         const errorMsg = (error as { message: string }).message
         
-        // 检查是否是证件号码重复的错误
         if (errorMsg.includes('证件号码') || errorMsg.includes('idNumber') || errorMsg.includes('duplicate') || errorMsg.includes('已存在')) {
           errorMessage = '证件号码已存在，请检查证件号码是否正确或使用其他证件号码'
         } else if (errorMsg.includes('手机号') || errorMsg.includes('phone') || errorMsg.includes('电话')) {
@@ -445,7 +340,6 @@ const DistributorWorkerUpload: React.FC = () => {
         } else if (errorMsg.includes('验证') || errorMsg.includes('validation')) {
           errorMessage = '输入信息验证失败，请检查输入内容'
         } else if (errorMsg && errorMsg !== '操作失败') {
-          // 如果后端返回了具体的错误信息，直接使用
           errorMessage = errorMsg
         }
       }
@@ -456,850 +350,139 @@ const DistributorWorkerUpload: React.FC = () => {
     }
   }
 
-  // 删除工人 - 使用本地状态更新而非重新加载全部数据
-  const handleDeleteWorker = (worker: Worker) => {
-    Modal.confirm({
-      title: t('distributor.confirmDelete'),
-      icon: <ExclamationCircleOutlined />,
-      content: t('distributor.confirmDeleteContent', { name: worker.name }),
-      onOk: async () => {
-        try {
-          setLoading(true)
-          await apiService.deleteDistributorWorker(worker.id)
-          message.success(t('distributor.workerInfoDeleted'))
-          
-          // 直接从本地状态中移除被删除的工人，而不是重新加载数据
-          setWorkers(prev => prev.filter(w => w.id !== worker.id))
-        } catch (error) {
-          console.error('删除工人失败:', error)
-          message.error(t('distributor.operationFailed'))
-        } finally {
-          setLoading(false)
-        }
-      }
-    })
-  }
-
-
-
-
-  // 切换工人状态
-  const handleToggleStatus = async (worker: Worker) => {
-    const newStatus = worker.status === 'active' ? 'inactive' : 'active'
-    const backendStatus = newStatus === 'active' ? 'ACTIVE' : 'INACTIVE'
-    
+  // 处理快速邀请
+  const handleQuickInvite = async (phoneNumbers: string[], areaCode: string, siteId: string) => {
     try {
-      // 调用后端API更新工人状态
-      await apiService.updateDistributorWorker(worker.id, { status: backendStatus })
-      
-      // 更新本地状态
-      setWorkers(prev => prev.map(w => 
-        w.id === worker.id 
-          ? { ...w, status: newStatus, updatedAt: new Date().toISOString() }
-          : w
-      ))
-      
-      // 显示成功消息
-      message.success(t('distributor.workerStatusUpdated', { 
-        status: newStatus === 'active' ? t('distributor.active') : t('distributor.inactive') 
-      }))
-    } catch (error) {
-      console.error('更新工人状态失败:', error)
-      message.error(t('distributor.operationFailed'))
-    }
-  }
-
-  // 导出工人数据
-  const handleExport = async (exportAll: boolean = true) => {
-    const dataToExport = exportAll ? workers : workers.filter(worker => selectedWorkerIds.includes(worker.id))
-    if (!exportAll && selectedWorkerIds.length === 0) {
-      message.warning(t('distributor.pleaseSelectWorkersToExport'))
-      return
-    }
-    
-    try {
-      // 分判商页面直接使用当前用户的分判商信息和已有的工人数据
-      const currentDistributorInfo = user?.distributor ? [user.distributor] : []
-      
-      
-      // 使用当前分判商信息进行导出
-      exportWorkersToExcel(dataToExport, currentDistributorInfo, sites)
-      message.success(t('distributor.exportedWorkers', { count: dataToExport.length.toString() }))
-    } catch (error) {
-      console.error('导出失败:', error)
-      message.error('导出失败，请重试')
-    }
-  }
-
-
-  // 导入工人数据
-  const handleImport = async (file: File) => {
-    setLoading(true)
-    try {
-      const { workers: importedWorkers, errors } = await readWorkerExcelFile(file, undefined, undefined, t, workers)
-      
-      if (errors.length > 0) {
-        message.error(t('distributor.importFailed', { errors: errors.join('; ') }))
-        return
-      }
-      
-      if (importedWorkers.length === 0) {
-        message.warning('Excel文件中没有找到有效的工人数据，请检查文件格式和内容')
-        return
-      }
-      
-      // 显示导入确认对话框
-      Modal.confirm({
-        title: t('distributor.importConfirm'),
-        content: (
-          <div>
-            <p>{t('distributor.importConfirmMessage', { count: importedWorkers.length.toString() })}</p>
-            <p style={{ color: '#1890ff', marginTop: '8px' }}>
-              {t('distributor.importDefaultSiteMessage', { siteName: sites.length > 0 ? sites[0].name : t('distributor.noSiteSelected') })}
-            </p>
-            <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
-              {t('distributor.importRulesMessage')}
-            </p>
-          </div>
-        ),
-        onOk: async () => {
-          await processWorkerImport(importedWorkers)
-        }
-      })
-    } catch (error) {
-      console.error('导入失败:', error)
-      message.error(t('distributor.importError', { error: error.message }))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // 处理工人导入 - 直接上传Excel文件
-  const processWorkerImport = async (file: File | any[]) => {
-    try {
-      setLoading(true)
-      
-      let result;
-      
-      // 判断输入类型
-      if (file instanceof File) {
-        // 直接上传Excel文件给后端处理
-        console.log(`准备上传Excel文件: ${file.name}`)
-        result = await apiService.importDistributorWorkersFromExcel(file)
-      } else {
-        // 处理已解析的工人数据（兼容旧逻辑）
-        console.log(`准备批量导入 ${file.length} 个工人`)
-        result = await apiService.importDistributorWorkers(file)
-      }
-      
-      // 刷新工人列表
-      await loadWorkers()
-      
-      // 显示导入结果
-      showWorkerImportResultModal(result.success, result.skipped, result.errorDetails || [])
-      
-    } catch (error) {
-      console.error('Import processing failed:', error)
-      message.error(t('distributor.importFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // 显示工人导入结果弹窗 - 与dashboard页面保持一致
-  const showWorkerImportResultModal = (successCount: number, skipCount: number, errors: string[]) => {
-    const totalCount = successCount + skipCount + errors.length
-    
-    Modal.info({
-      title: t('worker.importResultTitle'),
-      width: 600,
-      content: (
-        <div style={{ marginTop: '16px' }}>
-          {/* 总体统计 */}
-          <div style={{ 
-            background: '#f6ffed', 
-            border: '1px solid #b7eb8f', 
-            borderRadius: '6px', 
-            padding: '16px', 
-            marginBottom: '16px' 
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '8px' }} />
-              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
-                {t('worker.importCompleted')}
-              </span>
-            </div>
-            <div style={{ color: '#666', fontSize: '14px' }}>
-              {t('worker.importTotalProcessed').replace('{total}', totalCount.toString())}
-            </div>
-          </div>
-
-          {/* 详细统计 */}
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-            <div style={{ 
-              flex: 1, 
-              textAlign: 'center', 
-              padding: '12px', 
-              background: successCount > 0 ? '#f6ffed' : '#f5f5f5',
-              border: `1px solid ${successCount > 0 ? '#b7eb8f' : '#d9d9d9'}`,
-              borderRadius: '6px'
-            }}>
-              <div style={{ 
-                color: successCount > 0 ? '#52c41a' : '#999', 
-                fontSize: '24px', 
-                fontWeight: 'bold',
-                marginBottom: '4px'
-              }}>
-                {successCount}
-              </div>
-              <div style={{ color: '#666', fontSize: '12px' }}>
-                {t('worker.importSuccessCount')}
-              </div>
-            </div>
-            
-            <div style={{ 
-              flex: 1, 
-              textAlign: 'center', 
-              padding: '12px', 
-              background: skipCount > 0 ? '#fff7e6' : '#f5f5f5',
-              border: `1px solid ${skipCount > 0 ? '#ffd591' : '#d9d9d9'}`,
-              borderRadius: '6px'
-            }}>
-              <div style={{ 
-                color: skipCount > 0 ? '#fa8c16' : '#999', 
-                fontSize: '24px', 
-                fontWeight: 'bold',
-                marginBottom: '4px'
-              }}>
-                {skipCount}
-              </div>
-              <div style={{ color: '#666', fontSize: '12px' }}>
-                {t('worker.importSkipCount')}
-              </div>
-            </div>
-            
-            <div style={{ 
-              flex: 1, 
-              textAlign: 'center', 
-              padding: '12px', 
-              background: errors.length > 0 ? '#fff2f0' : '#f5f5f5',
-              border: `1px solid ${errors.length > 0 ? '#ffccc7' : '#d9d9d9'}`,
-              borderRadius: '6px'
-            }}>
-              <div style={{ 
-                color: errors.length > 0 ? '#ff4d4f' : '#999', 
-                fontSize: '24px', 
-                fontWeight: 'bold',
-                marginBottom: '4px'
-              }}>
-                {errors.length}
-              </div>
-              <div style={{ color: '#666', fontSize: '12px' }}>
-                {t('worker.importErrorCount')}
-              </div>
-            </div>
-          </div>
-
-          {/* 跳过原因详情 */}
-          {skipCount > 0 && (
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ 
-                color: '#fa8c16', 
-                fontWeight: 'bold', 
-                marginBottom: '8px',
-                fontSize: '14px'
-              }}>
-                {t('worker.importSkipReasons')}:
-              </div>
-              <div style={{ 
-                background: '#fff7e6', 
-                border: '1px solid #ffd591', 
-                borderRadius: '4px', 
-                padding: '12px'
-              }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                  <div style={{ color: '#666', fontSize: '12px' }}>
-                    <span style={{ fontWeight: 'bold' }}>身份证重复:</span> {skipCount} 条
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 错误汇总 - 只显示一条失败信息 */}
-          {errors.length > 0 && (
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ 
-                background: '#fff2f0', 
-                border: '1px solid #ffccc7', 
-                borderRadius: '6px', 
-                padding: '12px',
-                textAlign: 'center'
-              }}>
-                <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: '16px', marginRight: '8px' }} />
-                <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
-                  {t('worker.importErrorSummary', { count: errors.length.toString() })}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* 成功提示 - 当没有错误时显示 */}
-          {errors.length === 0 && successCount > 0 && (
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ 
-                background: '#f6ffed', 
-                border: '1px solid #b7eb8f', 
-                borderRadius: '6px', 
-                padding: '12px',
-                textAlign: 'center'
-              }}>
-                <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '8px' }} />
-                <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
-                  {t('worker.importSuccessMessage', { count: successCount.toString() })}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      ),
-      okText: t('common.ok')
-    })
-  }
-
-  // 从ExcelImportExportModal导入工人数据
-  const handleImportFromModal = async (importedWorkers: CreateWorkerRequest[]) => {
-    await processWorkerImport(importedWorkers)
-  }
-  
-  // 批量发送二维码（邮件或WhatsApp）
-  const handleBatchSendQRCode = async (method: 'email' | 'whatsapp') => {
-    if (selectedWorkerIds.length === 0) {
-      message.warning(t('worker.pleaseSelectWorkersToSend'))
-      return
-    }
-
-    const selectedWorkers = workers.filter(worker => selectedWorkerIds.includes(worker.id))
-    
-    // 处理电子邮件发送
-    if (method === 'email') {
-      // 检查是否所有选中的工人都有电子邮件地址
-      const workersWithoutEmail = selectedWorkers.filter(w => !w.email)
-      if (workersWithoutEmail.length > 0) {
-        message.warning(t('worker.noValidEmailWarning'))
-        return
-      }
-      
-      // 显示加载中的消息
-      const loadingKey = 'sendingQRCodesEmail'
-      message.loading({ 
-        content: t('worker.sendingQRCodes', { count: String(selectedWorkers.length) }), 
-        key: loadingKey 
-      })
-      
-      try {
-        setSendingEmailLoading(true)
-        
-        // 生成二维码并准备批量发送数据
-        const workerDataPromises = selectedWorkers.map(async worker => {
-          try {
-            // 使用工人工号生成二维码数据
-            const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId)
-            if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
-              throw new Error(t('qrcode.generateFailed'))
-            }
-            
-            return {
-              workerEmail: worker.email,
-              workerName: worker.name,
-              workerId: worker.workerId,
-              qrCodeDataUrl: qrCodeData.qrCodeDataUrl
-            }
-          } catch (err) {
-            console.error(`生成工人[${worker.name}]的二维码失败:`, err)
-            return null
-          }
-        })
-        
-        // 等待所有二维码生成完成
-        const workerDataResults = await Promise.all(workerDataPromises)
-        const validWorkerData = workerDataResults.filter(data => data !== null)
-        
-        if (validWorkerData.length === 0) {
-          message.error({ content: t('qrcode.allGenerationFailed'), key: loadingKey })
-          return
-        }
+      setSendingInviteLoading(true)
         
         // 获取当前的语言设置
         const currentLocale = localStorage.getItem('locale') || 'zh-CN'
         
-        // 分批发送，避免请求过大
-        const BATCH_SIZE = 10; // 每批10个工人
-        let successCount = 0;
-        let failedCount = 0;
-        let allFailedItems: any[] = [];
+        // 获取当前分判商信息
+        const currentDistributor = user?.distributor
         
-        // 将工人数据分成多个批次
-        const batches = [];
-        for (let i = 0; i < validWorkerData.length; i += BATCH_SIZE) {
-          batches.push(validWorkerData.slice(i, i + BATCH_SIZE));
+        if (!currentDistributor?.id) {
+          message.error('分判商信息获取失败，请重新登录')
+          return
         }
         
-        // 显示批次信息
-        message.info({ 
-          content: t('worker.batchProcessingInfo', { 
-            batches: String(batches.length), 
-            total: String(validWorkerData.length)
-          }) || `将分${batches.length}批处理${validWorkerData.length}个工人数据`,
-          key: loadingKey 
-        });
-        
-        // 逐批处理
-        for (let i = 0; i < batches.length; i++) {
-          const batch = batches[i];
-          
-          // 更新加载消息
-          message.loading({ 
-            content: `处理第${i+1}/${batches.length}批 (${batch.length}个工人)`, 
-            key: loadingKey 
-          });
-          
-          // 批量发送二维码邮件
-          const result = await apiService.batchSendQRCodeEmail({
-            workers: batch,
-            language: currentLocale
-          })
+      // 调用API发送邀请链接
+      const result = await apiService.sendInviteLink({
+        phoneNumbers,
+        areaCode,
+        language: currentLocale,
+        distributorId: currentDistributor.id,
+        siteId: siteId
+      })
         
           if (result.success) {
-            // 累加成功数量
-            successCount += (result.results?.succeeded || 0);
-            
-            // 收集失败项
-            if (result.results && result.results.failed > 0) {
-              const batchFailedItems = result.results.details.filter(item => !item.success);
-              allFailedItems = [...allFailedItems, ...batchFailedItems];
-              failedCount += result.results.failed;
-            }
-            
-            // 更新进度消息
-            message.loading({ 
-              content: `已完成${i+1}/${batches.length}批，成功${successCount}个，失败${failedCount}个`, 
-              key: loadingKey 
-            });
+        if (result.results) {
+          const { total, succeeded, failed } = result.results
+          if (failed === 0) {
+            message.success(t('distributor.inviteSuccess') + ` (${succeeded}/${total})`)
           } else {
-            // 整批失败
-            message.error({ 
-              content: `第${i+1}批发送失败: ${result.message || t('worker.batchSendFailed')}`, 
-              key: loadingKey 
-            });
-            failedCount += batch.length;
-          }
-        }
-        
-        // 所有批次处理完毕，显示最终结果
-        if (failedCount === 0) {
-          // 全部成功
-          message.success({ 
-            content: t('worker.batchSendComplete', { 
-              count: String(successCount),
-              total: String(validWorkerData.length)
-            }),
-            key: loadingKey
-          });
-          
-          // 批量发送成功后清除选择
-          setSelectedWorkerIds([]);
-        } else {
-          // 部分失败，显示失败项
-          message.info({ 
-            content: `发送完成: ${successCount}个成功，${failedCount}个失败`, 
-            key: loadingKey 
-          });
-          
-          // 创建一个可选择的Modal对话框
-          const failedModal = Modal.warning({
-            title: t('worker.partialSendFailure', { 
-              failed: String(failedCount),
-              total: String(validWorkerData.length)
-            }),
-            content: (
-              <FailedItemsContent 
-                failedItems={allFailedItems}
-                onResend={async (selectedItems) => {
-                  // 关闭当前对话框
-                  failedModal.destroy();
-                  
-                  // 如果没有选择任何项，直接返回
-                  if (!selectedItems || selectedItems.length === 0) {
-                    return;
-                  }
-                  
-                  // 显示正在重新发送的消息
-                  const resendKey = 'resendingEmails';
-                  message.loading({ 
-                    content: t('worker.resendingEmails', { count: String(selectedItems.length) }),
-                    key: resendKey
-                  });
-                  
-                  try {
-                    // 为所选项重新生成二维码并发送
-                    const selectedWorkers = workers.filter(worker => 
-                      selectedItems.some(item => item.workerId === worker.workerId)
-                    );
-                    
-                    // 生成二维码并准备批量发送数据
-                    const workerDataPromises = selectedWorkers.map(async worker => {
-                      try {
-                        // 获取工人的二维码数据
-                        const qrCodeData = await apiService.generateWorkerQRCode(worker.id);
-                        if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
-                          throw new Error(t('qrcode.generateFailed'));
-                        }
-                        
-                        return {
-                          workerEmail: worker.email,
-                          workerName: worker.name,
-                          workerId: worker.workerId,
-                          qrCodeDataUrl: qrCodeData.qrCodeDataUrl
-                        };
-                      } catch (err) {
-                        console.error(`生成工人[${worker.name}]的二维码失败:`, err);
-                        return null;
-                      }
-                    });
-                    
-                    // 等待所有二维码生成完成
-                    const workerDataResults = await Promise.all(workerDataPromises);
-                    const validWorkerData = workerDataResults.filter(data => data !== null);
-                    
-                    if (validWorkerData.length === 0) {
-                      message.error({ 
-                        content: t('qrcode.allGenerationFailed'), 
-                        key: resendKey 
-                      });
-                      return;
-                    }
-                    
-                    // 对于重发的项目也要分批处理，避免请求过大
-                    const RESEND_BATCH_SIZE = 10;
-                    let resendSuccessCount = 0;
-                    let resendFailedCount = 0;
-                    let resendFailedItems: any[] = [];
-                    
-                    // 将要重发的数据分批
-                    const resendBatches = [];
-                    for (let i = 0; i < validWorkerData.length; i += RESEND_BATCH_SIZE) {
-                      resendBatches.push(validWorkerData.slice(i, i + RESEND_BATCH_SIZE));
-                    }
-                    
-                    // 显示批次信息
-                    message.info({ 
-                      content: `将分${resendBatches.length}批重发${validWorkerData.length}个工人数据`,
-                      key: resendKey 
-                    });
-                    
-                    // 逐批处理重发
-                    for (let i = 0; i < resendBatches.length; i++) {
-                      const batch = resendBatches[i];
-                      
-                      // 获取当前的语言设置
-                      const currentLocale = localStorage.getItem('locale') || 'zh-CN';
-                      
-                      // 更新重发进度
-                      message.loading({ 
-                        content: `重发进度: ${i+1}/${resendBatches.length}批`, 
-                        key: resendKey 
-                      });
-                      
-                      // 批量重发
-                      const resendResult = await apiService.batchSendQRCodeEmail({
-                        workers: batch,
-                        language: currentLocale
-                      });
-                      
-                      if (resendResult.success) {
-                        resendSuccessCount += (resendResult.results?.succeeded || 0);
-                        
-                        if (resendResult.results && resendResult.results.failed > 0) {
-                          const batchFailedItems = resendResult.results.details.filter(item => !item.success);
-                          resendFailedItems = [...resendFailedItems, ...batchFailedItems];
-                          resendFailedCount += resendResult.results.failed;
-                        }
-                      } else {
-                        resendFailedCount += batch.length;
-                      }
-                    }
-                    
-                    // 显示重发最终结果
-                    if (resendFailedCount === 0) {
-                      message.success({ 
-                        content: t('worker.resendComplete', { 
-                          count: String(resendSuccessCount),
-                          total: String(validWorkerData.length)
-                        }),
-                        key: resendKey
-                      });
-                    } else {
-                      message.info({ 
-                        content: `重发完成: ${resendSuccessCount}个成功，${resendFailedCount}个失败`, 
-                        key: resendKey 
-                      });
-                      
-                      // 显示重发失败项
+            message.warning(`邀请发送完成: 成功 ${succeeded} 个，失败 ${failed} 个`)
+            
+            // 显示失败详情
+            if (result.results.details) {
+              const failedDetails = result.results.details.filter(detail => !detail.success)
+              if (failedDetails.length > 0) {
                       Modal.warning({
-                        title: t('worker.resendPartialFailure', { 
-                          failed: String(resendFailedCount),
-                          total: String(validWorkerData.length)
-                        }),
+                  title: '部分邀请发送失败',
                         content: (
                           <div>
-                            <p>{t('worker.resendFailureExplanation')}</p>
-                            <Table
-                              size="small"
-                              dataSource={resendFailedItems}
-                              columns={[
-                                {
-                                  title: t('worker.workerId'),
-                                  dataIndex: 'workerId',
-                                  key: 'workerId',
-                                },
-                                {
-                                  title: t('worker.name'),
-                                  dataIndex: 'workerName',
-                                  key: 'workerName',
-                                },
-                                {
-                                  title: t('common.error'),
-                                  dataIndex: 'message',
-                                  key: 'message',
-                                }
-                              ]}
-                              pagination={false}
-                              rowKey="workerId"
-                            />
+                      <p>以下电话号码发送失败：</p>
+                      <ul>
+                        {failedDetails.map((detail, index) => (
+                          <li key={index}>
+                            {detail.phoneNumber}: {detail.message}
+                          </li>
+                        ))}
+                      </ul>
                           </div>
                         ),
                         okText: t('common.ok'),
-                        width: 600,
-                      });
-                    }
-                  } catch (error) {
-                    console.error('重新发送二维码邮件失败:', error);
-                    message.error({ 
-                      content: typeof error === 'string' ? error : t('worker.resendFailed'),
-                      key: resendKey
-                    });
-                  }
-                }}
-                t={t}
-              />
-            ),
-            okText: t('common.ok'),
-            width: 700,
-          });
-        }
-      } catch (error) {
-        console.error('批量发送二维码邮件失败:', error)
-        message.error({ 
-          content: typeof error === 'string' ? error : t('worker.batchSendFailed'), 
-          key: loadingKey 
-        })
-      } finally {
-        setSendingEmailLoading(false)
-      }
-    } 
-    // WhatsApp发送处理
-    else if (method === 'whatsapp') {
-      // 检查是否所有选中的工人都有WhatsApp号码
-      const workersWithoutWhatsApp = selectedWorkers.filter(w => !w.whatsapp)
-      if (workersWithoutWhatsApp.length > 0) {
-        message.warning(t('worker.noValidWhatsappWarning'))
-        return
-      }
-      
-      // 显示加载中的消息
-      const loadingKey = 'sendingQRCodesWhatsApp'
-      message.loading({ 
-        content: t('worker.sendingQRCodesToWhatsApp', { count: String(selectedWorkers.length) }) || `正在发送二维码到${selectedWorkers.length}个工人的WhatsApp`, 
-        key: loadingKey 
-      })
-      
-      try {
-        setSendingWhatsAppLoading(true)
-        
-        // 生成二维码并准备批量发送数据
-        const workerDataPromises = selectedWorkers.map(async worker => {
-          try {
-            // 使用工人工号生成二维码数据
-            const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId)
-            if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
-              throw new Error(t('qrcode.generateFailed'))
+                  width: 500
+                })
+              }
             }
-            
-            return {
-              workerWhatsApp: worker.whatsapp,
-              workerName: worker.name,
-              workerId: worker.workerId,
-              qrCodeDataUrl: qrCodeData.qrCodeDataUrl
-            }
-          } catch (err) {
-            console.error(`生成工人[${worker.name}]的二维码失败:`, err)
-            return null
           }
-        })
-        
-        // 等待所有二维码生成完成
-        const workerDataResults = await Promise.all(workerDataPromises)
-        const validWorkerData = workerDataResults.filter(data => data !== null)
-        
-        if (validWorkerData.length === 0) {
-          message.error({ content: t('qrcode.allGenerationFailed'), key: loadingKey })
-          return
-        }
-        
-        // 获取当前的语言设置
-        const currentLocale = localStorage.getItem('locale') || 'zh-CN'
-        
-        // 分批发送，避免请求过大
-        const BATCH_SIZE = 10 // 每批10个工人
-        let successCount = 0
-        let failedCount = 0
-        let allFailedItems: any[] = []
-        
-        // 将工人数据分成多个批次
-        const batches = []
-        for (let i = 0; i < validWorkerData.length; i += BATCH_SIZE) {
-          batches.push(validWorkerData.slice(i, i + BATCH_SIZE))
-        }
-        
-        // 显示批次信息
-        message.info({ 
-          content: t('worker.batchProcessingInfo', { 
-            batches: String(batches.length), 
-            total: String(validWorkerData.length)
-          }) || `将分${batches.length}批处理${validWorkerData.length}个工人数据`,
-          key: loadingKey 
-        })
-        
-        // 逐批处理
-        for (let i = 0; i < batches.length; i++) {
-          const batch = batches[i]
-          
-          // 更新加载消息
-          message.loading({ 
-            content: `处理第${i+1}/${batches.length}批 (${batch.length}个工人)`, 
-            key: loadingKey 
-          })
-          
-          // 批量发送二维码到WhatsApp
-          const result = await apiService.batchSendQRCodeWhatsApp({
-            workers: batch,
-            language: currentLocale
-          })
-          
-          if (result.success) {
-            // 累加成功数量
-            successCount += (result.results?.succeeded || 0)
-            
-            // 收集失败项
-            if (result.results && result.results.failed > 0) {
-              const batchFailedItems = result.results.details.filter(item => !item.success)
-              allFailedItems = [...allFailedItems, ...batchFailedItems]
-              failedCount += result.results.failed
-            }
-            
-            // 更新进度消息
-            message.loading({ 
-              content: `已完成${i+1}/${batches.length}批，成功${successCount}个，失败${failedCount}个`, 
-              key: loadingKey 
-            })
-          } else {
-            // 整批失败
-            message.error({ 
-              content: `第${i+1}批发送失败: ${result.message || t('worker.batchSendFailed')}`, 
-              key: loadingKey 
-            })
-            failedCount += batch.length
-          }
-        }
-        
-        // 所有批次处理完毕，设置最终result为汇总结果
-        const result = {
-          success: true,
-          results: {
-            succeeded: successCount,
-            failed: failedCount,
-            total: validWorkerData.length,
-            details: allFailedItems
-          }
-        }
-        
-        if (result.success) {
-          message.success({ 
-            content: t('worker.batchSendComplete', { 
-              count: String(result.results?.succeeded || 0),
-              total: String(result.results?.total || validWorkerData.length)
-            }),
-            key: loadingKey
-          })
-          
-          // 显示详细结果
-          if (result.results && result.results.failed > 0) {
-            // 准备失败项数据
-            const failedItems = result.results.details.filter(item => !item.success)
-            
-            // 创建一个可选择的Modal对话框
-            const failedModal = Modal.warning({
-              title: t('worker.partialSendFailure', { 
-                failed: String(result.results.failed),
-                total: String(result.results.total)
-              }),
-              content: (
-                <FailedItemsContent 
-                  failedItems={failedItems}
-                  onResend={async (selectedItems) => {
-                    // 类似邮件重发的逻辑，可以根据需求实现WhatsApp的重发逻辑
-                    // 这里简化处理，只显示一个信息
-                    failedModal.destroy()
-                    if (selectedItems && selectedItems.length > 0) {
-                      message.info(t('worker.whatsAppResendNotImplemented') || '重新发送WhatsApp功能暂未实现')
-                    }
-                  }}
-                  t={t}
-                />
-              ),
-              okText: t('common.ok'),
-              width: 700,
-            })
-          }
-          
-          // 批量发送成功后清除选择
-          setSelectedWorkerIds([])
         } else {
-          message.error({ content: t('worker.batchSendFailed'), key: loadingKey })
+          message.success(t('distributor.inviteSuccess'))
         }
-      } catch (error) {
-        console.error('批量发送二维码到WhatsApp失败:', error)
-        message.error({ 
-          content: typeof error === 'string' ? error : t('worker.batchSendFailed'), 
-          key: 'sendingQRCodesWhatsApp' 
-        })
-      } finally {
-        setSendingWhatsAppLoading(false)
+          } else {
+        message.error(result.message || t('distributor.inviteFailed'))
       }
+    } catch (error) {
+      console.error('发送邀请链接失败:', error)
+      message.error(t('distributor.inviteFailed'))
+    } finally {
+      setSendingInviteLoading(false)
     }
+  }
+
+  // 处理复制链接
+  const handleCopyLink = (siteId: string) => {
+    const currentDistributor = user?.distributor
+    
+    if (!currentDistributor?.id) {
+      message.error('分判商信息获取失败，请重新登录')
+      return
+    }
+    
+    // 生成完整的注册链接
+    const baseUrl = window.location.origin
+    const registrationLink = `${baseUrl}/worker-registration?distributorId=${currentDistributor.id}&siteId=${siteId}`
+    
+    // 复制到剪贴板
+    navigator.clipboard.writeText(registrationLink).then(() => {
+      message.success('注册链接已复制到剪贴板')
+    }).catch(() => {
+      // 如果剪贴板API不可用，使用传统方法
+      const textArea = document.createElement('textarea')
+      textArea.value = registrationLink
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      message.success('注册链接已复制到剪贴板')
+    })
+  }
+
+  // 获取性别标签
+  const getGenderTag = (gender: string) => {
+    const map: Record<string, { color: string; text: string }> = { 
+      male: { color: 'blue', text: t('distributor.male') }, 
+      female: { color: 'pink', text: t('distributor.female') },
+      MALE: { color: 'blue', text: t('distributor.male') }, 
+      FEMALE: { color: 'pink', text: t('distributor.female') }
+    }
+    const cfg = map[gender] || { color: 'default', text: gender || '-' }
+    return <Tag color={cfg.color}>{cfg.text}</Tag>
+  }
+
+  // 获取状态标签
+  const getStatusTag = (status: string) => {
+    const map: Record<string, { color: string; text: string }> = { 
+      active: { color: 'green', text: t('distributor.active') }, 
+      inactive: { color: 'red', text: t('distributor.inactive') },
+      ACTIVE: { color: 'green', text: t('distributor.active') }, 
+      INACTIVE: { color: 'red', text: t('distributor.inactive') }
+    }
+    const cfg = map[status] || { color: 'default', text: status || '-' }
+    return <Tag color={cfg.color}>{cfg.text}</Tag>
   }
 
   // 工人表格列定义
   const workerColumns = [
-    { title: t('distributor.workerId'), dataIndex: 'workerId', key: 'workerId', width: 120, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId) },
-    { title: t('distributor.name'), dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name) },
-    { title: t('distributor.gender'), dataIndex: 'gender', key: 'gender', width: 80, render: (gender: string) => getGenderTag(gender), ellipsis: true, sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender) },
+    { title: t('distributor.workerId'), dataIndex: 'workerId', key: 'workerId', width: 110, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId) },
+    { title: t('distributor.name'), dataIndex: 'name', key: 'name', width: 130, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name) },
+    { title: t('distributor.gender'), dataIndex: 'gender', key: 'gender', width: 90, render: (gender: string) => getGenderTag(gender), ellipsis: true, sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender) },
     { 
       title: t('distributor.birthDate'), 
       dataIndex: 'birthDate', 
       key: 'birthDate', 
-      width: 120, 
+      width: 110, 
       render: (d?: string) => {
         if (!d) return '-';
         try {
@@ -1315,8 +498,8 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('distributor.age'), 
       dataIndex: 'age', 
       key: 'age', 
-      width: 80, 
-      render: (age: number, record: Worker) => {
+      width: 70, 
+      render: (_age: number, record: Worker) => {
         if (record.birthDate) {
           const birthDate = dayjs(record.birthDate);
           const now = dayjs();
@@ -1355,7 +538,7 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('worker.idType'),
       dataIndex: 'idType',
       key: 'idType',
-      width: 120,
+      width: 90,
       render: (idType: string) => {
         const typeMap: Record<string, string> = {
           'ID_CARD': t('worker.idCard'),
@@ -1370,7 +553,7 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('worker.idNumber'),
       dataIndex: 'idNumber',
       key: 'idNumber',
-      width: 180,
+      width: 160,
       sorter: (a: Worker, b: Worker) => a.idNumber.localeCompare(b.idNumber),
     },
     { 
@@ -1413,8 +596,8 @@ const DistributorWorkerUpload: React.FC = () => {
       }
       return whatsapp;
     }, ellipsis: true, sorter: (a: Worker, b: Worker) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
-    { title: t('distributor.status'), dataIndex: 'status', key: 'status', width: 100, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
-    { title: t('common.actions'), key: 'actions', width: 150, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
+    { title: t('distributor.status'), dataIndex: 'status', key: 'status', width: 90, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
+    { title: t('common.actions'), key: 'actions', width: 120, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -1445,47 +628,33 @@ const DistributorWorkerUpload: React.FC = () => {
         />
         <Button 
           size="small" 
-          type="primary"
-          danger={record.status === 'active'}
-          icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />} 
-          onClick={() => handleToggleStatus(record)}
-          title={record.status === 'active' ? t('distributor.pause') : t('distributor.enable')}
-        />
-        <Button 
-          size="small" 
           danger 
           icon={<DeleteOutlined />} 
-          onClick={() => handleDeleteWorker(record)}
+          onClick={() => {
+            Modal.confirm({
+              title: t('distributor.confirmDelete'),
+              icon: <ExclamationCircleOutlined />,
+              content: t('distributor.confirmDeleteContent', { name: record.name }),
+              onOk: async () => {
+                try {
+                  setLoading(true)
+                  await apiService.deleteDistributorWorker(record.id)
+                  message.success(t('distributor.workerInfoDeleted'))
+                  setWorkers(prev => prev.filter(w => w.id !== record.id))
+                } catch (error) {
+                  console.error('删除工人失败:', error)
+                  message.error(t('distributor.operationFailed'))
+                } finally {
+                  setLoading(false)
+                }
+              }
+            })
+          }}
           title={t('common.delete')}
         />
       </Space>
     ) }
   ]
-
-  // 获取性别标签
-  const getGenderTag = (gender: string) => {
-    const map: Record<string, { color: string; text: string }> = { 
-      male: { color: 'blue', text: t('distributor.male') }, 
-      female: { color: 'pink', text: t('distributor.female') },
-      MALE: { color: 'blue', text: t('distributor.male') }, 
-      FEMALE: { color: 'pink', text: t('distributor.female') }
-    }
-    const cfg = map[gender] || { color: 'default', text: gender || '-' }
-    return <Tag color={cfg.color}>{cfg.text}</Tag>
-  }
-
-  // 获取状态标签
-  const getStatusTag = (status: string) => {
-    const map: Record<string, { color: string; text: string }> = { 
-      active: { color: 'green', text: t('distributor.active') }, 
-      inactive: { color: 'red', text: t('distributor.inactive') },
-      ACTIVE: { color: 'green', text: t('distributor.active') }, 
-      INACTIVE: { color: 'red', text: t('distributor.inactive') }
-    }
-    const cfg = map[status] || { color: 'default', text: status || '-' }
-    return <Tag color={cfg.color}>{cfg.text}</Tag>
-  }
-
 
   // 行选择配置
   const rowSelection = {
@@ -1529,7 +698,6 @@ const DistributorWorkerUpload: React.FC = () => {
     }}>
       {/* 添加样式来修复表格固定列覆盖header的问题 */}
       <style>{tableStyles}</style>
-      
 
       {/* 工人管理表格 */}
       <Card 
@@ -1538,46 +706,8 @@ const DistributorWorkerUpload: React.FC = () => {
             <span>{`${t('distributor.workerInfoManagement')} (${workers.length})`}</span>
             <Button 
               type="link"
-              onClick={() => {
-                // 生成自注册链接
-                const distributorId = currentDistributor?.id || '';
-                const siteId = sites.length > 0 ? sites[0].id : '';
-                const registrationLink = `${window.location.origin}/worker-registration?distributorId=${distributorId}&siteId=${siteId}`;
-                
-                // 复制链接到剪贴板 - 添加兼容性处理
-                try {
-                  // 现代浏览器 - 首选Clipboard API
-                  if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(registrationLink).then(() => {
-                      message.success('分享链接已复制到剪贴板');
-                    }).catch(err => {
-                      console.error('Clipboard API失败:', err);
-                      fallbackCopyToClipboard(registrationLink);
-                    });
-                  } else {
-                    // 回退到传统方法
-                    fallbackCopyToClipboard(registrationLink);
-                  }
-                } catch (err) {
-                  console.error('复制失败:', err);
-                  message.error('复制链接失败，请手动复制');
-                  // 显示链接供手动复制
-                  Modal.info({
-                    title: '分享注册链接',
-                    content: (
-                      <div>
-                        <p>请手动复制以下链接：</p>
-                        <Input.TextArea 
-                          value={registrationLink} 
-                          autoSize={{ minRows: 2, maxRows: 4 }}
-                          onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                        />
-                      </div>
-                    ),
-                    okText: t('common.close')
-                  });
-                }
-              }}
+              icon={<WhatsAppOutlined />}
+              onClick={() => setQuickInviteModalOpen(true)}
             >
               {t('distributor.generateRegistrationLink')}
             </Button>
@@ -1638,7 +768,15 @@ const DistributorWorkerUpload: React.FC = () => {
               </Button>
               <Button 
                 icon={<DownloadOutlined />} 
-                onClick={() => handleExport(selectedWorkerIds.length === 0)}
+                onClick={() => {
+                  const dataToExport = selectedWorkerIds.length === 0 ? workers : workers.filter(worker => selectedWorkerIds.includes(worker.id))
+                  if (selectedWorkerIds.length === 0) {
+                    exportWorkersToExcel(dataToExport, user?.distributor ? [user.distributor] : [], sites)
+                    message.success(t('distributor.exportedWorkers', { count: dataToExport.length.toString() }))
+                  } else {
+                    message.warning(t('distributor.pleaseSelectWorkersToExport'))
+                  }
+                }}
               >
                 {selectedWorkerIds.length === 0 ? t('distributor.exportAll') : `${t('distributor.exportSelected')}(${selectedWorkerIds.length})`}
               </Button>
@@ -1694,7 +832,6 @@ const DistributorWorkerUpload: React.FC = () => {
           backgroundColor: 'white'
         }}
       >
-
         {/* 工人表格 */}
         <div style={{ 
           flex: 1, 
@@ -1748,7 +885,9 @@ const DistributorWorkerUpload: React.FC = () => {
                     size="small"
                     type="primary"
                     icon={<MailOutlined />}
-                    onClick={() => handleBatchSendQRCode('email')}
+                    onClick={() => {
+                      message.info('批量发送邮件功能暂未实现')
+                    }}
                     loading={sendingEmailLoading}
                   >
                     {t('worker.batchSendToEmail')}
@@ -1757,7 +896,9 @@ const DistributorWorkerUpload: React.FC = () => {
                     size="small"
                     type="primary"
                     icon={<WhatsAppOutlined />}
-                    onClick={() => handleBatchSendQRCode('whatsapp')}
+                    onClick={() => {
+                      message.info('批量发送WhatsApp功能暂未实现')
+                    }}
                     loading={sendingWhatsAppLoading}
                   >
                     {t('worker.batchSendToWhatsApp')}
@@ -1950,8 +1091,20 @@ const DistributorWorkerUpload: React.FC = () => {
         workers={workers}
         distributors={user?.distributor ? [user.distributor] : []}
         sites={sites}
-        onImport={handleImportFromModal}
+        onImport={async () => {
+          message.info('Excel导入功能暂未实现')
+        }}
       />
+
+      {/* 快速邀请弹窗 */}
+        <QuickInviteModal
+          visible={quickInviteModalOpen}
+          onClose={() => setQuickInviteModalOpen(false)}
+          onSend={handleQuickInvite}
+          onCopyLink={handleCopyLink}
+          sites={distributorSites}
+          loading={sendingInviteLoading}
+        />
     </div>
   );
 }

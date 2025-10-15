@@ -53,6 +53,7 @@ export interface WorkerFormData {
   idType: 'ID_CARD' | 'PASSPORT' | 'DRIVER_LICENSE' | 'OTHER';
   idNumber: string;
   region: string;
+  areaCode: string; // 地区区号
   phone: string;
   email?: string;
   whatsapp?: string;

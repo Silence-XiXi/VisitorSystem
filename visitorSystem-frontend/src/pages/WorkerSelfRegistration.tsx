@@ -26,6 +26,37 @@ const WorkerSelfRegistration: React.FC = () => {
   const [workerName, setWorkerName] = useState<string>('');
   const [qrLoading, setQrLoading] = useState(false);
   
+  // 根据语言确定默认区号
+  const getDefaultAreaCode = () => {
+    if (locale === 'zh-CN') {
+      return t('distributor.areaCodeChina'); // 简体中文默认中国大陆
+    } else {
+      return t('distributor.areaCodeHongKong'); // 繁体中文和英文默认香港
+    }
+  };
+
+  // 区号选项
+  const areaCodeOptions = [
+    { value: t('distributor.areaCodeChina'), areaCode: '+86', label: `+86 (${t('distributor.areaCodeChina')})` },
+    { value: t('distributor.areaCodeHongKong'), areaCode: '+852', label: `+852 (${t('distributor.areaCodeHongKong')})` },
+    { value: t('distributor.areaCodeMacau'), areaCode: '+853', label: `+853 (${t('distributor.areaCodeMacau')})` },
+    { value: t('distributor.areaCodeTaiwan'), areaCode: '+886', label: `+886 (${t('distributor.areaCodeTaiwan')})` },
+    { value: t('distributor.areaCodeSingapore'), areaCode: '+65', label: `+65 (${t('distributor.areaCodeSingapore')})` },
+    { value: t('distributor.areaCodeMalaysia'), areaCode: '+60', label: `+60 (${t('distributor.areaCodeMalaysia')})` },
+    { value: t('distributor.areaCodeThailand'), areaCode: '+66', label: `+66 (${t('distributor.areaCodeThailand')})` },
+    { value: t('distributor.areaCodePhilippines'), areaCode: '+63', label: `+63 (${t('distributor.areaCodePhilippines')})` },
+    { value: t('distributor.areaCodeIndonesia'), areaCode: '+62', label: `+62 (${t('distributor.areaCodeIndonesia')})` },
+    { value: t('distributor.areaCodeVietnam'), areaCode: '+84', label: `+84 (${t('distributor.areaCodeVietnam')})` },
+    { value: t('distributor.areaCodeUSCanada'), areaCode: '+1', label: `+1 (${t('distributor.areaCodeUSCanada')})` },
+    { value: t('distributor.areaCodeUK'), areaCode: '+44', label: `+44 (${t('distributor.areaCodeUK')})` },
+    { value: t('distributor.areaCodeGermany'), areaCode: '+49', label: `+49 (${t('distributor.areaCodeGermany')})` },
+    { value: t('distributor.areaCodeFrance'), areaCode: '+33', label: `+33 (${t('distributor.areaCodeFrance')})` },
+    { value: t('distributor.areaCodeJapan'), areaCode: '+81', label: `+81 (${t('distributor.areaCodeJapan')})` },
+    { value: t('distributor.areaCodeKorea'), areaCode: '+82', label: `+82 (${t('distributor.areaCodeKorea')})` },
+    { value: t('distributor.areaCodeIndia'), areaCode: '+91', label: `+91 (${t('distributor.areaCodeIndia')})` },
+    { value: t('distributor.areaCodeAustralia'), areaCode: '+61', label: `+61 (${t('distributor.areaCodeAustralia')})` },
+  ];
+  
   // 动态获取API基础地址
   const getApiBaseUrl = (): string => {
     // 优先使用环境变量
@@ -62,6 +93,17 @@ const WorkerSelfRegistration: React.FC = () => {
     const newLocale = e.target.value as 'zh-CN' | 'zh-TW' | 'en-US';
     setLocale(newLocale);
     message.success(t('login.languageChanged') || '语言已切换');
+  };
+
+  // 联系电话变化时自动填入WhatsApp
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const phoneValue = e.target.value;
+    const currentWhatsapp = form.getFieldValue('whatsapp');
+    
+    // 如果WhatsApp字段为空，自动填入联系电话
+    if (!currentWhatsapp && phoneValue) {
+      form.setFieldsValue({ whatsapp: phoneValue });
+    }
   };
   
   // 检查身份证号码是否已存在
@@ -147,6 +189,19 @@ const WorkerSelfRegistration: React.FC = () => {
 
     setSubmitting(true);
     try {
+      // 根据选中的地区名称找到对应的区号
+      const selectedArea = areaCodeOptions.find(option => option.value === values.areaCode);
+      const areaCode = selectedArea?.areaCode || '+86'; // 默认使用+86
+      
+      // 处理WhatsApp号码，如果填写了WhatsApp但没有区号，自动添加地区区号
+      let whatsappNumber = values.whatsapp || null;
+      if (whatsappNumber && areaCode) {
+        // 如果WhatsApp号码不以+开头，添加区号
+        if (!whatsappNumber.startsWith('+')) {
+          whatsappNumber = `${areaCode}${whatsappNumber}`;
+        }
+      }
+
       // 准备提交数据
       const submitData = {
         name: values.name,
@@ -154,12 +209,12 @@ const WorkerSelfRegistration: React.FC = () => {
         idType: values.idType,
         idNumber: values.idNumber,
         gender: values.gender.toUpperCase(),
-        region: values.region,
+        region: values.areaCode, // 保存地区名称（翻译键的内容）
         siteId: siteId,
         distributorId: distributorId,
         birthDate: values.birthDate ? values.birthDate.format('YYYY-MM-DD') : null,
         email: values.email || null,
-        whatsapp: values.whatsapp || null
+        whatsapp: whatsappNumber
       };
 
       // 使用专门的工人自助注册API
@@ -365,6 +420,9 @@ const WorkerSelfRegistration: React.FC = () => {
           layout="vertical"
           onFinish={handleSubmit}
           requiredMark={true}
+          initialValues={{
+            areaCode: getDefaultAreaCode()
+          }}
         >
           <Form.Item
             name="name"
@@ -382,6 +440,26 @@ const WorkerSelfRegistration: React.FC = () => {
             <Select placeholder={t('form.selectPlaceholder') + (t('worker.gender') || '性别')}>
               <Option value="male">{t('worker.male') || '男'}</Option>
               <Option value="female">{t('worker.female') || '女'}</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="areaCode"
+            label={t('distributor.areaCode') || '地区'}
+            rules={[{ required: true, message: t('form.required') || '请选择地区' }]}
+          >
+            <Select 
+              placeholder={t('form.selectPlaceholder') + (t('distributor.areaCode') || '地区')}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {areaCodeOptions.map(option => (
+                <Option key={option.value} value={option.value} label={option.label}>
+                  {option.label}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
 
@@ -441,7 +519,18 @@ const WorkerSelfRegistration: React.FC = () => {
             label={t('worker.phone') || '手机号码'}
             rules={[{ required: true, message: t('form.required') || '请输入手机号码' }]}
           >
-            <Input placeholder={t('form.inputPlaceholder') + (t('worker.phone') || '手机号码')} />
+            <Input 
+              placeholder={t('form.inputPlaceholder') + (t('worker.phone') || '手机号码')} 
+              onChange={handlePhoneChange}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="whatsapp"
+            label={t('worker.whatsapp') || 'WhatsApp'}
+            // help={t('distributor.whatsappPlaceholder') || '例如: +86 13800138000'}
+          >
+            <Input placeholder={(t('form.inputPlaceholder') || '请输入') + 'WhatsApp' + '（' + (t('form.optional') || '可选') + '）'} />
           </Form.Item>
 
           <Form.Item
@@ -457,28 +546,6 @@ const WorkerSelfRegistration: React.FC = () => {
             <Input placeholder={(t('form.inputPlaceholder') || '请输入') + (t('worker.email') || '邮箱') + '（' + (t('form.optional') || '可选') + '）'} />
           </Form.Item>
 
-          <Form.Item
-            name="whatsapp"
-            label={t('worker.whatsapp') || 'WhatsApp'}
-            help={t('distributor.whatsappPlaceholder') || '例如: +86 13800138000'}
-          >
-            <Input placeholder={(t('form.inputPlaceholder') || '请输入') + 'WhatsApp' + '（' + (t('form.optional') || '可选') + '）'} />
-          </Form.Item>
-
-          <Form.Item
-            name="region"
-            label={t('worker.region') || '地区'}
-            rules={[{ required: true, message: t('form.required') || '请选择地区' }]}
-            initialValue={t('regions.mainland') || '中国大陆'}
-          >
-            <Select placeholder={t('form.selectPlaceholder') + (t('worker.region') || '地区')}>
-              <Option value={t('regions.mainland') || '中国大陆'}>{t('regions.mainland') || '中国大陆'}</Option>
-              <Option value={t('regions.hongkong') || '中国香港'}>{t('regions.hongkong') || '中国香港'}</Option>
-              <Option value={t('regions.macau') || '中国澳门'}>{t('regions.macau') || '中国澳门'}</Option>
-              <Option value={t('regions.taiwan') || '中国台湾'}>{t('regions.taiwan') || '中国台湾'}</Option>
-              <Option value={t('regions.other') || '其他'}>{t('regions.other') || '其他'}</Option>
-            </Select>
-          </Form.Item>
 
           <Form.Item>
             <Button 

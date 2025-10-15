@@ -77,6 +77,12 @@ async function main() {
       description: 'WhatsApp模板名称',
       is_encrypted: false,
     },
+    {
+      config_key: 'WHATSAPP_QUICK_INV_TEMPLATE_NAME',
+      config_value: 'quick_invitation',
+      description: 'WhatsApp快速邀请模板名称',
+      is_encrypted: false,
+    },
   ];
 
   // 插入配置

@@ -120,10 +120,15 @@ interface Worker {
   status: 'ACTIVE' | 'INACTIVE';
   distributorId: string;
   siteId: string;
+  region?: string;
+  email?: string;
+  whatsapp?: string;
+  birthDate?: string;
   createdAt: string;
   updatedAt: string;
   distributor?: {
     id: string;
+    distributorId: string;
     name: string;
   };
   site?: {
@@ -1608,6 +1613,36 @@ class ApiService {
   async testEmailConfig(): Promise<{ success: boolean; message: string }> {
     return this.requestWithRetry('/email/test-config', {
       method: 'POST',
+    });
+  }
+
+  // 发送邀请链接到WhatsApp
+  async sendInviteLink(data: {
+    phoneNumbers: string[];
+    areaCode: string;
+    language?: string;
+    distributorId?: string;
+    siteId?: string;
+  }): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results?: {
+      total: number;
+      succeeded: number;
+      failed: number;
+      details: Array<{
+        phoneNumber: string;
+        success: boolean;
+        message?: string;
+      }>;
+    } 
+  }> {
+    return this.requestWithRetry('/whatsapp/send-invite-link', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     });
   }
 

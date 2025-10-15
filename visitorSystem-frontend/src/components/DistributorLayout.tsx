@@ -43,9 +43,7 @@ const DistributorLayout: React.FC = () => {
 
   // 检查用户角色，只有分判商才能访问
   useEffect(() => {
-    console.log('DistributorLayout - User:', user)
     if (user && user.role?.toLowerCase() !== 'distributor') {
-      console.log('User role is not distributor, redirecting to login')
       navigate('/login', { replace: true })
     }
   }, [user, navigate])
@@ -63,9 +61,7 @@ const DistributorLayout: React.FC = () => {
     const fetchDistributorInfo = async () => {
       if (user && user.role?.toLowerCase() === 'distributor') {
         try {
-          console.log('获取分判商信息...', user)
           const profile = await apiService.getProfile()
-          console.log('用户资料:', profile)
           
           if (profile.distributor) {
             setDistributorInfo(profile.distributor)

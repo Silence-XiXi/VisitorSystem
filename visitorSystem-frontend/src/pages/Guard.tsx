@@ -2236,13 +2236,21 @@ const Guard: React.FC = () => {
 
   // 主页面
   if (currentView === 'main') {
+    // 输出当前窗口宽度到控制台
+    // console.log('当前窗口宽度:', window.innerWidth)
+    
     return (
       <Layout style={{ minHeight: '100vh' }}>
         {renderHeader()}
         <div style={{ 
-          padding: '24px',
-          marginTop: '64px',
-          minHeight: 'calc(100vh - 64px)'
+          padding: window.innerWidth < 768 ? '8px' : 
+                 window.innerWidth < 1024 ? '12px' : 
+                 window.innerWidth < 1440 ? '12px' : '28px',
+          marginTop: '60px',
+          height: 'calc(100vh - 64px)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
         
         {/* 统计卡片 */}
@@ -2277,9 +2285,19 @@ const Guard: React.FC = () => {
           </Button>
         </div>
         
-        <Row gutter={16} style={{ marginBottom: '24px' }}>
-          <Col span={12}>
-            <Card style={{ height: '140px' }}>
+        {/* 统计卡片 */}
+        <Row gutter={[16, 16]} style={{ 
+          marginBottom: window.innerWidth < 768 ? '8px' : 
+                       window.innerWidth < 1024 ? '12px' : 
+                       window.innerWidth < 1440 ? '16px' : '20px',
+          flexShrink: 0
+        }}>
+          <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+            <Card style={{ 
+              height: window.innerWidth < 768 ? '80px' : 
+                     window.innerWidth < 1024 ? '90px' :
+                     window.innerWidth < 1440 ? '100px' : '110px'
+            }}>
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div 
@@ -2298,7 +2316,7 @@ const Guard: React.FC = () => {
                     <Statistic
                       title={t('guard.todayEntry')}
                       value={totalEnteredToday}
-                      prefix={<UserAddOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      prefix={<UserAddOutlined style={{ fontSize: 'clamp(18px, 3vw, 32px)' }} />}
                       valueStyle={{ 
                         color: '#1890ff',
                         fontSize: 'clamp(20px, 4vw, 28px)',
@@ -2323,7 +2341,7 @@ const Guard: React.FC = () => {
                     <Statistic
                       title={t('guard.exited')}
                       value={totalExitedToday}
-                      prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 32px)' }} />}
                       valueStyle={{ 
                         color: '#52c41a',
                         fontSize: 'clamp(20px, 4vw, 28px)',
@@ -2348,7 +2366,7 @@ const Guard: React.FC = () => {
                     <Statistic
                       title={t('guard.notExited')}
                       value={currentOnSite}
-                      prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 24px)' }} />}
+                      prefix={<UserOutlined style={{ fontSize: 'clamp(18px, 3vw, 32px)' }} />}
                       valueStyle={{ 
                         color: '#ff4d4f',
                         fontSize: 'clamp(20px, 4vw, 28px)',
@@ -2360,15 +2378,19 @@ const Guard: React.FC = () => {
               </div>
             </Card>
           </Col>
-          <Col span={12}>
-            <Card style={{ height: '140px' }}>
+          <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+            <Card style={{ 
+              height: window.innerWidth < 768 ? '80px' : 
+                     window.innerWidth < 1024 ? '90px' :
+                     window.innerWidth < 1440 ? '100px' : '110px'
+            }}>
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1, textAlign: 'center', padding: '0 2px' }}>
                     <Statistic
                       title={t('guard.borrowedItems')}
                       value={todayBorrowedItems}
-                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }} />}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 32px)' }} />}
                       valueStyle={{ 
                         color: '#1890ff',
                         fontSize: 'clamp(18px, 3.5vw, 26px)',
@@ -2381,7 +2403,7 @@ const Guard: React.FC = () => {
                     <Statistic
                       title={t('guard.returnedItems')}
                       value={todayReturnedItems}
-                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }} />}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 32px)' }} />}
                       valueStyle={{ 
                         color: '#52c41a',
                         fontSize: 'clamp(18px, 3.5vw, 26px)',
@@ -2394,7 +2416,7 @@ const Guard: React.FC = () => {
                     <Statistic
                       title={t('guard.pendingReturn')}
                       value={totalUnreturnedItems}
-                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }} />}
+                      prefix={<ShoppingCartOutlined style={{ fontSize: 'clamp(16px, 2.5vw, 32px)' }} />}
                       valueStyle={{ 
                         color: '#ff4d4f',
                         fontSize: 'clamp(18px, 3.5vw, 26px)',
@@ -2409,52 +2431,140 @@ const Guard: React.FC = () => {
         </Row>
 
         {/* 功能按钮 - 2×2布局 */}
-        <Row gutter={[24, 24]}>
-          <Col span={12}>
-            <Card 
-              hoverable
-              style={{ textAlign: 'center', height: '200px' }}
-              onClick={handleEntryRegistration}
-            >
-              <UserAddOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
-              <Title level={4}>{t('guard.entryRegistration')}</Title>
-              <Text type="secondary">{t('guard.entryDescription')}</Text>
+        <div style={{ 
+          flex: 1,
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'stretch',
+          paddingBottom: window.innerWidth < 768 ? '8px' : 
+                        window.innerWidth < 1024 ? '12px' : 
+                        window.innerWidth < 1440 ? '100px' : '150px'
+        }}>
+          <Row gutter={[16, window.innerWidth < 768 ? 0 : 
+                        window.innerWidth < 1024 ? 0 : 
+                        window.innerWidth < 1440 ? 0 : 0]} style={{ flex: 1 }}>
+            <Col xs={12} sm={12} md={12} lg={12} xl={12} style={{ height: '100%' }}>
+              <Card 
+                hoverable
+                style={{ 
+                  textAlign: 'center', 
+                  height: '94%',
+                  minHeight: window.innerWidth < 768 ? '30px' : 
+                            window.innerWidth < 1024 ? '40px' :
+                            window.innerWidth < 1440 ? '30px' : '35px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+                onClick={handleEntryRegistration}
+              >
+              <UserAddOutlined style={{ 
+                fontSize: window.innerWidth < 768 ? '48px' : '56px', 
+                color: '#1890ff', 
+                marginBottom: window.innerWidth < 768 ? '10px' : '12px' 
+              }} />
+              <Title level={4} style={{ 
+                fontSize: window.innerWidth < 768 ? '16px' : '18px',
+                margin: window.innerWidth < 768 ? '4px 0' : '8px 0'
+              }}>{t('guard.entryRegistration')}</Title>
+              <Text type="secondary" style={{ 
+                fontSize: window.innerWidth < 768 ? '12px' : '14px'
+              }}>{t('guard.entryDescription')}</Text>
             </Card>
           </Col>
-          <Col span={12}>
-            <Card 
-              hoverable
-              style={{ textAlign: 'center', height: '200px' }}
-              onClick={handleItemBorrowing}
-            >
-              <ShoppingCartOutlined style={{ fontSize: '48px', color: '#52c41a', marginBottom: '16px' }} />
-              <Title level={4}>{t('guard.borrowReturn')}</Title>
-              <Text type="secondary">{t('guard.borrowDescription')}</Text>
+            <Col xs={12} sm={12} md={12} lg={12} xl={12} style={{ height: '100%' }}>
+              <Card 
+                hoverable
+                style={{ 
+                  textAlign: 'center', 
+                  height: '94%',
+                  minHeight: window.innerWidth < 768 ? '30px' : 
+                            window.innerWidth < 1024 ? '40px' :
+                            window.innerWidth < 1440 ? '30px' : '35px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+                onClick={handleItemBorrowing}
+              >
+              <ShoppingCartOutlined style={{ 
+                fontSize: window.innerWidth < 768 ? '48px' : '56px', 
+                color: '#52c41a', 
+                marginBottom: window.innerWidth < 768 ? '10px' : '12px' 
+              }} />
+              <Title level={4} style={{ 
+                fontSize: window.innerWidth < 768 ? '16px' : '18px',
+                margin: window.innerWidth < 768 ? '4px 0' : '8px 0'
+              }}>{t('guard.borrowReturn')}</Title>
+              <Text type="secondary" style={{ 
+                fontSize: window.innerWidth < 768 ? '12px' : '14px'
+              }}>{t('guard.borrowDescription')}</Text>
             </Card>
           </Col>
-          <Col span={12}>
-            <Card 
-              hoverable
-              style={{ textAlign: 'center', height: '200px' }}
-              onClick={handleExitProcess}
-            >
-              <LogoutOutlined style={{ fontSize: '48px', color: '#fa541c', marginBottom: '16px' }} />
-              <Title level={4}>{t('guard.exitRegistration')}</Title>
-              <Text type="secondary">{t('guard.exitDescription')}</Text>
+          </Row>
+          <Row gutter={[16, window.innerWidth < 768 ? 0 : 
+                        window.innerWidth < 1024 ? 0 : 
+                        window.innerWidth < 1440 ? 0 : 0]} style={{ flex: 1 }}>
+            <Col xs={12} sm={12} md={12} lg={12} xl={12} style={{ height: '100%' }}>
+              <Card 
+                hoverable
+                style={{ 
+                  textAlign: 'center', 
+                  height: '94%',
+                  minHeight: window.innerWidth < 768 ? '30px' : 
+                            window.innerWidth < 1024 ? '40px' :
+                            window.innerWidth < 1440 ? '30px' : '35px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+                onClick={handleExitProcess}
+              >
+              <LogoutOutlined style={{ 
+                fontSize: window.innerWidth < 768 ? '48px' : '56px', 
+                color: '#fa541c', 
+                marginBottom: window.innerWidth < 768 ? '10px' : '12px' 
+              }} />
+              <Title level={4} style={{ 
+                fontSize: window.innerWidth < 768 ? '16px' : '18px',
+                margin: window.innerWidth < 768 ? '4px 0' : '8px 0'
+              }}>{t('guard.exitRegistration')}</Title>
+              <Text type="secondary" style={{ 
+                fontSize: window.innerWidth < 768 ? '12px' : '14px'
+              }}>{t('guard.exitDescription')}</Text>
             </Card>
           </Col>
-          <Col span={12}>
-            <Card 
-              hoverable
-              style={{ textAlign: 'center', height: '200px' }}
-              onClick={handleReports}
-            >
-              <BarChartOutlined style={{ fontSize: '48px', color: '#722ed1', marginBottom: '16px' }} />
-              <Title level={4}>{t('guard.reports')}</Title>
-              <Text type="secondary">{t('guard.viewVisitorRecords')}</Text>
+            <Col xs={12} sm={12} md={12} lg={12} xl={12} style={{ height: '100%' }}>
+              <Card 
+                hoverable
+                style={{ 
+                  textAlign: 'center', 
+                  height: '94%',
+                  minHeight: window.innerWidth < 768 ? '30px' : 
+                            window.innerWidth < 1024 ? '40px' :
+                            window.innerWidth < 1440 ? '30px' : '35px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+                onClick={handleReports}
+              >
+              <BarChartOutlined style={{ 
+                fontSize: window.innerWidth < 768 ? '48px' : '56px', 
+                color: '#722ed1', 
+                marginBottom: window.innerWidth < 768 ? '10px' : '12px' 
+              }} />
+              <Title level={4} style={{ 
+                fontSize: window.innerWidth < 768 ? '16px' : '18px',
+                margin: window.innerWidth < 768 ? '4px 0' : '8px 0'
+              }}>{t('guard.reports')}</Title>
+              <Text type="secondary" style={{ 
+                fontSize: window.innerWidth < 768 ? '12px' : '14px'
+              }}>{t('guard.viewVisitorRecords')}</Text>
             </Card>
           </Col>
-        </Row>
+          </Row>
+        </div>
         </div>
         {renderUserCenterModal()}
       </Layout>
@@ -3366,7 +3476,7 @@ const Guard: React.FC = () => {
         title: t('guard.physicalCardId'),
         dataIndex: 'physicalCardId',
         key: 'physicalCardId',
-        width: 120,
+        width: 100,
         render: (text: string) => text || '-',
       },
       // {
@@ -3387,7 +3497,7 @@ const Guard: React.FC = () => {
         title: t('guard.idCard'),
         dataIndex: 'idNumber',
         key: 'idNumber',
-        width: 140,
+        width: 100,
         render: (text: string) => {
           if (!text) return '-'
           // 显示前4位和后4位，中间用星号代替
@@ -3450,7 +3560,7 @@ const Guard: React.FC = () => {
         title: t('guard.borrowedItems'),
         dataIndex: 'borrowedItems',
         key: 'borrowedItems',
-        width: 100,
+        width: 90,
         render: (value: number, record: AttendanceRecord) => {
           // 统一显示蓝色样式
           const color = '#1890ff'
@@ -3458,7 +3568,7 @@ const Guard: React.FC = () => {
           const borderColor = '#91d5ff'
           
           return (
-            <Tooltip title={`今日相关 ${value} 件物品（今日借出+未归还+今日归还）`}>
+            <Tooltip title={t('guard.todayRelatedItemsTooltip', { count: value.toString() })}>
               <span 
                 style={{ 
                   color, 
@@ -3513,7 +3623,7 @@ const Guard: React.FC = () => {
         ),
         dataIndex: 'returnedItems',
         key: 'returnedItems',
-        width: 100,
+        width: 90,
         render: (value: number, record: AttendanceRecord) => {
           // 当借用物品数量为0时，无论已归还数量如何都显示绿色（没有需要归还的物品）
           if (record.borrowedItems === 0) {
@@ -3522,7 +3632,7 @@ const Guard: React.FC = () => {
             const backgroundColor = '#f6ffed'
             const borderColor = '#b7eb8f'
             return (
-              <Tooltip title="无借用物品">
+              <Tooltip title={t('guard.noBorrowedItems')}>
                 <span 
                   style={{ 
                     color, 
@@ -3673,53 +3783,12 @@ const Guard: React.FC = () => {
                   {t('common.refresh')}
                 </Button>
               </div>
-              <div               style={{ 
+              <div style={{ 
                 display: 'flex', 
-                alignItems: window.innerWidth < 768 ? 'flex-start' : 'center', 
+                alignItems: 'center', 
                 gap: '12px',
-                flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-                width: window.innerWidth < 768 ? '100%' : 'auto'
+                width: 'auto'
               }}>
-                {window.innerWidth >= 768 && (
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px'
-                  }}>
-                    <Text strong style={{ fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)' }}>{t('guard.dateRange')}</Text>
-                    <DatePicker.RangePicker
-                      value={dateFilter.startDate && dateFilter.endDate ? [
-                        dayjs(dateFilter.startDate),
-                        dayjs(dateFilter.endDate)
-                      ] : undefined}
-                      onChange={handleDateFilterChange}
-                      style={{ 
-                        width: 240,
-                        fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)'
-                      }}
-                      size="small"
-                      placeholder={[t('guard.startDate'), t('guard.endDate')]}
-                    />
-                    <Text strong style={{ fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)' }}>{t('guard.statusFilter')}</Text>
-                    <Select
-                      value={statusFilter}
-                      onChange={handleStatusFilterChange}
-                      style={{ 
-                        width: 120,
-                        fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)'
-                      }}
-                      size="small"
-                    >
-                      <Option value="all">{t('common.all')}</Option>
-                      <Option value="in">{t('guard.onSite')}</Option>
-                      <Option value="out">{t('guard.exited')}</Option>
-                    </Select>
-                    <Text type="secondary">
-                      {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
-                    </Text>
-                  </div>
-                )}
-                
                 <Space wrap>
                   {[
                     { key: 'entry', label: t('guard.entryRegistration'), icon: <UserAddOutlined />, color: '#1890ff', onClick: handleEntryRegistration },
@@ -3757,53 +3826,85 @@ const Guard: React.FC = () => {
               </div>
             </div>
             
-            {/* 手机端筛选框 */}
-            {window.innerWidth < 768 && (
+            {/* 筛选框区域 - 桌面端和移动端 */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+              alignItems: window.innerWidth < 768 ? 'flex-start' : 'center',
+              gap: window.innerWidth < 768 ? '12px' : '16px',
+              marginBottom: '16px',
+              padding: '16px',
+              background: '#fafafa',
+              borderRadius: '8px',
+              border: '1px solid #f0f0f0'
+            }}>
+              {/* 日期范围筛选 */}
               <div style={{ 
                 display: 'flex', 
-                flexDirection: 'column',
-                gap: '12px',
-                marginBottom: '16px'
+                alignItems: 'center', 
+                gap: '6px'
               }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px'
+                <Text strong style={{ 
+                  fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)',
+                  minWidth: '50px'
                 }}>
-                  <Text strong>{t('guard.dateRange')}</Text>
-                  <DatePicker.RangePicker
-                    value={dateFilter.startDate && dateFilter.endDate ? [
-                      dayjs(dateFilter.startDate),
-                      dayjs(dateFilter.endDate)
-                    ] : undefined}
-                    onChange={handleDateFilterChange}
-                    style={{ width: 200 }}
-                    size="small"
-                    placeholder={[t('guard.startDate'), t('guard.endDate')]}
-                  />
-                </div>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px'
-                }}>
-                  <Text strong>{t('guard.statusFilter')}</Text>
-                  <Select
-                    value={statusFilter}
-                    onChange={handleStatusFilterChange}
-                    style={{ width: 120 }}
-                    size="small"
-                  >
-                    <Option value="all">{t('common.all')}</Option>
-                    <Option value="in">{t('guard.onSite')}</Option>
-                    <Option value="out">{t('guard.exited')}</Option>
-                  </Select>
-                  <Text type="secondary">
-                    {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
-                  </Text>
-                </div>
+                  {t('guard.dateRange')}
+                </Text>
+                <DatePicker.RangePicker
+                  value={dateFilter.startDate && dateFilter.endDate ? [
+                    dayjs(dateFilter.startDate),
+                    dayjs(dateFilter.endDate)
+                  ] : undefined}
+                  onChange={handleDateFilterChange}
+                  style={{ 
+                    width: window.innerWidth >= 768 ? 240 : 190,
+                    fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)'
+                  }}
+                  size="middle"
+                  placeholder={[t('guard.startDate'), t('guard.endDate')]}
+                />
               </div>
-            )}
+              
+              {/* 状态筛选 */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px'
+              }}>
+                <Text strong style={{ 
+                  fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)',
+                  minWidth: '50px'
+                }}>
+                  {t('guard.statusFilter')}
+                </Text>
+                <Select
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  style={{ 
+                    width: 140,
+                    fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)'
+                  }}
+                  size="middle"
+                >
+                  <Option value="all">{t('common.all')}</Option>
+                  <Option value="in">{t('guard.onSite')}</Option>
+                  <Option value="out">{t('guard.exited')}</Option>
+                </Select>
+              </div>
+              
+              {/* 记录统计信息 */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                marginLeft: window.innerWidth >= 768 ? 'auto' : '0'
+              }}>
+                <Text type="secondary" style={{
+                  fontSize: window.innerWidth >= 768 ? 'clamp(16px, 2.5vw, 20px)' : 'clamp(14px, 2vw, 18px)'
+                }}>
+                  {t('guard.totalRecords').replace('{count}', filteredRecords.length.toString())}
+                </Text>
+              </div>
+            </div>
           </div>
 
           {/* 表格区域 */}
@@ -3830,7 +3931,7 @@ const Guard: React.FC = () => {
                   emptyText: visitorRecordsLoading ? '加载中...' : '暂无访客记录'
                 }}
                 style={{
-                  fontSize: window.innerWidth >= 768 ? 'clamp(18px, 3vw, 24px)' : 'clamp(14px, 2vw, 18px)'
+                  fontSize: window.innerWidth >= 768 ? 'clamp(24px, 3.5vw, 32px)' : 'clamp(16px, 2.5vw, 22px)'
                 }}
               />
             </div>

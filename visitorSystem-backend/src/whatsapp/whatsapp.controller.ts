@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { WhatsAppService } from './whatsapp.service';
 import { SendQRCodeDto } from './dto/send-qrcode.dto';
 import { BatchSendQRCodeDto } from './dto/batch-send-qrcode.dto';
+import { SendInviteLinkDto } from './dto/send-invite-link.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('whatsapp')
@@ -44,6 +45,32 @@ export class WhatsAppController {
     return this.whatsappService.batchSendQRCode(
       batchSendQRCodeDto.workers,
       batchSendQRCodeDto.language
+    );
+  }
+
+  @Post('send-invite-link')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '发送邀请链接到WhatsApp' })
+  async sendInviteLink(@Body() sendInviteLinkDto: SendInviteLinkDto): Promise<{
+    success: boolean;
+    message: string;
+    results?: {
+      total: number;
+      succeeded: number;
+      failed: number;
+      details: Array<{
+        phoneNumber: string;
+        success: boolean;
+        message?: string;
+      }>;
+    };
+  }> {
+    return this.whatsappService.sendInviteLink(
+      sendInviteLinkDto.phoneNumbers,
+      sendInviteLinkDto.areaCode,
+      sendInviteLinkDto.language,
+      sendInviteLinkDto.distributorId,
+      sendInviteLinkDto.siteId
     );
   }
 }

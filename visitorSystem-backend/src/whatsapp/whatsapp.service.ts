@@ -554,4 +554,297 @@ export class WhatsAppService {
       results
     };
   }
+
+  /**
+   * 发送邀请链接到WhatsApp
+   * @param phoneNumbers 电话号码列表
+   * @param areaCode 区号
+   * @param language 语言
+   * @param distributorId 分判商ID
+   * @param siteId 工地ID
+   * @returns 发送结果
+   */
+  async sendInviteLink(
+    phoneNumbers: string[],
+    areaCode: string,
+    language?: string,
+    distributorId?: string,
+    siteId?: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    results?: {
+      total: number;
+      succeeded: number;
+      failed: number;
+      details: Array<{
+        phoneNumber: string;
+        success: boolean;
+        message?: string;
+      }>;
+    };
+  }> {
+    try {
+      // 延迟初始化：确保配置已加载
+      this.logger.log('开始发送邀请链接，检查配置状态...');
+      await this.ensureConfigLoaded();
+      
+      // 验证API密钥有效性
+      if (!this.apiKey) {
+        this.logger.error('API密钥未配置，无法发送WhatsApp消息');
+        return { 
+          success: false, 
+          message: '发送失败: API密钥未配置' 
+        };
+      }
+
+      // 初始化结果
+      const results = {
+        total: phoneNumbers.length,
+        succeeded: 0,
+        failed: 0,
+        details: [] as Array<{
+          phoneNumber: string;
+          success: boolean;
+          message?: string;
+        }>
+      };
+
+      // 生成邀请链接
+      const registrationLink = this.generateRegistrationLink(distributorId, siteId);
+      
+      // 遍历每个电话号码并发送邀请链接
+      for (const phoneNumber of phoneNumbers) {
+        try {
+          // 格式化电话号码
+          const formattedPhone = this.formatPhoneNumber(phoneNumber, areaCode);
+          
+          // 发送邀请链接
+          const result = await this.sendInviteLinkMessage(formattedPhone, registrationLink, language);
+          
+          // 添加到结果列表
+          results.details.push({
+            phoneNumber: formattedPhone,
+            success: result.success,
+            message: result.success ? undefined : result.message
+          });
+          
+          // 累加成功或失败数量
+          if (result.success) {
+            results.succeeded++;
+          } else {
+            results.failed++;
+          }
+        } catch (error) {
+          this.logger.error(`向电话号码 ${phoneNumber} 发送邀请链接失败:`, error);
+          
+          // 添加错误到结果列表
+          results.details.push({
+            phoneNumber: `${areaCode}${phoneNumber}`,
+            success: false,
+            message: error instanceof Error ? error.message : '未知错误'
+          });
+          
+          results.failed++;
+        }
+      }
+
+      // 返回汇总结果
+      return {
+        success: true,
+        message: `已处理 ${results.total} 个电话号码，成功 ${results.succeeded} 个，失败 ${results.failed} 个`,
+        results
+      };
+    } catch (error) {
+      this.logger.error('发送邀请链接失败:', error);
+      return {
+        success: false,
+        message: `发送失败: ${error instanceof Error ? error.message : '未知错误'}`
+      };
+    }
+  }
+
+  /**
+   * 生成注册链接
+   * @param distributorId 分判商ID
+   * @param siteId 工地ID
+   * @returns 注册链接（只返回路径部分，不包含域名）
+   */
+  private generateRegistrationLink(distributorId?: string, siteId?: string): string {
+    // 根据需求，只返回路径部分，不包含http和域名
+    // 例如：worker-registration?distributorId=xxx&siteId=xxx
+    let link = 'worker-registration';
+    
+    if (distributorId && siteId) {
+      link += `?distributorId=${distributorId}&siteId=${siteId}`;
+    }
+    
+    return link;
+  }
+
+  /**
+   * 格式化电话号码
+   * @param phoneNumber 原始电话号码
+   * @param areaCode 区号
+   * @returns 格式化后的电话号码
+   */
+  private formatPhoneNumber(phoneNumber: string, areaCode: string): string {
+    // 移除所有非数字字符
+    const cleanNumber = phoneNumber.replace(/\D/g, '');
+    
+    // 如果区号已经包含+号，直接拼接
+    if (areaCode.startsWith('+')) {
+      return `${areaCode}${cleanNumber}`;
+    }
+    
+    // 否则添加+号
+    return `+${areaCode}${cleanNumber}`;
+  }
+
+  /**
+   * 发送邀请链接消息到WhatsApp
+   * @param toPhoneNumber 接收方手机号
+   * @param registrationLink 注册链接
+   * @param language 语言
+   * @returns 发送结果
+   */
+  private async sendInviteLinkMessage(
+    toPhoneNumber: string,
+    registrationLink: string,
+    language?: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const url = 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly';
+      
+      // 根据语言选择模板和语言代码
+      const templateName = await this.getQuickInviteTemplateName(language);
+      const languageCode = this.getLanguageCode(language);
+      
+      const payload = {
+        type: 'template',
+        template: {
+          language: { code: languageCode },
+          name: templateName,
+          components: [
+            {
+              type: 'button',
+              parameters: [
+                {
+                  type: 'text',
+                  text: registrationLink
+                }
+              ],
+              sub_type: 'url',
+              index: 0
+            }
+          ]
+        },
+        to: toPhoneNumber,
+        from: this.fromPhoneNumber
+      };
+      
+      this.logger.log(`发送邀请链接到 ${toPhoneNumber}: ${registrationLink}`);
+      this.logger.log(`使用模板: ${templateName}, 语言: ${languageCode}`);
+      
+      const response = await firstValueFrom(this.httpService.post(url, payload, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-API-Key': this.apiKey
+        }
+      }));
+      
+      this.logger.log(`邀请链接发送成功到 ${toPhoneNumber}:`, response.data);
+      
+      return {
+        success: true,
+        message: '邀请链接发送成功'
+      };
+    } catch (error) {
+      this.logger.error(`发送邀请链接到 ${toPhoneNumber} 失败:`, error);
+      
+      let errorMessage = '发送失败';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      return {
+        success: false,
+        message: errorMessage
+      };
+    }
+  }
+
+  /**
+   * 获取快速邀请模板名称（从系统配置获取）
+   * @param language 语言
+   * @returns 模板名称
+   */
+  private async getQuickInviteTemplateName(language?: string): Promise<string> {
+    try {
+      // 从系统配置获取基础模板名称
+      const templateBase = await this.systemConfigService.getConfigValue('WHATSAPP_QUICK_INV_TEMPLATE_NAME') || 'quick_invitation';
+      
+      // 根据语言添加后缀
+      let templateSuffix = '_cn'; // 默认简体中文
+      if (language) {
+        if (language === 'zh-CN') {
+          templateSuffix = '_cn';
+        } else if (language === 'zh-TW') {
+          templateSuffix = '_tw';
+        } else if (language === 'en-US') {
+          templateSuffix = '_en';
+        }
+      }
+      
+      const templateName = templateBase + templateSuffix;
+      this.logger.log(`使用快速邀请模板: ${templateName}`);
+      
+      return templateName;
+    } catch (error) {
+      this.logger.warn('获取快速邀请模板名称失败，使用默认值:', error);
+      // 返回默认模板名称
+      const defaultTemplate = 'quick_invitation_cn';
+      this.logger.log(`使用默认快速邀请模板: ${defaultTemplate}`);
+      return defaultTemplate;
+    }
+  }
+
+  /**
+   * 获取邀请模板名称
+   * @param language 语言
+   * @returns 模板名称
+   */
+  private getInviteTemplateName(language?: string): string {
+    switch (language) {
+      case 'zh-CN':
+        return 'worker_invite_cn';
+      case 'zh-TW':
+        return 'worker_invite_tw';
+      case 'en-US':
+        return 'worker_invite_en';
+      default:
+        return 'worker_invite_cn'; // 默认中文
+    }
+  }
+
+  /**
+   * 获取语言代码
+   * @param language 语言
+   * @returns 语言代码
+   */
+  private getLanguageCode(language?: string): string {
+    switch (language) {
+      case 'zh-CN':
+        return 'zh_CN';
+      case 'zh-TW':
+        return 'zh_HK';
+      case 'en-US':
+        return 'en_US';
+      default:
+        return 'zh_CN'; // 默认中文
+    }
+  }
 }
