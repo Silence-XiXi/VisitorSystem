@@ -42,6 +42,13 @@ const AdminSites: React.FC = () => {
   const [editingSite, setEditingSite] = useState<Site | null>(null)
   const [siteForm] = Form.useForm()
   const [selectedSiteIds, setSelectedSiteIds] = useState<string[]>([])
+  const [isFromDistributorForm, setIsFromDistributorForm] = useState(false)
+  const [isFromGuardForm, setIsFromGuardForm] = useState(false)
+  const [isFromSiteForm, setIsFromSiteForm] = useState(false)
+  // 层级关系：
+  // 分判商标签页：新增分判商1000，新增工地1001
+  // 门卫标签页：新增门卫2000，新增工地2001
+  // 工地标签页：新增工地3000，新增分判商3001
 
   // 分判商管理状态
   const [distributors, setDistributors] = useState<Distributor[]>(mockDistributors)
@@ -795,8 +802,26 @@ const AdminSites: React.FC = () => {
         
         setSites(prev => [transformedNewSite, ...prev])
         
-        // 刷新全局工地筛选器
-        await refreshSites()
+        // 如果是从分判商表单打开的，自动选中新工地
+        if (isFromDistributorForm) {
+          const currentSiteIds = distributorForm.getFieldValue('siteIds') || []
+          distributorForm.setFieldsValue({
+            siteIds: [...currentSiteIds, transformedNewSite.id]
+          })
+          setIsFromDistributorForm(false)
+        }
+        
+        // 如果是从门卫表单打开的，自动选中新工地，但不更新全局筛选
+        if (isFromGuardForm) {
+          guardForm.setFieldsValue({
+            siteId: transformedNewSite.id
+          })
+          setIsFromGuardForm(false)
+          // 不调用 refreshSites()，避免全局筛选自动跳转
+        } else {
+          // 只有在不是从门卫表单打开的情况下才刷新全局工地筛选器
+          await refreshSites()
+        }
         
       message.success(t('admin.siteAdded'))
     }
@@ -894,6 +919,15 @@ const AdminSites: React.FC = () => {
         }
         
         setDistributors(prev => [transformedDistributor, ...prev])
+        
+        // 如果是从工地表单打开的，自动选中新分判商
+        if (isFromSiteForm) {
+          const currentDistributorIds = siteForm.getFieldValue('distributorIds') || []
+          siteForm.setFieldsValue({
+            distributorIds: [...currentDistributorIds, transformedDistributor.id]
+          })
+          setIsFromSiteForm(false)
+        }
         
         // 显示发送方式选择对话框
         showSendMethodModal(transformedDistributor, defaultPwd)
@@ -3018,7 +3052,19 @@ const AdminSites: React.FC = () => {
       />
 
       {/* 工地管理模态框 */}
-      <Modal title={editingSite ? t('admin.editSite') : t('admin.addSite')} open={siteModalOpen} onCancel={() => { setSiteModalOpen(false); setEditingSite(null) }} onOk={onSiteSubmit} destroyOnClose>
+      <Modal 
+        title={editingSite ? t('admin.editSite') : t('admin.addSite')} 
+        open={siteModalOpen} 
+        onCancel={() => { 
+          setSiteModalOpen(false); 
+          setEditingSite(null);
+          setIsFromDistributorForm(false);
+          setIsFromGuardForm(false);
+        }} 
+        onOk={onSiteSubmit} 
+        destroyOnClose
+        zIndex={isFromDistributorForm ? 1001 : isFromGuardForm ? 2001 : 3000}
+      >
         <Form form={siteForm} layout="vertical">
           <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Input placeholder={t('admin.siteNamePlaceholder')} />
@@ -3039,14 +3085,55 @@ const AdminSites: React.FC = () => {
             <Select 
               mode="multiple" 
               placeholder={t('admin.distributorSelectPlaceholder')} 
-              options={distributors.map(d => ({ value: d.id, label: d.name }))} 
+              options={distributors.map(d => ({ value: d.id, label: d.name }))}
+              dropdownRender={(isFromGuardForm || isFromDistributorForm) ? undefined : (menu) => (
+                <div>
+                  {menu}
+                  <div style={{ 
+                    padding: '8px 12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    background: '#fafafa'
+                  }}>
+                    <Button
+                      type="dashed"
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        setIsFromDistributorForm(false)
+                        setIsFromGuardForm(false)
+                        setIsFromSiteForm(true)
+                        setDistributorModalOpen(true)
+                        setEditingDistributor(null)
+                        distributorForm.resetFields()
+                      }}
+                      style={{ 
+                        width: '100%',
+                        borderColor: '#52c41a',
+                        color: '#52c41a'
+                      }}
+                    >
+                      {t('admin.addNewDistributor')}
+                    </Button>
+                  </div>
+                </div>
+              )}
             />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* 分判商管理模态框 */}
-      <Modal title={editingDistributor ? t('admin.editDistributor') : t('admin.addDistributor')} open={distributorModalOpen} onCancel={() => { setDistributorModalOpen(false); setEditingDistributor(null) }} onOk={onDistributorSubmit} destroyOnClose>
+      <Modal 
+        title={editingDistributor ? t('admin.editDistributor') : t('admin.addDistributor')} 
+        open={distributorModalOpen} 
+        onCancel={() => { 
+          setDistributorModalOpen(false); 
+          setEditingDistributor(null);
+          setIsFromSiteForm(false);
+        }} 
+        onOk={onDistributorSubmit} 
+        destroyOnClose
+        zIndex={isFromGuardForm ? 2002 : isFromSiteForm ? 3001 : 1000}
+      >
         <Form form={distributorForm} layout="vertical">
           <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Input placeholder={t('admin.distributorNamePlaceholder')} />
@@ -3058,7 +3145,37 @@ const AdminSites: React.FC = () => {
             <Select 
               mode="multiple" 
               placeholder={t('admin.siteMultiSelectPlaceholder')} 
-              options={sites.map(s => ({ value: s.id, label: s.name }))} 
+              options={sites.map(s => ({ value: s.id, label: s.name }))}
+              dropdownRender={isFromSiteForm ? undefined : (menu) => (
+                <div>
+                  {menu}
+                  <div style={{ 
+                    padding: '8px 12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    background: '#fafafa'
+                  }}>
+                    <Button
+                      type="dashed"
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        setIsFromDistributorForm(true)
+                        setIsFromGuardForm(false)
+                        setIsFromSiteForm(false)
+                        setSiteModalOpen(true)
+                        setEditingSite(null)
+                        siteForm.resetFields()
+                      }}
+                      style={{ 
+                        width: '100%',
+                        borderColor: '#1890ff',
+                        color: '#1890ff'
+                      }}
+                    >
+                      {t('admin.addNewSite')}
+                    </Button>
+                  </div>
+                </div>
+              )}
             />
           </Form.Item>
           <Form.Item name="phone" label={t('admin.phoneLabel')}>
@@ -3085,7 +3202,17 @@ const AdminSites: React.FC = () => {
       </Modal>
 
       {/* 门卫管理模态框 */}
-      <Modal title={editingGuard ? t('admin.editGuard') : t('admin.addGuard')} open={guardModalOpen} onCancel={() => { setGuardModalOpen(false); setEditingGuard(null) }} onOk={onGuardSubmit} destroyOnClose>
+      <Modal 
+        title={editingGuard ? t('admin.editGuard') : t('admin.addGuard')} 
+        open={guardModalOpen} 
+        onCancel={() => { 
+          setGuardModalOpen(false); 
+          setEditingGuard(null);
+        }} 
+        onOk={onGuardSubmit} 
+        destroyOnClose
+        zIndex={2000}
+      >
         <Form form={guardForm} layout="vertical">
           <Form.Item name="name" label={t('admin.nameLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Input placeholder={t('admin.guardNamePlaceholder')} />
@@ -3093,7 +3220,37 @@ const AdminSites: React.FC = () => {
           <Form.Item name="siteId" label={t('admin.siteIdLabel')} rules={[{ required: true, message: t('form.required') }]}>
             <Select 
               placeholder={t('admin.siteSelectPlaceholder')} 
-              options={sites.map(s => ({ value: s.id, label: s.name }))} 
+              options={sites.map(s => ({ value: s.id, label: s.name }))}
+              dropdownRender={(menu) => (
+                <div>
+                  {menu}
+                  <div style={{ 
+                    padding: '8px 12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    background: '#fafafa'
+                  }}>
+                    <Button
+                      type="dashed"
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        setIsFromDistributorForm(false)
+                        setIsFromGuardForm(true)
+                        setIsFromSiteForm(false)
+                        setSiteModalOpen(true)
+                        setEditingSite(null)
+                        siteForm.resetFields()
+                      }}
+                      style={{ 
+                        width: '100%',
+                        borderColor: '#1890ff',
+                        color: '#1890ff'
+                      }}
+                    >
+                      {t('admin.addNewSite')}
+                    </Button>
+                  </div>
+                </div>
+              )}
             />
           </Form.Item>
           <Form.Item name="phone" label={t('admin.phoneLabel')} rules={[{ required: true, message: t('form.required') }]}>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Upload, Button, message, Alert, List, Space, Progress, Card, Typography } from 'antd';
-import { UploadOutlined, DownloadOutlined, FileExcelOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { readWorkerExcelFile, generateImportTemplate } from '../utils/excelUtils';
+import { UploadOutlined, DownloadOutlined, FileExcelOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { generateImportTemplate } from '../utils/excelUtils';
 import { Worker, CreateWorkerRequest } from '../types/worker';
 import { useLocale } from '../contexts/LocaleContext';
 
@@ -11,17 +11,14 @@ interface ExcelImportExportModalProps {
   visible: boolean;
   onClose: () => void;
   workers: Worker[];
-  distributors: any[];
-  sites: any[];
-  onImport: (workers: CreateWorkerRequest[]) => Promise<void>;
+  distributors: unknown[];
+  sites: unknown[];
+  onImport: (file: File) => Promise<void>;
 }
 
 const ExcelImportExportModal: React.FC<ExcelImportExportModalProps> = ({
   visible,
   onClose,
-  workers,
-  distributors,
-  sites,
   onImport
 }) => {
   const { t } = useLocale();
@@ -195,7 +192,7 @@ const ExcelImportExportModal: React.FC<ExcelImportExportModalProps> = ({
                 <List
                   size="small"
                   dataSource={importResult.errors}
-                  renderItem={(error, index) => (
+                  renderItem={(error) => (
                     <List.Item>
                       <Space>
                         <CloseCircleOutlined style={{ color: '#ff4d4f' }} />

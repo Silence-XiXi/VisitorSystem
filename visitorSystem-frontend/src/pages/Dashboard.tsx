@@ -8,7 +8,12 @@ import {
   MenuUnfoldOutlined,
   FileTextOutlined,
   ClockCircleOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  DashboardOutlined,
+  HomeOutlined,
+  SettingOutlined,
+  HistoryOutlined,
+  UsergroupAddOutlined
 } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom'
@@ -113,27 +118,27 @@ const Dashboard: React.FC = () => {
   const menuItems = [
     {
       key: 'reports',
-      icon: <FileTextOutlined />,
+      icon: <DashboardOutlined style={{ color: '#1890ff', fontSize: '16px' }} />,
       label: t('navigation.overview')
     },
     {
       key: 'admin-sites',
-      icon: <FileTextOutlined />,
+      icon: <HomeOutlined style={{ color: '#52c41a', fontSize: '16px' }} />,
       label: t('admin.siteManagement')
     },
     {
       key: 'item-categories',
-      icon: <AppstoreOutlined />,
+      icon: <AppstoreOutlined style={{ color: '#fa8c16', fontSize: '16px' }} />,
       label: t('admin.itemCategoryManagement')
     },
     {
       key: 'item-borrow-records',
-      icon: <ClockCircleOutlined />,
+      icon: <HistoryOutlined style={{ color: '#722ed1', fontSize: '16px' }} />,
       label: t('admin.itemBorrowRecords')
     },
     {
       key: 'workers',
-      icon: <TeamOutlined />,
+      icon: <UsergroupAddOutlined style={{ color: '#13c2c2', fontSize: '16px' }} />,
       label: t('navigation.workerManagement')
     }
   ]
@@ -141,13 +146,13 @@ const Dashboard: React.FC = () => {
   const dropdownItems = [
     {
       key: 'account',
-      icon: <UserOutlined />,
+      icon: <SettingOutlined style={{ color: '#1890ff', fontSize: '14px' }} />,
       label: t('navigation.accountSettings'),
       onClick: () => handleMenuClick('account')
     },
     {
       key: 'logout',
-      icon: <LogoutOutlined />,
+      icon: <LogoutOutlined style={{ color: '#ff4d4f', fontSize: '14px' }} />,
       label: t('navigation.logout'),
       onClick: handleLogout
     }
@@ -190,8 +195,12 @@ const Dashboard: React.FC = () => {
           mode="inline"
           selectedKeys={[getSelectedMenu()]}
           items={menuItems}
-          style={{ border: 'none' }}
+          style={{ 
+            border: 'none',
+            background: 'transparent'
+          }}
           onClick={({ key }) => handleMenuClick(key)}
+          theme="light"
         />
       </Sider>
 
@@ -354,3 +363,45 @@ const Dashboard: React.FC = () => {
 }
 
 export default Dashboard
+
+// 添加自定义样式来美化菜单
+const menuStyles = `
+  .ant-menu-item {
+    margin: 4px 8px !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .ant-menu-item:hover {
+    background-color: #f0f8ff !important;
+    transform: translateX(2px) !important;
+  }
+  
+  .ant-menu-item-selected {
+    background-color: #e6f7ff !important;
+    border-right: 3px solid #1890ff !important;
+  }
+  
+  .ant-menu-item-selected:hover {
+    background-color: #bae7ff !important;
+  }
+  
+  .ant-menu-item .anticon {
+    transition: all 0.3s ease !important;
+  }
+  
+  .ant-menu-item:hover .anticon {
+    transform: scale(1.1) !important;
+  }
+  
+  .ant-menu-item-selected .anticon {
+    transform: scale(1.05) !important;
+  }
+`
+
+// 动态添加样式
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style')
+  styleElement.textContent = menuStyles
+  document.head.appendChild(styleElement)
+}

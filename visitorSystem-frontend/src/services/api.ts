@@ -11,11 +11,11 @@ const API_BASE_URL = (() => {
   const currentHost = window.location.hostname;
   const currentPort = window.location.port;
   
-  console.log('[API Config] Current location:', {
-    hostname: currentHost,
-    port: currentPort,
-    href: window.location.href
-  });
+  // console.log('[API Config] Current location:', {
+  //   hostname: currentHost,
+  //   port: currentPort,
+  //   href: window.location.href
+  // });
   
   // 检测是否通过nginx代理访问（端口9017、8081、8082等）
   const proxyPorts = ['80', '443', '9017', '8081', '8082'];
@@ -1182,7 +1182,7 @@ class ApiService {
 
   // 获取工人借用物品记录
   async getWorkerBorrowRecords(workerId: string, visitorRecordId?: string): Promise<any[]> {
-    console.log(`调用 getWorkerBorrowRecords API，工人ID: ${workerId}, 访客记录ID: ${visitorRecordId || '无'}`);
+    // console.log(`调用 getWorkerBorrowRecords API，工人ID: ${workerId}, 访客记录ID: ${visitorRecordId || '无'}`);
     try {
       let url = `/guards/borrow-records?workerId=${workerId}`;
       if (visitorRecordId) {
@@ -1191,10 +1191,10 @@ class ApiService {
       const result = await this.requestWithRetry<any[]>(url, {
         method: 'GET',
       });
-      console.log(`工人 ${workerId} ${visitorRecordId ? `(访客记录ID: ${visitorRecordId})` : ''} 的借用记录 API 响应:`, result);
+      // console.log(`工人 ${workerId} ${visitorRecordId ? `(访客记录ID: ${visitorRecordId})` : ''} 的借用记录 API 响应:`, result);
       return result;
     } catch (error) {
-      console.error(`获取工人 ${workerId} 的借用记录失败:`, error);
+      // console.error(`获取工人 ${workerId} 的借用记录失败:`, error);
       return [];
     }
   }

@@ -892,7 +892,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.workerId'),
       dataIndex: 'workerId',
       key: 'workerId',
-      width: 120,
+      width: 100,
       fixed: 'left' as const,
       sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId),
     },
@@ -900,7 +900,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.name'),
       dataIndex: 'name',
       key: 'name',
-      width: 100,
+      width: 120,
       fixed: 'left' as const,
       sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name),
       render: (name: string) => name,
@@ -909,7 +909,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.gender'),
       dataIndex: 'gender',
       key: 'gender',
-      width: 60,
+      width: 75,
       sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender),
       render: (gender: string) => getGenderTag(gender),
     },
@@ -971,8 +971,45 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.region'),
       dataIndex: 'region',
       key: 'region',
-      width: 100,
+      width: 120,
       sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region),
+      render: (region: string) => {
+        const areaCodeMap: Record<string, string> = {
+          '+86': t('distributor.areaCodeChina'),
+          '+852': t('distributor.areaCodeHongKong'),
+          '+853': t('distributor.areaCodeMacau'),
+          '+886': t('distributor.areaCodeTaiwan'),
+          '+65': t('distributor.areaCodeSingapore'),
+          '+60': t('distributor.areaCodeMalaysia'),
+          '+66': t('distributor.areaCodeThailand'),
+          '+63': t('distributor.areaCodePhilippines'),
+          '+62': t('distributor.areaCodeIndonesia'),
+          '+84': t('distributor.areaCodeVietnam'),
+          '+1': t('distributor.areaCodeUSCanada'),
+          '+44': t('distributor.areaCodeUK'),
+          '+49': t('distributor.areaCodeGermany'),
+          '+33': t('distributor.areaCodeFrance'),
+          '+81': t('distributor.areaCodeJapan'),
+          '+82': t('distributor.areaCodeKorea'),
+          '+91': t('distributor.areaCodeIndia'),
+          '+61': t('distributor.areaCodeAustralia'),
+        }
+        
+        // 如果传入的是区号，返回对应的地区名称
+        if (areaCodeMap[region]) {
+          return areaCodeMap[region]
+        }
+        
+        // 如果传入的是旧的地区名称，尝试反向映射
+        const reverseMap: Record<string, string> = {
+          [t('regions.mainland')]: t('distributor.areaCodeChina'),
+          [t('regions.hongkong')]: t('distributor.areaCodeHongKong'),
+          [t('regions.macau')]: t('distributor.areaCodeMacau'),
+          [t('regions.taiwan')]: t('distributor.areaCodeTaiwan'),
+        }
+        
+        return reverseMap[region] || region || '-'
+      }
     },
     {
       title: t('worker.distributor'),
@@ -994,7 +1031,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.phone'),
       dataIndex: 'phone',
       key: 'phone',
-      width: 130,
+      width: 110,
       sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone),
     },
     {

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
 
 const { Option } = Select
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons'
 
 import { Worker, Site, CreateWorkerRequest } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
@@ -36,7 +36,7 @@ const tableStyles = `
 `
 
 const DistributorWorkerUpload: React.FC = () => {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const { user } = useAuth()
   
   // 从用户信息中获取分判商信息
@@ -60,6 +60,11 @@ const DistributorWorkerUpload: React.FC = () => {
   const [sendingWhatsAppLoading] = useState(false)
   const [quickInviteModalOpen, setQuickInviteModalOpen] = useState(false)
   const [sendingInviteLoading, setSendingInviteLoading] = useState(false)
+  
+  // 迁移功能状态
+  const [migrateModalOpen, setMigrateModalOpen] = useState(false)
+  const [migrateLoading, setMigrateLoading] = useState(false)
+  const [targetSiteId, setTargetSiteId] = useState<string>('')
   
   // 工地数据状态
   const [sites, setSites] = useState<Site[]>([])
@@ -100,8 +105,8 @@ const DistributorWorkerUpload: React.FC = () => {
       // 检查sites属性（通过site_distributors表关联的工地信息）
       if ('sites' in distributor && Array.isArray(distributor.sites) && distributor.sites.length > 0) {
         // 从site_distributors关联表中获取工地信息
-        sitesList = distributor.sites.map((siteDistributor: any) => {
-          const site = siteDistributor.site || siteDistributor
+        sitesList = distributor.sites.map((siteDistributor: unknown) => {
+          const site = (siteDistributor as any).site || siteDistributor
           return {
             id: site.id,
             name: site.name,
@@ -284,7 +289,7 @@ const DistributorWorkerUpload: React.FC = () => {
           idType: values.idType,
           idNumber: values.idNumber,
           gender: values.gender?.toUpperCase() as 'MALE' | 'FEMALE',
-          region: values.region || t('regions.mainland'),
+          region: values.region || getDefaultAreaCode(), // 保存区号，根据当前语言设置默认值
           siteId: selectedSiteId,
           distributorId: currentDistributor?.id || 'default-distributor',
           status: (values.status?.toUpperCase() || 'ACTIVE') as 'ACTIVE' | 'INACTIVE',
@@ -421,6 +426,70 @@ const DistributorWorkerUpload: React.FC = () => {
     }
   }
 
+  // 处理工人迁移
+  const handleMigrateWorkers = async () => {
+    if (selectedWorkerIds.length === 0) {
+      message.warning(t('distributor.pleaseSelectWorkersToMigrate'))
+      return
+    }
+    
+    if (!targetSiteId) {
+      message.warning(t('distributor.pleaseSelectTargetSite'))
+      return
+    }
+    
+    const targetSite = sites.find(site => site.id === targetSiteId)
+    if (!targetSite) {
+      message.error('目标工地不存在')
+      return
+    }
+    
+    // 显示确认对话框
+    Modal.confirm({
+      title: t('distributor.migrateConfirm'),
+      icon: <ExclamationCircleOutlined />,
+      content: t('distributor.migrateConfirmContent', { 
+        count: selectedWorkerIds.length.toString(), 
+        siteName: targetSite.name 
+      }),
+      onOk: async () => {
+        try {
+          setMigrateLoading(true)
+          
+          // 批量更新选中的工人 - 只更新siteId字段
+          const updatePromises = selectedWorkerIds.map(workerId => {
+            // 简化数据传递，只传递siteId，让后端保持其他字段不变
+            return apiService.updateDistributorWorker(workerId, { siteId: targetSiteId })
+          })
+          
+          await Promise.all(updatePromises)
+          
+          // 更新本地状态
+          setWorkers(prev => prev.map(worker => 
+            selectedWorkerIds.includes(worker.id) 
+              ? { 
+                  ...worker, 
+                  siteId: targetSiteId,
+                  site: targetSite,
+                  updatedAt: new Date().toISOString()
+                }
+              : worker
+          ))
+          
+          message.success(t('distributor.migrateSuccess'))
+          setSelectedWorkerIds([])
+          setMigrateModalOpen(false)
+          setTargetSiteId('')
+        } catch (error) {
+          console.error('迁移工人失败:', error)
+          message.error(t('distributor.migrateFailed'))
+        } finally {
+          setMigrateLoading(false)
+        }
+      }
+    })
+  }
+
   // 处理复制链接
   const handleCopyLink = (siteId: string) => {
     const currentDistributor = user?.distributor
@@ -434,18 +503,71 @@ const DistributorWorkerUpload: React.FC = () => {
     const baseUrl = window.location.origin
     const registrationLink = `${baseUrl}/worker-registration?distributorId=${currentDistributor.id}&siteId=${siteId}`
     
-    // 复制到剪贴板
-    navigator.clipboard.writeText(registrationLink).then(() => {
-      message.success('注册链接已复制到剪贴板')
-    }).catch(() => {
-      // 如果剪贴板API不可用，使用传统方法
+    // 检查是否支持现代剪贴板API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      // 使用现代剪贴板API
+      navigator.clipboard.writeText(registrationLink).then(() => {
+        message.success(t('distributor.copyLinkSuccess'))
+      }).catch((error) => {
+        console.warn('现代剪贴板API失败，尝试降级方案:', error)
+        // 降级到传统方法
+        fallbackCopyToClipboard(registrationLink)
+      })
+    } else {
+      // 直接使用传统方法
+      fallbackCopyToClipboard(registrationLink)
+    }
+  }
+
+  // 降级复制方法
+  const fallbackCopyToClipboard = (text: string) => {
+    try {
+      // 创建临时文本区域
       const textArea = document.createElement('textarea')
-      textArea.value = registrationLink
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
       document.body.appendChild(textArea)
+      
+      // 选择并复制文本
+      textArea.focus()
       textArea.select()
-      document.execCommand('copy')
+      
+      const successful = document.execCommand('copy')
       document.body.removeChild(textArea)
-      message.success('注册链接已复制到剪贴板')
+      
+      if (successful) {
+        message.success(t('distributor.copyLinkSuccess'))
+      } else {
+        // 如果复制失败，显示链接让用户手动复制
+        showManualCopyDialog(text)
+      }
+    } catch (error) {
+      console.error('复制失败:', error)
+      // 显示链接让用户手动复制
+      showManualCopyDialog(text)
+    }
+  }
+
+  // 显示手动复制对话框
+  const showManualCopyDialog = (text: string) => {
+    Modal.info({
+      title: t('distributor.manualCopyTitle'),
+      content: (
+        <div>
+          <p>{t('distributor.manualCopyDescription')}</p>
+          <Input.TextArea
+            value={text}
+            readOnly
+            rows={3}
+            style={{ marginTop: 8 }}
+            onFocus={(e) => e.target.select()}
+          />
+        </div>
+      ),
+      okText: t('distributor.manualCopyOk'),
+      width: 500
     })
   }
 
@@ -471,6 +593,54 @@ const DistributorWorkerUpload: React.FC = () => {
     }
     const cfg = map[status] || { color: 'default', text: status || '-' }
     return <Tag color={cfg.color}>{cfg.text}</Tag>
+  }
+
+  // 根据当前语言获取默认区号
+  const getDefaultAreaCode = () => {
+    if (locale === 'zh-CN') {
+      return '+86'; // 简体中文默认中国大陆
+    } else {
+      return '+852'; // 繁体中文和英文默认香港
+    }
+  };
+
+  // 根据区号获取对应的地区名称
+  const getRegionNameByAreaCode = (areaCode: string) => {
+    const areaCodeMap: Record<string, string> = {
+      '+86': t('distributor.areaCodeChina'),
+      '+852': t('distributor.areaCodeHongKong'),
+      '+853': t('distributor.areaCodeMacau'),
+      '+886': t('distributor.areaCodeTaiwan'),
+      '+65': t('distributor.areaCodeSingapore'),
+      '+60': t('distributor.areaCodeMalaysia'),
+      '+66': t('distributor.areaCodeThailand'),
+      '+63': t('distributor.areaCodePhilippines'),
+      '+62': t('distributor.areaCodeIndonesia'),
+      '+84': t('distributor.areaCodeVietnam'),
+      '+1': t('distributor.areaCodeUSCanada'),
+      '+44': t('distributor.areaCodeUK'),
+      '+49': t('distributor.areaCodeGermany'),
+      '+33': t('distributor.areaCodeFrance'),
+      '+81': t('distributor.areaCodeJapan'),
+      '+82': t('distributor.areaCodeKorea'),
+      '+91': t('distributor.areaCodeIndia'),
+      '+61': t('distributor.areaCodeAustralia'),
+    }
+    
+    // 如果传入的是区号，返回对应的地区名称
+    if (areaCodeMap[areaCode]) {
+      return areaCodeMap[areaCode]
+    }
+    
+    // 如果传入的是旧的地区名称，尝试反向映射
+    const reverseMap: Record<string, string> = {
+      [t('regions.mainland')]: t('distributor.areaCodeChina'),
+      [t('regions.hongkong')]: t('distributor.areaCodeHongKong'),
+      [t('regions.macau')]: t('distributor.areaCodeMacau'),
+      [t('regions.taiwan')]: t('distributor.areaCodeTaiwan'),
+    }
+    
+    return reverseMap[areaCode] || areaCode || '-'
   }
 
   // 工人表格列定义
@@ -560,10 +730,10 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('distributor.region'), 
       dataIndex: 'region', 
       key: 'region', 
-      width: 100, 
+      width: 120, 
       ellipsis: true, 
       sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region),
-      render: (region: string) => region || '-'
+      render: (region: string) => getRegionNameByAreaCode(region)
     },
     { 
       title: t('distributor.site'), 
@@ -611,7 +781,7 @@ const DistributorWorkerUpload: React.FC = () => {
               idNumber: record.idNumber, // 设置证件号码
               birthDate: record.birthDate ? dayjs(record.birthDate) : undefined,
               siteId: record.siteId, // 确保工地ID被设置
-              region: record.region // 直接使用数据库原始值
+              region: record.region // 直接使用数据库原始值（区号）
             })
             setWorkerModalOpen(true) 
           }}
@@ -791,7 +961,7 @@ const DistributorWorkerUpload: React.FC = () => {
                   workerForm.setFieldsValue({
                     status: 'active',
                     idType: 'ID_CARD', // 设置默认证件类型为身份证
-                    region: t('regions.mainland'),
+                    region: getDefaultAreaCode(), // 根据当前语言设置默认区号
                     siteId: defaultSiteId, // 设置默认工地为第一个工地
                     birthDate: null, // 初始日期为空
                     email: '', // 初始邮箱为空
@@ -902,6 +1072,14 @@ const DistributorWorkerUpload: React.FC = () => {
                     loading={sendingWhatsAppLoading}
                   >
                     {t('worker.batchSendToWhatsApp')}
+                  </Button>
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<SwapOutlined />}
+                    onClick={() => setMigrateModalOpen(true)}
+                  >
+                    {t('distributor.migrateWorkers')}
                   </Button>
                   <Button 
                     size="small" 
@@ -1029,13 +1207,39 @@ const DistributorWorkerUpload: React.FC = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="region" label={t('distributor.region')} rules={[{ required: true, message: t('distributor.pleaseSelectRegion') }]}>
-                <Select placeholder={t('distributor.regionPlaceholder')} options={[
-                  { value: t('regions.mainland'), label: t('regions.mainland') },
-                  { value: t('regions.hongkong'), label: t('regions.hongkong') },
-                  { value: t('regions.macau'), label: t('regions.macau') },
-                  { value: t('regions.taiwan'), label: t('regions.taiwan') }
-                ]} />
+              <Form.Item name="region" label={t('distributor.areaCode')} rules={[{ required: true, message: t('distributor.pleaseSelectAreaCode') }]}>
+                <Select 
+                  placeholder={t('distributor.areaCodePlaceholder')}
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                  }
+                >
+                  {[
+                    { value: '+86', label: `+86 (${t('distributor.areaCodeChina')})` },
+                    { value: '+852', label: `+852 (${t('distributor.areaCodeHongKong')})` },
+                    { value: '+853', label: `+853 (${t('distributor.areaCodeMacau')})` },
+                    { value: '+886', label: `+886 (${t('distributor.areaCodeTaiwan')})` },
+                    { value: '+65', label: `+65 (${t('distributor.areaCodeSingapore')})` },
+                    { value: '+60', label: `+60 (${t('distributor.areaCodeMalaysia')})` },
+                    { value: '+66', label: `+66 (${t('distributor.areaCodeThailand')})` },
+                    { value: '+63', label: `+63 (${t('distributor.areaCodePhilippines')})` },
+                    { value: '+62', label: `+62 (${t('distributor.areaCodeIndonesia')})` },
+                    { value: '+84', label: `+84 (${t('distributor.areaCodeVietnam')})` },
+                    { value: '+1', label: `+1 (${t('distributor.areaCodeUSCanada')})` },
+                    { value: '+44', label: `+44 (${t('distributor.areaCodeUK')})` },
+                    { value: '+49', label: `+49 (${t('distributor.areaCodeGermany')})` },
+                    { value: '+33', label: `+33 (${t('distributor.areaCodeFrance')})` },
+                    { value: '+81', label: `+81 (${t('distributor.areaCodeJapan')})` },
+                    { value: '+82', label: `+82 (${t('distributor.areaCodeKorea')})` },
+                    { value: '+91', label: `+91 (${t('distributor.areaCodeIndia')})` },
+                    { value: '+61', label: `+61 (${t('distributor.areaCodeAustralia')})` },
+                  ].map(option => (
+                    <Option key={option.value} value={option.value} label={option.label}>
+                      {option.label}
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1091,8 +1295,33 @@ const DistributorWorkerUpload: React.FC = () => {
         workers={workers}
         distributors={user?.distributor ? [user.distributor] : []}
         sites={sites}
-        onImport={async () => {
-          message.info('Excel导入功能暂未实现')
+        onImport={async (file: File) => {
+          try {
+            setLoading(true)
+            const result = await apiService.importDistributorWorkersFromExcel(file)
+            
+            if (result.success !== undefined) {
+              const { success, skipped, errors } = result
+              if (errors > 0) {
+                message.warning(`导入完成：成功 ${success} 条，跳过 ${skipped} 条，失败 ${errors} 条`)
+              } else {
+                message.success(`导入成功：成功 ${success} 条，跳过 ${skipped} 条`)
+              }
+              
+              // 刷新工人列表
+              await loadWorkers()
+            } else {
+              message.success('Excel导入成功')
+              // 刷新工人列表
+              await loadWorkers()
+            }
+          } catch (error: unknown) {
+            console.error('Excel导入失败:', error)
+            const errorMessage = (error instanceof Error ? error.message : '导入失败，请检查文件格式')
+            message.error(`Excel导入失败：${errorMessage}`)
+          } finally {
+            setLoading(false)
+          }
         }}
       />
 
@@ -1105,6 +1334,45 @@ const DistributorWorkerUpload: React.FC = () => {
           sites={distributorSites}
           loading={sendingInviteLoading}
         />
+
+      {/* 迁移工人模态框 */}
+      <Modal
+        title={t('distributor.migrateWorkersToSite')}
+        open={migrateModalOpen}
+        onCancel={() => {
+          setMigrateModalOpen(false)
+          setTargetSiteId('')
+        }}
+        onOk={handleMigrateWorkers}
+        confirmLoading={migrateLoading}
+        destroyOnClose
+        width={500}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ margin: '0 0 8px 0', color: '#666' }}>
+            {t('distributor.selectedWorkers', { count: selectedWorkerIds.length.toString() })}
+          </p>
+        </div>
+        
+        <Form layout="vertical">
+          <Form.Item 
+            label={t('distributor.selectTargetSite')}
+            required
+          >
+            <Select
+              placeholder={t('distributor.selectTargetSite')}
+              value={targetSiteId}
+              onChange={setTargetSiteId}
+              style={{ width: '100%' }}
+              options={sites.map(site => ({
+                value: site.id,
+                label: site.name
+              }))}
+              loading={sitesLoading}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

@@ -1545,6 +1545,148 @@ export class AdminService {
     return records;
   }
 
+  // 地区名称到区号的映射表
+  private getAreaCodeFromRegion(regionInput: string): string {
+    if (!regionInput || typeof regionInput !== 'string') {
+      return '+86'; // 默认返回中国大陆区号
+    }
+    
+    // 清理输入：去除前后空格
+    const cleanInput = regionInput.trim();
+    const lowerInput = cleanInput.toLowerCase();
+    
+    // 地区到区号的映射表
+    const regionMap = {
+      // 中国大陆相关
+      '+86': [
+        '中国大陆', 'Mainland China', 'China', '中国', 'CN', 'PRC', 'People\'s Republic of China',
+        '中國大陸', '中國', 'PRC', 'People\'s Republic of China'
+      ],
+      // 香港相关
+      '+852': [
+        '中国香港', 'Hong Kong', '香港', 'HK', 'HKG',
+        '中國香港', '香港', 'HK', 'HKG'
+      ],
+      // 澳门相关
+      '+853': [
+        '中国澳门', 'Macau', 'Macao', '澳门', 'MO', 'MAC',
+        '中國澳門', '澳門', 'MO', 'MAC'
+      ],
+      // 台湾相关
+      '+886': [
+        '中国台湾', 'Taiwan', '台湾', 'TW', 'TWN', 'Republic of China', 'ROC',
+        '中國台灣', '台灣', 'TW', 'TWN', 'Republic of China', 'ROC'
+      ],
+      // 新加坡
+      '+65': [
+        'Singapore', '新加坡', 'SG', 'SGP',
+        '新加坡', 'SG', 'SGP'
+      ],
+      // 马来西亚
+      '+60': [
+        'Malaysia', '马来西亚', 'MY', 'MYS',
+        '馬來西亞', 'MY', 'MYS'
+      ],
+      // 泰国
+      '+66': [
+        'Thailand', '泰国', 'TH', 'THA',
+        '泰國', 'TH', 'THA'
+      ],
+      // 菲律宾
+      '+63': [
+        'Philippines', '菲律宾', 'PH', 'PHL',
+        '菲律賓', 'PH', 'PHL'
+      ],
+      // 印度尼西亚
+      '+62': [
+        'Indonesia', '印度尼西亚', 'ID', 'IDN',
+        '印度尼西亞', 'ID', 'IDN'
+      ],
+      // 越南
+      '+84': [
+        'Vietnam', '越南', 'VN', 'VNM',
+        '越南', 'VN', 'VNM'
+      ],
+      // 美国/加拿大
+      '+1': [
+        'United States', 'USA', 'US', 'America', '美国', 'Canada', '加拿大', 'CA', 'CAN',
+        '美國', '加拿大', 'CA', 'CAN'
+      ],
+      // 英国
+      '+44': [
+        'United Kingdom', 'UK', 'Britain', '英国', 'GB', 'GBR',
+        '英國', 'GB', 'GBR'
+      ],
+      // 德国
+      '+49': [
+        'Germany', '德国', 'DE', 'DEU',
+        '德國', 'DE', 'DEU'
+      ],
+      // 法国
+      '+33': [
+        'France', '法国', 'FR', 'FRA',
+        '法國', 'FR', 'FRA'
+      ],
+      // 日本
+      '+81': [
+        'Japan', '日本', 'JP', 'JPN',
+        '日本', 'JP', 'JPN'
+      ],
+      // 韩国
+      '+82': [
+        'South Korea', 'Korea', '韩国', 'KR', 'KOR',
+        '韓國', 'KR', 'KOR'
+      ],
+      // 印度
+      '+91': [
+        'India', '印度', 'IN', 'IND',
+        '印度', 'IN', 'IND'
+      ],
+      // 澳大利亚
+      '+61': [
+        'Australia', '澳大利亚', 'AU', 'AUS',
+        '澳大利亞', 'AU', 'AUS'
+      ]
+    };
+    
+    // 遍历所有区号和对应的地区名称列表
+    for (const [areaCode, regionNames] of Object.entries(regionMap)) {
+      for (const regionName of regionNames) {
+        // 直接匹配
+        if (cleanInput === regionName) {
+          return areaCode;
+        }
+        
+        // 小写匹配
+        if (lowerInput === regionName.toLowerCase()) {
+          return areaCode;
+        }
+        
+        // 模糊匹配 - 检查是否包含关键词
+        if (lowerInput.includes(regionName.toLowerCase()) || regionName.toLowerCase().includes(lowerInput)) {
+          return areaCode;
+        }
+      }
+    }
+    
+    // 特殊处理一些常见的情况
+    if (lowerInput.includes('china') || lowerInput.includes('mainland') || lowerInput.includes('中國')) {
+      return '+86';
+    }
+    if (lowerInput.includes('hong') && lowerInput.includes('kong')) {
+      return '+852';
+    }
+    if (lowerInput.includes('macau') || lowerInput.includes('macao') || lowerInput.includes('澳門')) {
+      return '+853';
+    }
+    if (lowerInput.includes('taiwan') || lowerInput.includes('台灣')) {
+      return '+886';
+    }
+    
+    // 如果都匹配不到，返回默认值
+    return '+86';
+  }
+
   // 通过Excel文件导入工人数据
   async importWorkersFromExcel(user: CurrentUser, file: Express.Multer.File) {
     if (user.role !== 'ADMIN') {
@@ -1582,6 +1724,15 @@ export class AdminService {
           return value.toString().trim();
         };
 
+        // 获取原始地区名称并转换为区号
+        const rawRegion = getValue(row['地区'] || row['region'] || row['Region']);
+        const areaCode = this.getAreaCodeFromRegion(rawRegion);
+        
+        // 调试信息：显示地区识别过程
+        if (rawRegion) {
+          console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        }
+
         const workerData = {
           name: getValue(row['姓名'] || row['name'] || row['Name']) || '',
           gender: this.normalizeGender(getValue(row['性别'] || row['gender'] || row['Gender']) || ''),
@@ -1590,7 +1741,7 @@ export class AdminService {
           email: getValue(row['邮箱'] || row['email'] || row['Email']),
           whatsapp: getValue(row['WhatsApp'] || row['whatsapp']),
           birthDate: getValue(row['出生日期'] || row['birthDate'] || row['Birth Date']),
-          region: getValue(row['地区'] || row['region'] || row['Region']),
+          region: areaCode, // 保存识别出的区号
           siteId: getValue(row['工地代码'] || row['siteCode'] || row['Site Code'] || row['工地ID'] || row['siteId'] || row['Site ID']),
           distributorId: getValue(row['分判商ID'] || row['distributorId'] || row['Distributor ID']),
           status: this.normalizeWorkerStatus(getValue(row['状态'] || row['status'] || row['Status']) || ''),

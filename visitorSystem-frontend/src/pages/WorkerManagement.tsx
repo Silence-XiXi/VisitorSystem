@@ -13,7 +13,8 @@ import apiService from '../services/api';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import { 
-  generateImportTemplate
+  generateImportTemplate,
+  getAreaCodeFromRegion
 } from '../utils/excelUtils';
 
 const { Search } = Input;
@@ -516,19 +517,30 @@ const WorkerManagement: React.FC = () => {
       setLoading(true)
       
       // 准备导入数据
-      const workersData = importedWorkers.map(workerData => ({
-        name: String(workerData.name || ''),
-        gender: String(workerData.gender || 'MALE'),
-        idCard: String(workerData.idCard || ''),
-        birthDate: workerData.birthDate ? String(workerData.birthDate) : '',
-        region: workerData.region ? String(workerData.region) : t('regions.mainland'),
-        phone: String(workerData.phone || ''),
-        email: workerData.email ? String(workerData.email) : '',
-        whatsapp: workerData.whatsapp ? String(workerData.whatsapp) : '',
-        status: String(workerData.status || 'ACTIVE'),
-        distributorId: workerData.distributorId ? String(workerData.distributorId) : null,
-        siteId: workerData.siteId ? String(workerData.siteId) : selectedSiteId
-      }))
+      const workersData = importedWorkers.map((workerData, index) => {
+        // 获取原始地区名称并转换为区号
+        const rawRegion = workerData.region ? String(workerData.region) : t('regions.mainland');
+        const areaCode = getAreaCodeFromRegion(rawRegion, t);
+        
+        // 调试信息：显示地区识别过程
+        if (rawRegion) {
+          console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        }
+
+        return {
+          name: String(workerData.name || ''),
+          gender: String(workerData.gender || 'MALE'),
+          idCard: String(workerData.idCard || ''),
+          birthDate: workerData.birthDate ? String(workerData.birthDate) : '',
+          region: areaCode, // 保存识别出的区号
+          phone: String(workerData.phone || ''),
+          email: workerData.email ? String(workerData.email) : '',
+          whatsapp: workerData.whatsapp ? String(workerData.whatsapp) : '',
+          status: String(workerData.status || 'ACTIVE'),
+          distributorId: workerData.distributorId ? String(workerData.distributorId) : null,
+          siteId: workerData.siteId ? String(workerData.siteId) : selectedSiteId
+        };
+      })
 
       // 使用批量导入API
       const result = await apiService.importWorkers(workersData)

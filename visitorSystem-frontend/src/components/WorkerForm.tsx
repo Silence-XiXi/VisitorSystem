@@ -1,4 +1,4 @@
-import { useEffect, forwardRef, useImperativeHandle, useState } from 'react';
+import { useEffect, forwardRef, useImperativeHandle, useState, useCallback } from 'react';
 import { Form, Input, Select, Button, message, Row, Col, DatePicker } from 'antd';
 import { PhoneOutlined, MailOutlined, WhatsAppOutlined, IdcardOutlined, CalendarOutlined } from '@ant-design/icons';
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Distributor, Site } from '../types/worker';
@@ -36,11 +36,20 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
   selectedSiteId,
   isDistributorForm = false
 }, ref) => {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [form] = Form.useForm();
   const isEdit = !!worker;
   const [sitesData, setSitesData] = useState<Site[]>(sites || []);
   const [sitesLoading, setSitesLoading] = useState(false);
+
+  // 根据当前语言获取默认区号
+  const getDefaultAreaCode = useCallback(() => {
+    if (locale === 'zh-CN') {
+      return '+86'; // 简体中文默认中国大陆
+    } else {
+      return '+852'; // 繁体中文和英文默认香港
+    }
+  }, [locale]);
 
   useImperativeHandle(ref, () => ({
     submit: () => {
@@ -70,7 +79,6 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
     loadSites();
   }, [isDistributorForm, sites]);
 
-
   useEffect(() => {
     if (worker) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -78,15 +86,16 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
       form.setFieldsValue({
         ...workerData,
         birthDate: worker.birthDate ? dayjs(worker.birthDate) : undefined,
-        region: worker.region // 直接使用数据库原始值
+        region: worker.region // 直接使用数据库原始值（区号）
       });
     } else if (selectedSiteId) {
-      // 新增工人时，默认选择当前全局筛选的工地
+      // 新增工人时，默认选择当前全局筛选的工地和根据语言设置的默认区号
       form.setFieldsValue({
-        siteId: selectedSiteId
+        siteId: selectedSiteId,
+        region: getDefaultAreaCode() // 根据当前语言设置默认区号
       });
     }
-  }, [worker, form, selectedSiteId, t]);
+  }, [worker, form, selectedSiteId, t, locale, getDefaultAreaCode]);
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     console.log('WorkerForm handleSubmit called with values:', values);
@@ -139,7 +148,7 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
       form={form}
       layout="vertical"
       onFinish={handleSubmit}
-      initialValues={{ status: 'ACTIVE', gender: 'MALE' }}
+      initialValues={{ status: 'ACTIVE', gender: 'MALE', region: getDefaultAreaCode() }}
       className="worker-form"
     >
       <Row gutter={16}>
@@ -225,14 +234,39 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
         <Col span={12}>
           <Form.Item
             name="region"
-            label={t('worker.region')}
+            label={t('distributor.areaCode')}
           >
-            <Select placeholder={t('form.selectPlaceholder') + t('worker.region')}>
-              <Option value={t('regions.mainland')}>{t('regions.mainland')}</Option>
-              <Option value={t('regions.hongkong')}>{t('regions.hongkong')}</Option>
-              <Option value={t('regions.macau')}>{t('regions.macau')}</Option>
-              <Option value={t('regions.taiwan')}>{t('regions.taiwan')}</Option>
-              <Option value={t('regions.other')}>{t('regions.other')}</Option>
+            <Select 
+              placeholder={t('distributor.areaCodePlaceholder')}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {[
+                { value: '+86', label: `+86 (${t('distributor.areaCodeChina')})` },
+                { value: '+852', label: `+852 (${t('distributor.areaCodeHongKong')})` },
+                { value: '+853', label: `+853 (${t('distributor.areaCodeMacau')})` },
+                { value: '+886', label: `+886 (${t('distributor.areaCodeTaiwan')})` },
+                { value: '+65', label: `+65 (${t('distributor.areaCodeSingapore')})` },
+                { value: '+60', label: `+60 (${t('distributor.areaCodeMalaysia')})` },
+                { value: '+66', label: `+66 (${t('distributor.areaCodeThailand')})` },
+                { value: '+63', label: `+63 (${t('distributor.areaCodePhilippines')})` },
+                { value: '+62', label: `+62 (${t('distributor.areaCodeIndonesia')})` },
+                { value: '+84', label: `+84 (${t('distributor.areaCodeVietnam')})` },
+                { value: '+1', label: `+1 (${t('distributor.areaCodeUSCanada')})` },
+                { value: '+44', label: `+44 (${t('distributor.areaCodeUK')})` },
+                { value: '+49', label: `+49 (${t('distributor.areaCodeGermany')})` },
+                { value: '+33', label: `+33 (${t('distributor.areaCodeFrance')})` },
+                { value: '+81', label: `+81 (${t('distributor.areaCodeJapan')})` },
+                { value: '+82', label: `+82 (${t('distributor.areaCodeKorea')})` },
+                { value: '+91', label: `+91 (${t('distributor.areaCodeIndia')})` },
+                { value: '+61', label: `+61 (${t('distributor.areaCodeAustralia')})` },
+              ].map(option => (
+                <Option key={option.value} value={option.value} label={option.label}>
+                  {option.label}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
         </Col>
