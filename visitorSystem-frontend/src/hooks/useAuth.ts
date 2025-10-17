@@ -194,7 +194,7 @@ export const useAuth = () => {
     try {
       cancelAllRequests();
       await apiService.logout();
-      console.log(t('auth.logoutSuccess'));
+      // console.log(t('auth.logoutSuccess'));
     } catch (error) {
       console.error(t('auth.logoutFailed'), error);
     } finally {

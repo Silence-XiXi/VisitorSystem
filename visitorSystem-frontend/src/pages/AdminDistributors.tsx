@@ -84,7 +84,8 @@ const AdminDistributors: React.FC = () => {
       const defaultPwd = v.defaultPassword && String(v.defaultPassword).trim() ? String(v.defaultPassword).trim() : 'Pass@123'
       const newItem: Distributor = { id: (Date.now()).toString(), name: v.name, siteIds: v.siteId ? [v.siteId] : [], contactName: v.contactName, phone: v.phone, email: v.email, accountUsername: v.accountUsername, accountStatus: v.accountStatus }
       setDists(prev => [newItem, ...prev])
-      message.success(t('admin.distributorAdded').replace('{username}', newItem.accountUsername || '-').replace('{password}', defaultPwd))
+      // message.success(t('admin.distributorAdded').replace('{username}', newItem.accountUsername || '-').replace('{password}', defaultPwd))
+      message.success(t('admin.distributorAdded'))
     }
     setOpen(false)
     setEditing(null)

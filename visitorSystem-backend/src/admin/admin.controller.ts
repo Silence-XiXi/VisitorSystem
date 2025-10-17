@@ -215,6 +215,20 @@ export class AdminController {
     return this.adminService.updateSite(user, id, siteData);
   }
 
+  @Delete('sites/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '删除工地' })
+  @ApiResponse({ status: 200, description: '删除成功' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  @ApiResponse({ status: 404, description: '工地不存在' })
+  @ApiResponse({ status: 400, description: '工地下还有关联数据，无法删除' })
+  async deleteSite(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') id: string
+  ) {
+    return this.adminService.deleteSite(user, id);
+  }
+
   @Put('users/:id/status')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: '更新用户状态' })
@@ -301,6 +315,19 @@ export class AdminController {
     @Param('id') guardId: string
   ) {
     return this.adminService.toggleGuardStatus(user, guardId);
+  }
+
+  @Patch('distributors/:id/toggle-status')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '切换分判商账户状态' })
+  @ApiResponse({ status: 200, description: '状态切换成功' })
+  @ApiResponse({ status: 404, description: '分判商不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async toggleDistributorStatus(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') distributorId: string
+  ) {
+    return this.adminService.toggleDistributorStatus(user, distributorId);
   }
 
   // 删除分判商

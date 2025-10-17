@@ -18,7 +18,7 @@ export class RedisService {
 
     // 监听连接事件
     this.redis.on('connect', () => {
-      console.log('Redis连接成功');
+      // console.log('Redis连接成功');
     });
 
     this.redis.on('error', (err) => {

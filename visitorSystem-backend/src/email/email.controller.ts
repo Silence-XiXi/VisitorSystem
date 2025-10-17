@@ -329,9 +329,9 @@ export class EmailController {
     try {
       const { distributorEmail, distributorName, username, password, loginUrl, language } = body;
       
-      console.log('接收分判商账号邮件请求:', {
-        email: distributorEmail, 
-        name: distributorName, 
+      // console.log('接收分判商账号邮件请求:', {
+      //   email: distributorEmail, 
+      //   name: distributorName,
         username,
         loginUrl,
         languageProvided: !!language
@@ -373,7 +373,7 @@ export class EmailController {
       // 验证语言参数格式
       const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
       const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-CN';
-      console.log('使用语言:', selectedLanguage);
+      // console.log('使用语言:', selectedLanguage);
   
       try {
         // 先检查邮件配置

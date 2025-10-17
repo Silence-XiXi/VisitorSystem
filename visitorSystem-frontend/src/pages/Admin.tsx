@@ -93,7 +93,8 @@ const Admin: React.FC = () => {
     } else {
       const newItem: Distributor = { id: (Date.now()).toString(), code: v.code || '', name: v.name, contactName: v.contactName, phone: v.phone, email: v.email, accountUsername: v.accountUsername, accountStatus: v.accountStatus }
       setDists(prev => [newItem, ...prev])
-      message.success(t('admin.distributorAdded').replace('{username}', newItem.accountUsername || '-').replace('{password}', 'Pass@123'))
+      // message.success(t('admin.distributorAdded').replace('{username}', newItem.accountUsername || '-').replace('{password}', 'Pass@123'))
+      message.success(t('admin.distributorAdded'))
     }
     resetAndClose()
   }

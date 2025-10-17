@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Upload, Select, Pagination, Tooltip } from 'antd'
+import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Upload, Select, Pagination, Tooltip, Radio } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
 import { apiService } from '../services/api'
@@ -32,6 +32,10 @@ const ItemCategoryManagement: React.FC = () => {
     total: 0
   })
 
+  // 批量修改状态相关状态
+  const [batchUpdateStatusModalOpen, setBatchUpdateStatusModalOpen] = useState(false)
+  const [selectedStatus, setSelectedStatus] = useState<string>('')
+
   // 加载分类数据
   const loadCategories = async () => {
     try {
@@ -62,6 +66,7 @@ const ItemCategoryManagement: React.FC = () => {
     
     return matchesSearch && matchesStatus
   })
+
   
   // 更新分页信息中的总记录数
   useEffect(() => {
@@ -156,6 +161,119 @@ const ItemCategoryManagement: React.FC = () => {
     })
   }
 
+  // 批量删除分类
+  const handleBatchDeleteCategories = () => {
+    if (selectedCategoryIds.length === 0) {
+      message.warning(t('itemCategory.pleaseSelectCategoriesToDelete'))
+      return
+    }
+
+    Modal.confirm({
+      title: t('itemCategory.batchDeleteTitle'),
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <p>{t('itemCategory.batchDeleteContent').replace('{count}', selectedCategoryIds.length.toString())}</p>
+          <p style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '8px' }}>
+            {t('itemCategory.batchDeleteWarning')}
+          </p>
+        </div>
+      ),
+      okText: t('itemCategory.batchDeleteConfirm'),
+      cancelText: t('common.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          setLoading(true)
+          const deletePromises = selectedCategoryIds.map(categoryId => 
+            apiService.deleteItemCategory(categoryId)
+          )
+          await Promise.all(deletePromises)
+          
+          setCategories(prev => prev.filter(c => !selectedCategoryIds.includes(c.id)))
+          setSelectedCategoryIds([])
+          message.success(t('itemCategory.batchDeleteSuccess').replace('{count}', selectedCategoryIds.length.toString()))
+        } catch (error: any) {
+          console.error('批量删除失败:', error)
+          let errorMessage = t('itemCategory.batchDeleteFailed')
+          
+          if (error?.response?.data?.message) {
+            errorMessage = error.response.data.message
+          } else if (error?.message) {
+            errorMessage = error.message
+          }
+          
+          message.error(errorMessage)
+        } finally {
+          setLoading(false)
+        }
+      }
+    })
+  }
+
+  // 批量修改状态
+  const handleBatchUpdateStatus = () => {
+    if (selectedCategoryIds.length === 0) {
+      message.warning(t('itemCategory.pleaseSelectCategoriesToUpdate'))
+      return
+    }
+    setBatchUpdateStatusModalOpen(true)
+  }
+
+  // 确认批量修改状态
+  const handleConfirmBatchUpdateStatus = async () => {
+    if (!selectedStatus) {
+      message.warning(t('itemCategory.pleaseSelectStatus'))
+      return
+    }
+
+    try {
+      setLoading(true)
+      
+      // 只对状态不匹配的分类进行切换
+      const categoriesToUpdate = categories.filter(category => 
+        selectedCategoryIds.includes(category.id) && category.status !== selectedStatus
+      )
+      
+      if (categoriesToUpdate.length === 0) {
+        message.info(t('itemCategory.allCategoriesAlreadyInSelectedStatus'))
+        setSelectedCategoryIds([])
+        setBatchUpdateStatusModalOpen(false)
+        setSelectedStatus('')
+        return
+      }
+      
+      const updatePromises = categoriesToUpdate.map(category => 
+        apiService.toggleItemCategoryStatus(category.id)
+      )
+      const updatedCategories = await Promise.all(updatePromises)
+      
+      // 使用API返回的完整数据更新本地状态
+      setCategories(prev => prev.map(category => {
+        const updatedCategory = updatedCategories.find(updated => updated.id === category.id)
+        return updatedCategory || category
+      }))
+      
+      setSelectedCategoryIds([])
+      setBatchUpdateStatusModalOpen(false)
+      setSelectedStatus('')
+      message.success(t('itemCategory.batchUpdateStatusSuccess').replace('{count}', selectedCategoryIds.length.toString()))
+    } catch (error: any) {
+      console.error('批量修改状态失败:', error)
+      let errorMessage = t('itemCategory.batchUpdateStatusFailed')
+      
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
+      message.error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // 表格列定义
   const columns = [
     { 
@@ -177,7 +295,7 @@ const ItemCategoryManagement: React.FC = () => {
       title: t('itemCategory.descriptionLabel'), 
       dataIndex: 'description', 
       key: 'description',
-      width: 240,
+      width: 260,
       ellipsis: true,
       render: (description: string) => description || '-'
     },
@@ -185,7 +303,7 @@ const ItemCategoryManagement: React.FC = () => {
       title: t('itemCategory.status'), 
       dataIndex: 'status', 
       key: 'status', 
-      width: 100,
+      width: 80,
       sorter: (a: ItemCategory, b: ItemCategory) => a.status.localeCompare(b.status),
       render: (status: string) => {
         const map: Record<string, { color: string; text: string }> = { 
@@ -200,7 +318,7 @@ const ItemCategoryManagement: React.FC = () => {
       title: t('itemCategory.createTime'), 
       dataIndex: 'createdAt', 
       key: 'createdAt', 
-      width: 160,
+      width: 140,
       sorter: (a: ItemCategory, b: ItemCategory) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       render: (time: string) => new Date(time).toLocaleString() 
     },
@@ -208,7 +326,7 @@ const ItemCategoryManagement: React.FC = () => {
       title: t('itemCategory.updateTime'), 
       dataIndex: 'updatedAt', 
       key: 'updatedAt', 
-      width: 160,
+      width: 140,
       sorter: (a: ItemCategory, b: ItemCategory) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
       render: (time: string) => new Date(time).toLocaleString() 
     },
@@ -897,16 +1015,33 @@ const ItemCategoryManagement: React.FC = () => {
                 {t('itemCategory.selectedCategories').replace('{count}', selectedCategoryIds.length.toString())}
                 {selectedCategoryIds.length > 0 && (
                   <span style={{ color: '#999', marginLeft: '8px' }}>
-                    / {t('itemCategory.totalCategories').replace('{count}', paginatedCategories.length.toString())}
+                    / {t('itemCategory.totalCategories').replace('{count}', categories.length.toString())}
                   </span>
                 )}
               </span>
-              <Button 
-                onClick={() => setSelectedCategoryIds([])}
-                size="small"
-              >
-                {t('itemCategory.clearSelection').replace('{count}', selectedCategoryIds.length.toString())}
-              </Button>
+              <Space>
+                <Button 
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />} 
+                  onClick={handleBatchDeleteCategories}
+                >
+                  {t('itemCategory.batchDeleteCategories')}({selectedCategoryIds.length})
+                </Button>
+                <Button 
+                  size="small"
+                  icon={<CheckCircleOutlined />} 
+                  onClick={handleBatchUpdateStatus}
+                >
+                  {t('itemCategory.batchUpdateStatus')}({selectedCategoryIds.length})
+                </Button>
+                <Button 
+                  onClick={() => setSelectedCategoryIds([])}
+                  size="small"
+                >
+                  {t('itemCategory.clearSelection').replace('{count}', selectedCategoryIds.length.toString())}
+                </Button>
+              </Space>
             </div>
           )}
 
@@ -940,6 +1075,7 @@ const ItemCategoryManagement: React.FC = () => {
               rowSelection={{
                 selectedRowKeys: selectedCategoryIds,
                 onChange: (selectedRowKeys) => setSelectedCategoryIds(selectedRowKeys as string[]),
+                preserveSelectedRowKeys: true,
                 getCheckboxProps: (record) => ({
                   name: record.name,
                 }),
@@ -1048,6 +1184,44 @@ const ItemCategoryManagement: React.FC = () => {
                 {t('itemCategory.inactive')}
               </Button>
             </Input.Group>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 批量修改状态模态框 */}
+      <Modal
+        title={t('itemCategory.batchUpdateStatus')}
+        open={batchUpdateStatusModalOpen}
+        onCancel={() => {
+          setBatchUpdateStatusModalOpen(false)
+          setSelectedStatus('')
+        }}
+        onOk={handleConfirmBatchUpdateStatus}
+        destroyOnClose
+        width={500}
+      >
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>{t('itemCategory.confirmBatchUpdateStatus')}</p>
+          <p style={{ color: '#666', fontSize: '16px' }}>
+            {t('itemCategory.selectedCategories').replace('{count}', selectedCategoryIds.length.toString())}
+          </p>
+        </div>
+        <Form layout="vertical">
+          <Form.Item label={<span style={{ fontSize: '16px' }}>{t('itemCategory.selectStatus')}</span>} required>
+            <Radio.Group
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <div style={{ display: 'flex', gap: '32px' }}>
+                <Radio value="ACTIVE" style={{ fontSize: '16px' }}>
+                  <Tag color="green" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('itemCategory.active')}</Tag>
+                </Radio>
+                <Radio value="INACTIVE" style={{ fontSize: '16px' }}>
+                  <Tag color="red" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('itemCategory.inactive')}</Tag>
+                </Radio>
+              </div>
+            </Radio.Group>
           </Form.Item>
         </Form>
       </Modal>

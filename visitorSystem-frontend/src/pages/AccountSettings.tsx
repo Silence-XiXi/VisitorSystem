@@ -68,13 +68,13 @@ const AccountSettings: React.FC = () => {
       try {
         emailPassword = await apiService.getDecryptedSystemConfig('EMAIL_PASSWORD')
       } catch (error) {
-        console.log('获取邮箱密码失败，使用默认值')
+        // console.log('获取邮箱密码失败，使用默认值')
       }
       
       try {
         whatsappToken = await apiService.getDecryptedSystemConfig('WHATSAPP_API_TOKEN')
       } catch (error) {
-        console.log('获取WhatsApp Token失败，使用默认值')
+        // console.log('获取WhatsApp Token失败，使用默认值')
       }
       
       // 处理邮箱配置

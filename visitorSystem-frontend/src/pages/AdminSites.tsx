@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Tabs, Upload, Pagination, Card } from 'antd'
+import { Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, Tabs, Upload, Pagination, Card, Radio } from 'antd'
 import { 
   PlusOutlined, 
   EditOutlined, 
@@ -14,7 +14,8 @@ import {
   DownloadOutlined, 
   SendOutlined, 
   CloseOutlined, 
-  ReloadOutlined 
+  ReloadOutlined,
+  SettingOutlined
 } from '@ant-design/icons'
 import { Site, Distributor, Guard } from '../types/worker'
 import { mockSites, mockDistributors, mockGuards } from '../data/mockData'
@@ -63,6 +64,11 @@ const AdminSites: React.FC = () => {
   const [editingGuard, setEditingGuard] = useState<Guard | null>(null)
   const [guardForm] = Form.useForm()
   const [selectedGuardIds, setSelectedGuardIds] = useState<string[]>([])
+
+  // 批量修改状态相关状态
+  const [batchUpdateStatusModalOpen, setBatchUpdateStatusModalOpen] = useState(false)
+  const [batchUpdateStatusType, setBatchUpdateStatusType] = useState<'sites' | 'distributors' | 'guards'>('sites')
+  const [selectedStatus, setSelectedStatus] = useState<string>('')
 
   // 工地筛选状态
   const [siteStatusFilters, setSiteStatusFilters] = useState<string[]>([])
@@ -186,7 +192,7 @@ const AdminSites: React.FC = () => {
         email: guard.email,
         whatsapp: guard.whatsapp,
         accountUsername: guard.user?.username || guard.guardId,
-        accountStatus: (guard.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
+        accountStatus: (guard.user?.status === 'ACTIVE' ? 'active' : 'disabled') as 'active' | 'disabled',
         createdAt: guard.createdAt,
         updatedAt: guard.updatedAt
       }))
@@ -241,17 +247,17 @@ const AdminSites: React.FC = () => {
           return
         }
         
-        console.log('发送分判商账号邮件请求数据:', requestData)
+        // console.log('发送分判商账号邮件请求数据:', requestData)
         
         // 打印所有参数的长度
-        Object.entries(requestData).forEach(([key, value]) => {
-          console.log(`${key} 长度: ${String(value).length}`)
-        })
+        // Object.entries(requestData).forEach(([key, value]) => {
+        //   console.log(`${key} 长度: ${String(value).length}`)
+        // })
         
         // 发送邮件
-        console.log('开始发送分判商账号邮件...')
+        // console.log('开始发送分判商账号邮件...')
         const result = await apiService.sendDistributorAccountEmail(requestData)
-        console.log('发送分判商账号邮件结果:', result)
+        // console.log('发送分判商账号邮件结果:', result)
         
         if (result.success) {
           message.success({ content: t('admin.sendByEmailSuccess').replace('{name}', distributor.contactName || ''), key: 'sendEmail' })
@@ -287,7 +293,6 @@ const AdminSites: React.FC = () => {
           <div>
             <p>{t('admin.accountInfo').replace('{username}', distributor.accountUsername || '')}</p>
             <p>{t('admin.passwordInfo').replace('{password}', password)}</p>
-            <p style={{ marginTop: '16px', color: '#ff4d4f' }}>{t('admin.noContactInfo')}</p>
           </div>
         ),
         okText: t('common.ok')
@@ -349,7 +354,7 @@ const AdminSites: React.FC = () => {
       onOk: async () => {
         try {
           const result = await apiService.resetDistributorPassword(record.id)
-          console.log('密码重置成功:', result)
+          // console.log('密码重置成功:', result)
           
           // 显示成功消息，包含新密码信息
           Modal.success({
@@ -535,10 +540,7 @@ const AdminSites: React.FC = () => {
           danger 
           size="small" 
           icon={<DeleteOutlined />} 
-          onClick={async () => {
-            setSites(prev => prev.filter(s => s.id !== record.id))
-            await refreshSites()
-          }}
+          onClick={() => handleDeleteSite(record)}
           title={t('admin.deleteTooltip')}
         />
       </Space>
@@ -652,6 +654,119 @@ const AdminSites: React.FC = () => {
     })
   }, [globallyFilteredDistributors, distributorStatusFilters, distributorKeyword])
 
+  // 批量修改状态
+  const handleBatchUpdateStatus = (type: 'sites' | 'distributors' | 'guards') => {
+    const selectedIds = type === 'sites' ? selectedSiteIds : 
+                       type === 'distributors' ? selectedDistributorIds : selectedGuardIds
+    
+    if (selectedIds.length === 0) {
+      message.warning(t('admin.pleaseSelectItemsToDelete'))
+      return
+    }
+
+    setBatchUpdateStatusType(type)
+    setSelectedStatus('')
+    setBatchUpdateStatusModalOpen(true)
+  }
+
+  // 确认批量修改状态
+  const handleConfirmBatchUpdateStatus = async () => {
+    if (!selectedStatus) {
+      message.warning(t('admin.pleaseSelectStatus'))
+      return
+    }
+
+    const selectedIds = batchUpdateStatusType === 'sites' ? selectedSiteIds : 
+                       batchUpdateStatusType === 'distributors' ? selectedDistributorIds : selectedGuardIds
+
+    try {
+      if (batchUpdateStatusType === 'sites') {
+        // 批量修改工地状态 - 需要获取完整工地信息
+        const updatePromises = selectedIds.map(siteId => {
+          const site = sites.find(s => s.id === siteId)
+          if (site) {
+            return apiService.updateSite(siteId, {
+              name: site.name,
+              address: site.address,
+              code: site.code,
+              manager: site.manager,
+              phone: site.phone,
+              status: selectedStatus,
+              distributorIds: site.distributorIds
+            })
+          }
+          return Promise.resolve()
+        })
+        await Promise.all(updatePromises)
+        
+        // 更新本地状态
+        setSites(prev => prev.map(site => 
+          selectedIds.includes(site.id) 
+            ? { ...site, status: selectedStatus as 'active' | 'inactive' | 'suspended' }
+            : site
+        ))
+      } else if (batchUpdateStatusType === 'distributors') {
+        // 批量修改分判商状态 - 使用切换状态API
+        const updatePromises = selectedIds.map(distributorId => {
+          const distributor = distributors.find(d => d.id === distributorId)
+          if (distributor && distributor.accountStatus !== selectedStatus) {
+            return apiService.toggleDistributorStatus(distributorId)
+          }
+          return Promise.resolve()
+        })
+        await Promise.all(updatePromises)
+        
+        // 更新本地状态
+        setDistributors(prev => prev.map(distributor => 
+          selectedIds.includes(distributor.id) 
+            ? { ...distributor, accountStatus: selectedStatus as 'active' | 'disabled' }
+            : distributor
+        ))
+      } else if (batchUpdateStatusType === 'guards') {
+        // 批量修改门卫状态 - 使用切换状态API
+        const updatePromises = selectedIds.map(guardId => {
+          const guard = guards.find(g => g.id === guardId)
+          if (guard && guard.accountStatus !== selectedStatus) {
+            return apiService.toggleGuardStatus(guardId)
+          }
+          return Promise.resolve()
+        })
+        await Promise.all(updatePromises)
+        
+        // 更新本地状态
+        setGuards(prev => prev.map(guard => 
+          selectedIds.includes(guard.id) 
+            ? { ...guard, accountStatus: selectedStatus as 'active' | 'disabled' }
+            : guard
+        ))
+      }
+
+      // 清空选择
+      if (batchUpdateStatusType === 'sites') {
+        setSelectedSiteIds([])
+      } else if (batchUpdateStatusType === 'distributors') {
+        setSelectedDistributorIds([])
+      } else {
+        setSelectedGuardIds([])
+      }
+
+      setBatchUpdateStatusModalOpen(false)
+      message.success(t('admin.batchUpdateStatusSuccess'))
+    } catch (error: unknown) {
+      console.error('批量修改状态失败:', error)
+      let errorMessage = t('admin.batchUpdateStatusFailed')
+      if (error && typeof error === 'object' && 'response' in error) {
+        const apiError = error as { response?: { data?: { message?: string } } }
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message
+        }
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        const simpleError = error as { message: string }
+        errorMessage = simpleError.message
+      }
+      message.error(errorMessage)
+    }
+  }
 
   // 批量发送账号密码到Email
   const handleBatchSendEmail = () => {
@@ -899,10 +1014,10 @@ const AdminSites: React.FC = () => {
           siteIds: v.siteIds || []
         }
         
-        console.log('准备创建分判商，数据:', distributorData)
+        // console.log('准备创建分判商，数据:', distributorData)
         
         const newDistributor = await apiService.createDistributor(distributorData)
-        console.log('分判商创建成功:', newDistributor)
+        // console.log('分判商创建成功:', newDistributor)
         
         // 转换数据格式以匹配前端期望
         const transformedDistributor = {
@@ -978,10 +1093,15 @@ const AdminSites: React.FC = () => {
           username: v.accountUsername // 添加用户名更新
         }
         
-        console.log('准备更新门卫，数据:', updateData)
+        // 如果状态发生变化，需要调用状态切换API
+        if (v.accountStatus !== editingGuard.accountStatus) {
+          await apiService.toggleGuardStatus(editingGuard.id)
+        }
+        
+        // console.log('准备更新门卫，数据:', updateData)
         
         const updatedGuard = await apiService.updateGuard(editingGuard.id, updateData)
-        console.log('门卫更新成功:', updatedGuard)
+        // console.log('门卫更新成功:', updatedGuard)
         
         // 转换数据格式以匹配前端期望
         const transformedGuard = {
@@ -1352,7 +1472,7 @@ const AdminSites: React.FC = () => {
             if (error.statusCode === 409) {
               // 编号已存在，跳过
               skipCount++
-              console.log(`跳过重复的工地: ${siteData.name} (编号: ${importData.code || '自动生成'})`)
+              // console.log(`跳过重复的工地: ${siteData.name} (编号: ${importData.code || '自动生成'})`)
             } else {
               // 其他错误
               errors.push(`${siteData.name}: ${error.message || t('createFailed')}`)
@@ -1393,27 +1513,27 @@ const AdminSites: React.FC = () => {
       
       // 显示导入确认对话框
       // 调试翻译键
-      console.log('🔍 翻译键调试信息:');
-      console.log('当前语言:', locale);
-      console.log('翻译对象类型:', typeof messages);
-      console.log('翻译对象键:', Object.keys(messages || {}));
-      console.log('admin对象存在:', !!messages?.admin);
-      console.log('admin对象键:', messages?.admin ? Object.keys(messages.admin) : '无');
-      console.log('admin对象键数量:', messages?.admin ? Object.keys(messages.admin).length : 0);
-      console.log('查找导入相关键:');
+      // console.log('🔍 翻译键调试信息:');
+      // console.log('当前语言:', locale);
+      // console.log('翻译对象类型:', typeof messages);
+      // console.log('翻译对象键:', Object.keys(messages || {}));
+      // console.log('admin对象存在:', !!messages?.admin);
+      // console.log('admin对象键:', messages?.admin ? Object.keys(messages.admin) : '无');
+      // console.log('admin对象键数量:', messages?.admin ? Object.keys(messages.admin).length : 0);
+      // console.log('查找导入相关键:');
       const adminKeys = messages?.admin ? Object.keys(messages.admin) : [];
       const importKeys = adminKeys.filter(key => key.includes('import') || key.includes('Import'));
-      console.log('包含import的键:', importKeys);
-      console.log('admin.distributorImportConfirm:', t('admin.distributorImportConfirm'));
-      console.log('admin.importConfirmMessage:', t('admin.importConfirmMessage'));
-      console.log('admin.importDefaultSiteMessage:', t('admin.importDefaultSiteMessage'));
-      console.log('admin.importRulesMessage:', t('admin.importRulesMessage'));
-      console.log('admin.noSiteSelected:', t('admin.noSiteSelected'));
+      // console.log('包含import的键:', importKeys);
+      // console.log('admin.distributorImportConfirm:', t('admin.distributorImportConfirm'));
+      // console.log('admin.importConfirmMessage:', t('admin.importConfirmMessage'));
+      // console.log('admin.importDefaultSiteMessage:', t('admin.importDefaultSiteMessage'));
+      // console.log('admin.importRulesMessage:', t('admin.importRulesMessage'));
+      // console.log('admin.noSiteSelected:', t('admin.noSiteSelected'));
       
       // 检查其他翻译键是否工作
-      console.log('其他翻译键测试:');
-      console.log('common.save:', t('common.save'));
-      console.log('common.cancel:', t('common.cancel'));
+      // console.log('其他翻译键测试:');
+      // console.log('common.save:', t('common.save'));
+      // console.log('common.cancel:', t('common.cancel'));
       
       Modal.confirm({
         title: t('admin.distributorImportConfirm'),
@@ -1512,7 +1632,7 @@ const AdminSites: React.FC = () => {
             if (error.statusCode === 409) {
               // 用户名已存在，跳过
               skipCount++
-              console.log(`跳过重复的分判商: ${distributorData.name} (用户名: ${importData.username})`)
+              // console.log(`跳过重复的分判商: ${distributorData.name} (用户名: ${importData.username})`)
             } else {
               // 其他错误
               errors.push(`${distributorData.name}: ${error.message || t('createFailed')}`)
@@ -1689,7 +1809,7 @@ const AdminSites: React.FC = () => {
             if (error.statusCode === 409) {
               // 用户名已存在，跳过
               skipCount++
-              console.log(`跳过重复的门卫: ${guardData.name} (用户名: ${importData.username})`)
+              // console.log(`跳过重复的门卫: ${guardData.name} (用户名: ${importData.username})`)
             } else {
               // 其他错误
               errors.push(`${guardData.name}: ${error.message || t('createFailed')}`)
@@ -2080,7 +2200,7 @@ const AdminSites: React.FC = () => {
       onOk: async () => {
         try {
           const result = await apiService.toggleGuardStatus(record.id)
-          console.log('门卫状态切换成功:', result)
+          // console.log('门卫状态切换成功:', result)
           
           // 更新本地状态
         setGuards(prev => prev.map(g => 
@@ -2091,6 +2211,83 @@ const AdminSites: React.FC = () => {
         } catch (error: unknown) {
           console.error('切换门卫状态失败:', error)
           let errorMessage = '切换状态失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
+      }
+    })
+  }
+
+  // 删除工地
+  const handleDeleteSite = (record: Site) => {
+    Modal.confirm({
+      title: t('admin.deleteSiteTitle'),
+      content: t('admin.deleteSiteConfirm').replace('{name}', record.name),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const result = await apiService.deleteSite(record.id)
+          // console.log('工地删除成功:', result)
+          
+          // 从本地状态中移除
+          setSites(prev => prev.filter(s => s.id !== record.id))
+          message.success(t('admin.siteDeleted').replace('{name}', record.name))
+        } catch (error: unknown) {
+          console.error('删除工地失败:', error)
+          let errorMessage = '删除工地失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
+      }
+    })
+  }
+
+  // 批量删除工地
+  const handleBatchDeleteSites = () => {
+    if (selectedSiteIds.length === 0) {
+      message.warning(t('admin.pleaseSelectItemsToDelete'))
+      return
+    }
+
+    Modal.confirm({
+      title: t('admin.batchDeleteSites'),
+      content: t('admin.confirmBatchDeleteSites').replace('{count}', selectedSiteIds.length.toString()),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const deletePromises = selectedSiteIds.map(siteId => 
+            apiService.deleteSite(siteId)
+          )
+          
+          await Promise.all(deletePromises)
+          
+          // 从本地状态中移除
+          setSites(prev => prev.filter(s => !selectedSiteIds.includes(s.id)))
+          setSelectedSiteIds([])
+          message.success(t('admin.batchDeleteSuccess'))
+        } catch (error: unknown) {
+          console.error('批量删除工地失败:', error)
+          let errorMessage = t('admin.batchDeleteFailed')
           if (error && typeof error === 'object' && 'response' in error) {
             const apiError = error as { response?: { data?: { message?: string } } }
             if (apiError.response?.data?.message) {
@@ -2117,7 +2314,7 @@ const AdminSites: React.FC = () => {
       onOk: async () => {
         try {
           const result = await apiService.deleteDistributor(record.id)
-          console.log('分判商删除成功:', result)
+          // console.log('分判商删除成功:', result)
           
           // 从本地状态中移除
           setDistributors(prev => prev.filter(d => d.id !== record.id))
@@ -2125,6 +2322,49 @@ const AdminSites: React.FC = () => {
         } catch (error: unknown) {
           console.error('删除分判商失败:', error)
           let errorMessage = '删除分判商失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
+      }
+    })
+  }
+
+  // 批量删除分判商
+  const handleBatchDeleteDistributors = () => {
+    if (selectedDistributorIds.length === 0) {
+      message.warning(t('admin.pleaseSelectItemsToDelete'))
+      return
+    }
+
+    Modal.confirm({
+      title: t('admin.batchDeleteDistributors'),
+      content: t('admin.confirmBatchDeleteDistributors').replace('{count}', selectedDistributorIds.length.toString()),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const deletePromises = selectedDistributorIds.map(distributorId => 
+            apiService.deleteDistributor(distributorId)
+          )
+          
+          await Promise.all(deletePromises)
+          
+          // 从本地状态中移除
+          setDistributors(prev => prev.filter(d => !selectedDistributorIds.includes(d.id)))
+          setSelectedDistributorIds([])
+          message.success(t('admin.batchDeleteSuccess'))
+        } catch (error: unknown) {
+          console.error('批量删除分判商失败:', error)
+          let errorMessage = t('admin.batchDeleteFailed')
           if (error && typeof error === 'object' && 'response' in error) {
             const apiError = error as { response?: { data?: { message?: string } } }
             if (apiError.response?.data?.message) {
@@ -2151,7 +2391,7 @@ const AdminSites: React.FC = () => {
       onOk: async () => {
         try {
           const result = await apiService.deleteGuard(record.id)
-          console.log('门卫删除成功:', result)
+          // console.log('门卫删除成功:', result)
           
           // 从本地状态中移除
           setGuards(prev => prev.filter(g => g.id !== record.id))
@@ -2159,6 +2399,49 @@ const AdminSites: React.FC = () => {
         } catch (error: unknown) {
           console.error('删除门卫失败:', error)
           let errorMessage = '删除门卫失败'
+          if (error && typeof error === 'object' && 'response' in error) {
+            const apiError = error as { response?: { data?: { message?: string } } }
+            if (apiError.response?.data?.message) {
+              errorMessage = apiError.response.data.message
+            }
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            const simpleError = error as { message: string }
+            errorMessage = simpleError.message
+          }
+          message.error(errorMessage)
+        }
+      }
+    })
+  }
+
+  // 批量删除门卫
+  const handleBatchDeleteGuards = () => {
+    if (selectedGuardIds.length === 0) {
+      message.warning(t('admin.pleaseSelectItemsToDelete'))
+      return
+    }
+
+    Modal.confirm({
+      title: t('admin.batchDeleteGuards'),
+      content: t('admin.confirmBatchDeleteGuards').replace('{count}', selectedGuardIds.length.toString()),
+      okText: t('admin.confirm'),
+      cancelText: t('admin.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const deletePromises = selectedGuardIds.map(guardId => 
+            apiService.deleteGuard(guardId)
+          )
+          
+          await Promise.all(deletePromises)
+          
+          // 从本地状态中移除
+          setGuards(prev => prev.filter(g => !selectedGuardIds.includes(g.id)))
+          setSelectedGuardIds([])
+          message.success(t('admin.batchDeleteSuccess'))
+        } catch (error: unknown) {
+          console.error('批量删除门卫失败:', error)
+          let errorMessage = t('admin.batchDeleteFailed')
           if (error && typeof error === 'object' && 'response' in error) {
             const apiError = error as { response?: { data?: { message?: string } } }
             if (apiError.response?.data?.message) {
@@ -2184,7 +2467,7 @@ const AdminSites: React.FC = () => {
       onOk: async () => {
         try {
           const result = await apiService.resetGuardPassword(record.id)
-          console.log('门卫密码重置成功:', result)
+          // console.log('门卫密码重置成功:', result)
           
           // 显示成功消息，包含新密码信息
           Modal.success({
@@ -2448,12 +2731,29 @@ const AdminSites: React.FC = () => {
               </span>
             )}
           </span>
-          <Button 
-            onClick={() => setSelectedSiteIds([])}
-            size="small"
-          >
-            {t('admin.clearSelection')}({selectedSiteIds.length})
-          </Button>
+          <Space>
+            <Button 
+              size="small"
+              icon={<CheckCircleOutlined />} 
+              onClick={() => handleBatchUpdateStatus('sites')}
+            >
+              {t('admin.batchUpdateSiteStatus')}({selectedSiteIds.length})
+            </Button>
+            <Button 
+              size="small"
+              danger
+              icon={<DeleteOutlined />} 
+              onClick={handleBatchDeleteSites}
+            >
+              {t('admin.batchDeleteSites')}({selectedSiteIds.length})
+            </Button>
+            <Button 
+              onClick={() => setSelectedSiteIds([])}
+              size="small"
+            >
+              {t('admin.clearSelection')}({selectedSiteIds.length})
+            </Button>
+          </Space>
         </div>
       )}
       
@@ -2509,6 +2809,7 @@ const AdminSites: React.FC = () => {
               rowSelection={{
                 selectedRowKeys: selectedSiteIds,
                 onChange: (selectedRowKeys) => setSelectedSiteIds(selectedRowKeys as string[]),
+                preserveSelectedRowKeys: true,
                 getCheckboxProps: (record) => ({
                   name: record.name,
                 }),
@@ -2660,7 +2961,22 @@ const AdminSites: React.FC = () => {
               onClick={() => handleBatchSendEmail()}
               title={t('admin.batchSendEmailTitle')}
             >
-              {t('admin.batchSendEmail')}
+              {t('admin.batchSendToEmail')}({selectedDistributorIds.length})
+            </Button>
+            <Button 
+              size="small"
+              icon={<CheckCircleOutlined />} 
+              onClick={() => handleBatchUpdateStatus('distributors')}
+            >
+              {t('admin.batchUpdateDistributorStatus')}({selectedDistributorIds.length})
+            </Button>
+            <Button 
+              size="small"
+              danger
+              icon={<DeleteOutlined />} 
+              onClick={handleBatchDeleteDistributors}
+            >
+              {t('admin.batchDeleteDistributors')}({selectedDistributorIds.length})
             </Button>
             <Button 
               onClick={() => setSelectedDistributorIds([])}
@@ -2724,6 +3040,7 @@ const AdminSites: React.FC = () => {
               rowSelection={{
                 selectedRowKeys: selectedDistributorIds,
                 onChange: (selectedRowKeys) => setSelectedDistributorIds(selectedRowKeys as string[]),
+                preserveSelectedRowKeys: true,
                 getCheckboxProps: (record) => ({
                   name: record.name,
                 }),
@@ -2869,12 +3186,29 @@ const AdminSites: React.FC = () => {
               </span>
             )}
           </span>
-          <Button 
-            onClick={() => setSelectedGuardIds([])}
-            size="small"
-          >
-            {t('admin.clearSelection')}({selectedGuardIds.length})
-          </Button>
+          <Space>
+            <Button 
+              size="small"
+              icon={<CheckCircleOutlined />} 
+              onClick={() => handleBatchUpdateStatus('guards')}
+            >
+              {t('admin.batchUpdateGuardStatus')}({selectedGuardIds.length})
+            </Button>
+            <Button 
+              size="small"
+              danger
+              icon={<DeleteOutlined />} 
+              onClick={handleBatchDeleteGuards}
+            >
+              {t('admin.batchDeleteGuards')}({selectedGuardIds.length})
+            </Button>
+            <Button 
+              onClick={() => setSelectedGuardIds([])}
+              size="small"
+            >
+              {t('admin.clearSelection')}({selectedGuardIds.length})
+            </Button>
+          </Space>
         </div>
       )}
       
@@ -2930,6 +3264,7 @@ const AdminSites: React.FC = () => {
               rowSelection={{
                 selectedRowKeys: selectedGuardIds,
                 onChange: (selectedRowKeys) => setSelectedGuardIds(selectedRowKeys as string[]),
+                preserveSelectedRowKeys: true,
                 getCheckboxProps: (record) => ({
                   name: record.name,
                 }),
@@ -3272,6 +3607,58 @@ const AdminSites: React.FC = () => {
           )}
           <Form.Item name="accountStatus" label={t('admin.accountStatusLabel')} initialValue={'active'}>
             <Select options={[{ value: 'active', label: t('admin.active') }, { value: 'disabled', label: t('admin.disabled') }]} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 批量修改状态模态框 */}
+      <Modal
+        title={t('admin.batchUpdateStatus')}
+        open={batchUpdateStatusModalOpen}
+        onCancel={() => {
+          setBatchUpdateStatusModalOpen(false)
+          setSelectedStatus('')
+        }}
+        onOk={handleConfirmBatchUpdateStatus}
+        destroyOnClose
+        width={500}
+      >
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>{t('admin.confirmBatchUpdateStatus')}</p>
+          <p style={{ color: '#666', fontSize: '16px' }}>
+            {batchUpdateStatusType === 'sites' && `${t('admin.selectedSites').replace('{count}', selectedSiteIds.length.toString())}`}
+            {batchUpdateStatusType === 'distributors' && `${t('admin.selectedDistributors').replace('{count}', selectedDistributorIds.length.toString())}`}
+            {batchUpdateStatusType === 'guards' && `${t('admin.selectedGuards').replace('{count}', selectedGuardIds.length.toString())}`}
+          </p>
+        </div>
+        <Form layout="vertical">
+          <Form.Item label={<span style={{ fontSize: '16px' }}>{t('admin.selectStatus')}</span>} required>
+            <Radio.Group
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              {batchUpdateStatusType === 'sites' && (
+                <div style={{ display: 'flex', gap: '32px' }}>
+                  <Radio value="active" style={{ fontSize: '16px' }}>
+                    <Tag color="green" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('admin.siteActive')}</Tag>
+                  </Radio>
+                  <Radio value="inactive" style={{ fontSize: '16px' }}>
+                    <Tag color="red" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('admin.siteInactive')}</Tag>
+                  </Radio>
+                </div>
+              )}
+              {(batchUpdateStatusType === 'distributors' || batchUpdateStatusType === 'guards') && (
+                <div style={{ display: 'flex', gap: '32px' }}>
+                  <Radio value="active" style={{ fontSize: '16px' }}>
+                    <Tag color="green" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('admin.active')}</Tag>
+                  </Radio>
+                  <Radio value="disabled" style={{ fontSize: '16px' }}>
+                    <Tag color="red" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('admin.disabled')}</Tag>
+                  </Radio>
+                </div>
+              )}
+            </Radio.Group>
           </Form.Item>
         </Form>
       </Modal>

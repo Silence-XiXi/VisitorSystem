@@ -98,7 +98,7 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
   }, [worker, form, selectedSiteId, t, locale, getDefaultAreaCode]);
 
   const handleSubmit = async (values: Record<string, unknown>) => {
-    console.log('WorkerForm handleSubmit called with values:', values);
+    // console.log('WorkerForm handleSubmit called with values:', values);
     try {
       const birthDateStr: string | undefined = values.birthDate ? (values.birthDate as Dayjs).format('YYYY-MM-DD') : undefined;
 
@@ -112,14 +112,14 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
         delete (formData as any).workerId;
       }
       
-      console.log('Processed formData:', formData);
-      console.log('isEdit:', isEdit);
+      // console.log('Processed formData:', formData);
+      // console.log('isEdit:', isEdit);
       
       if (isEdit) {
-        console.log('Calling onSubmit for edit with id:', worker!.id);
+        // console.log('Calling onSubmit for edit with id:', worker!.id);
         await onSubmit({ ...formData, id: worker!.id } as UpdateWorkerRequest);
       } else {
-        console.log('Calling onSubmit for create');
+        // console.log('Calling onSubmit for create');
         await onSubmit(formData as CreateWorkerRequest);
       }
       

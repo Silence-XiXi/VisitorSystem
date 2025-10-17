@@ -369,7 +369,7 @@ export class GuardsService {
       throw new ForbiddenException('只有门卫可以访问此接口');
     }
 
-    // console.log(`获取物品借用记录 - user: ${user.username}, status: ${status}, workerId: ${workerId}, visitorRecordId: ${visitorRecordId}`);
+    // // console.log(`获取物品借用记录 - user: ${user.username}, status: ${status}, workerId: ${workerId}, visitorRecordId: ${visitorRecordId}`);
 
     const guard = await this.prisma.guard.findUnique({
       where: { userId: user.id }
@@ -379,7 +379,7 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
-    // console.log(`门卫信息: ${guard.id}, siteId: ${guard.siteId}`);
+    // // console.log(`门卫信息: ${guard.id}, siteId: ${guard.siteId}`);
 
     const whereClause: any = {
       siteId: guard.siteId
@@ -387,7 +387,7 @@ export class GuardsService {
 
     // 如果提供了访客记录ID，优先使用访客记录ID进行筛选
     if (visitorRecordId) {
-      // console.log(`使用访客记录ID过滤: ${visitorRecordId}`);
+      // // console.log(`使用访客记录ID过滤: ${visitorRecordId}`);
       whereClause.visitorRecordId = visitorRecordId;
     }
     // 如果没有提供访客记录ID，但提供了工人ID，则使用工人ID筛选
@@ -403,10 +403,10 @@ export class GuardsService {
       });
 
       if (worker) {
-        // console.log(`找到工人: ${worker.id}, workerId: ${worker.workerId}, name: ${worker.name}`);
+        // // console.log(`找到工人: ${worker.id}, workerId: ${worker.workerId}, name: ${worker.name}`);
         whereClause.workerId = worker.id;  // 使用工人的数据库ID
       } else {
-        // console.log(`未找到工人, 使用原始workerId: ${workerId}`);
+        // // console.log(`未找到工人, 使用原始workerId: ${workerId}`);
         whereClause.workerId = workerId;
       }
     }
@@ -415,7 +415,7 @@ export class GuardsService {
       whereClause.status = status.toUpperCase();
     }
 
-    // console.log('借用记录查询条件:', whereClause);
+    // // console.log('借用记录查询条件:', whereClause);
 
     const records = await this.prisma.itemBorrowRecord.findMany({
       where: whereClause,
@@ -438,9 +438,9 @@ export class GuardsService {
       }
     });
 
-    // console.log(`找到借用记录: ${records.length}条`);
+    // // console.log(`找到借用记录: ${records.length}条`);
     // if (records.length > 0) {
-    //   console.log('第一条记录示例:', JSON.stringify(records[0], null, 2).substring(0, 200) + '...');
+    //   // console.log('第一条记录示例:', JSON.stringify(records[0], null, 2).substring(0, 200) + '...');
     // }
 
     return records;
@@ -460,7 +460,7 @@ export class GuardsService {
       throw new NotFoundException('门卫信息不存在');
     }
 
-    // console.log('收到借用记录请求:', {
+    // // console.log('收到借用记录请求:', {
     //   workerId: recordData.workerId,
     //   categoryId: recordData.categoryId,
     //   itemCode: recordData.itemCode,
@@ -492,7 +492,7 @@ export class GuardsService {
       return workerById;
     }
     
-    // console.log('查找到的工人信息:', worker ? {
+    // // console.log('查找到的工人信息:', worker ? {
     //   id: worker.id,
     //   workerId: worker.workerId,
     //   name: worker.name,
@@ -511,7 +511,7 @@ export class GuardsService {
       }
     });
 
-    // console.log('查找到的访客记录:', visitorRecord ? {
+    // // console.log('查找到的访客记录:', visitorRecord ? {
     //   id: visitorRecord.id,
     //   workerId: visitorRecord.workerId,
     //   status: visitorRecord.status,
@@ -556,7 +556,7 @@ export class GuardsService {
     }
 
     // 创建借用记录（关联当前有效的访客记录）
-    // console.log('创建借用记录，关联访客记录:', {
+    // // console.log('创建借用记录，关联访客记录:', {
     //   workerId: worker.id,
     //   workerIdNumber: worker.workerId,
     //   visitorRecordId: visitorRecord.id,
@@ -1002,7 +1002,7 @@ export class GuardsService {
 
   // 创建访客记录（入场登记）
   async createVisitorRecord(user: CurrentUser, recordData: any) {
-    // console.log('创建访客记录，接收到的数据:', JSON.stringify(recordData, null, 2));
+    // // console.log('创建访客记录，接收到的数据:', JSON.stringify(recordData, null, 2));
     
     if (user.role !== 'GUARD') {
       throw new ForbiddenException('只有门卫可以创建访客记录');
@@ -1040,8 +1040,8 @@ export class GuardsService {
       throw new BadRequestException('该工人已经在场，无法重复登记');
     }
 
-    // console.log('工人原始电话号码:', worker.phone);
-    // console.log('传入的电话号码:', recordData.phone);
+    // // console.log('工人原始电话号码:', worker.phone);
+    // // console.log('传入的电话号码:', recordData.phone);
     
     // 创建访客记录
     const visitorRecord = await this.prisma.visitorRecord.create({
@@ -1069,7 +1069,7 @@ export class GuardsService {
       }
     });
 
-    // console.log('创建的访客记录:', JSON.stringify({
+    // // console.log('创建的访客记录:', JSON.stringify({
     //   id: visitorRecord.id,
     //   workerId: visitorRecord.workerId,
     //   phone: visitorRecord.phone,

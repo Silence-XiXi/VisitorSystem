@@ -208,42 +208,42 @@ export class DistributorsService {
         }
       });
     } catch (error: any) {
-      console.log('创建工人时的错误:', error);
-      console.log('错误代码:', error?.code);
-      console.log('错误元数据:', error?.meta);
-      console.log('错误消息:', error?.message);
+      // console.log('创建工人时的错误:', error);
+      // console.log('错误代码:', error?.code);
+      // console.log('错误元数据:', error?.meta);
+      // console.log('错误消息:', error?.message);
       
       // 检查是否是Prisma唯一约束冲突错误
       if (error?.code === 'P2002') {
-        console.log('检测到唯一约束冲突');
+        // console.log('检测到唯一约束冲突');
         const target = error?.meta?.target;
-        console.log('冲突字段:', target);
+        // console.log('冲突字段:', target);
         
         if (Array.isArray(target)) {
           if (target.includes('idCard')) {
-            console.log('身份证号冲突');
+            // console.log('身份证号冲突');
             throw new ConflictException('身份证号已存在');
           } else if (target.includes('workerId')) {
-            console.log('工人编号冲突');
+            // console.log('工人编号冲突');
             throw new ConflictException('工人编号已存在');
           } else if (target.includes('phone')) {
-            console.log('手机号冲突');
+            // console.log('手机号冲突');
             throw new ConflictException('手机号码已存在');
           }
         } else if (typeof target === 'string') {
           if (target.includes('idCard')) {
-            console.log('身份证号冲突');
+            // console.log('身份证号冲突');
             throw new ConflictException('身份证号已存在');
           } else if (target.includes('workerId')) {
-            console.log('工人编号冲突');
+            // console.log('工人编号冲突');
             throw new ConflictException('工人编号已存在');
           } else if (target.includes('phone')) {
-            console.log('手机号冲突');
+            // console.log('手机号冲突');
             throw new ConflictException('手机号码已存在');
           }
         }
         
-        console.log('其他唯一约束冲突:', target);
+        // console.log('其他唯一约束冲突:', target);
         throw new ConflictException('数据已存在，请检查输入信息');
       }
       
@@ -260,7 +260,7 @@ export class DistributorsService {
         throw new ConflictException('数据已存在，请检查输入信息');
       }
       
-      console.log('非唯一约束错误，重新抛出');
+      // console.log('非唯一约束错误，重新抛出');
       throw error;
     }
   }
@@ -415,7 +415,7 @@ export class DistributorsService {
       const workerData = workersData[i];
       
       try {
-        // console.log(`处理第${i + 1}行数据:`, workerData);
+        // // console.log(`处理第${i + 1}行数据:`, workerData);
         
         // 检查必填字段
         if (!workerData.name || !workerData.gender || !workerData.idNumber || !workerData.phone) {
@@ -427,7 +427,7 @@ export class DistributorsService {
           
           results.errors++;
           results.errorDetails.push(`第${i + 1}行：缺少必填字段 [${missingFields.join(', ')}]`);
-          // console.log(`第${i + 1}行缺少必填字段:`, missingFields);
+          // // console.log(`第${i + 1}行缺少必填字段:`, missingFields);
           continue;
         }
 
@@ -438,7 +438,7 @@ export class DistributorsService {
 
         if (existingWorker) {
           results.skipped++;
-          console.log(`第${i + 1}行证件号码重复:`, workerData.idNumber);
+          // console.log(`第${i + 1}行证件号码重复:`, workerData.idNumber);
           continue;
         }
 
@@ -643,7 +643,7 @@ export class DistributorsService {
     }
 
     try {
-      // console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
+      // // console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
       
       // 读取Excel文件
       const workbook = XLSX.read(file.buffer, { type: 'buffer' });
@@ -651,14 +651,14 @@ export class DistributorsService {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // console.log('Excel解析结果:', jsonData.length, '行数据');
-      // console.log('第一行数据示例:', jsonData[0]);
+      // // console.log('Excel解析结果:', jsonData.length, '行数据');
+      // // console.log('第一行数据示例:', jsonData[0]);
 
       // 转换Excel数据为工人数据格式
       const workersData = jsonData.map((row: any, index: number) => {
         // 获取所有可能的字段名
         const fieldNames = Object.keys(row);
-        // console.log(`第${index + 1}行字段:`, fieldNames);
+        // // console.log(`第${index + 1}行字段:`, fieldNames);
         
         // 辅助函数：处理空值，将 "-" 转换为 null
         const getValue = (value: any) => {
@@ -674,7 +674,7 @@ export class DistributorsService {
         
         // 调试信息：显示地区识别过程
         // if (rawRegion) {
-        //   console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        //   // console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
         // }
 
         return {
@@ -692,7 +692,7 @@ export class DistributorsService {
         };
       });
 
-      // console.log('转换后的工人数据示例:', workersData[0]);
+      // // console.log('转换后的工人数据示例:', workersData[0]);
 
       // 调用现有的导入方法
       return await this.importWorkers(user, workersData);

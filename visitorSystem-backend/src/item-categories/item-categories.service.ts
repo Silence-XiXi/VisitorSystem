@@ -79,9 +79,6 @@ export class ItemCategoriesService {
 
   async findAll(): Promise<ItemCategory[]> {
     return this.prisma.itemCategory.findMany({
-      where: {
-        status: ItemCategoryStatus.ACTIVE
-      },
       orderBy: { createdAt: 'desc' }
     });
   }

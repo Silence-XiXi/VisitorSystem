@@ -702,36 +702,6 @@ const ItemBorrowRecords: React.FC = () => {
         </div>
       )}
 
-      {/* 选择状态显示 */}
-      {selectedRowKeys.length > 0 && (
-        <div style={{ 
-          marginBottom: 8, 
-          padding: '8px 16px', 
-          backgroundColor: '#f6ffed', 
-          border: '1px solid #b7eb8f',
-          borderRadius: '4px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0
-        }}>
-          <span>
-            {t('itemBorrowRecords.selectedRecords').replace('{count}', selectedRowKeys.length.toString())}
-            {selectedRowKeys.length > 0 && (
-              <span style={{ color: '#999', marginLeft: '8px' }}>
-                / {t('itemBorrowRecords.totalRecords').replace('{count}', paginatedData.length.toString())}
-              </span>
-            )}
-          </span>
-          <Button 
-            onClick={() => setSelectedRowKeys([])}
-            size="small"
-          >
-            {t('itemBorrowRecords.clearSelection').replace('{count}', selectedRowKeys.length.toString())}
-          </Button>
-        </div>
-      )}
-
       {/* 物品借用记录表格 */}
       <Card style={{ 
         margin: 0,
@@ -754,6 +724,36 @@ const ItemBorrowRecords: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
+          {/* 选择状态显示 */}
+          {selectedRowKeys.length > 0 && (
+            <div style={{ 
+              marginBottom: 8, 
+              padding: '8px 16px', 
+              backgroundColor: '#f6ffed', 
+              border: '1px solid #b7eb8f',
+              borderRadius: '4px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0
+            }}>
+              <span>
+                {t('itemBorrowRecords.selectedRecords').replace('{count}', selectedRowKeys.length.toString())}
+                {selectedRowKeys.length > 0 && (
+                  <span style={{ color: '#999', marginLeft: '8px' }}>
+                    / {t('itemBorrowRecords.totalRecords').replace('{count}', borrowRecords.length.toString())}
+                  </span>
+                )}
+              </span>
+              <Button 
+                onClick={() => setSelectedRowKeys([])}
+                size="small"
+              >
+                {t('itemBorrowRecords.clearSelection').replace('{count}', selectedRowKeys.length.toString())}
+              </Button>
+            </div>
+          )}
+
           {/* 表格容器 */}
           <div style={{ 
             flex: 1, 

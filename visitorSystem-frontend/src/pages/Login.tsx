@@ -97,7 +97,7 @@ const Login: React.FC = () => {
     if (hasRedirected.current) return
 
     if (!authLoading && isAuthenticated && userRole && !hasRedirected.current) {
-      console.log('Login success detected, redirecting to:', userRole)
+      // console.log('Login success detected, redirecting to:', userRole)
       hasRedirected.current = true
       handleRedirect(userRole)
     }

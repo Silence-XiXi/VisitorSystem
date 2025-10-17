@@ -263,7 +263,7 @@ const Reports: React.FC = () => {
     }
     
     // // 添加调试信息
-    // console.log('屏幕高度:', windowHeight, '可用高度:', availableHeight, '最终高度:', finalHeight)
+    // // console.log('屏幕高度:', windowHeight, '可用高度:', availableHeight, '最终高度:', finalHeight)
     
     setTableHeight(finalHeight)
   }

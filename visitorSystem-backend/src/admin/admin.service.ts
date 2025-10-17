@@ -316,12 +316,13 @@ export class AdminService {
       }
     }
 
-    // 处理可选字段，确保空字符串转换为null
+    // 处理可选字段，确保空字符串转换为null，但只处理实际传递的字段
     const processedData = {
       ...updateData,
-      email: updateData.email || null,
-      whatsapp: updateData.whatsapp || null,
-      birthDate: updateData.birthDate ? new Date(updateData.birthDate) : null
+      // 只处理实际传递的字段，避免清空未传递的字段
+      ...(updateData.email !== undefined && { email: updateData.email || null }),
+      ...(updateData.whatsapp !== undefined && { whatsapp: updateData.whatsapp || null }),
+      ...(updateData.birthDate !== undefined && { birthDate: updateData.birthDate ? new Date(updateData.birthDate) : null })
     };
 
     return this.prisma.worker.update({
@@ -359,7 +360,7 @@ export class AdminService {
       throw new ForbiddenException('只有管理员可以创建分销商');
     }
 
-    console.log('创建分判商数据:', JSON.stringify(distributorData, null, 2));
+    // // console.log('创建分判商数据:', JSON.stringify(distributorData, null, 2));
 
     // 数据验证
     if (!distributorData.name || !distributorData.name.trim()) {
@@ -444,7 +445,7 @@ export class AdminService {
     // 如果有关联的工地，创建关联关系
     if (validSiteIds && validSiteIds.length > 0) {
       try {
-        console.log('创建工地关联关系:', validSiteIds);
+        // // console.log('创建工地关联关系:', validSiteIds);
         
         const siteDistributorData = validSiteIds.map((siteId: string) => ({
           siteId,
@@ -455,7 +456,7 @@ export class AdminService {
           data: siteDistributorData
         });
 
-        console.log('工地关联关系创建成功');
+        // // console.log('工地关联关系创建成功');
 
         // 重新查询以包含关联的工地
         const distributorWithSites = await this.prisma.distributor.findUnique({
@@ -996,6 +997,56 @@ export class AdminService {
     return updatedSite;
   }
 
+  // 删除工地
+  async deleteSite(user: CurrentUser, siteId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以删除工地');
+    }
+
+    // 检查工地是否存在
+    const existingSite = await this.prisma.site.findUnique({
+      where: { id: siteId },
+      include: {
+        distributors: true,
+        guards: true,
+        workers: true,
+        visitorRecords: true
+      }
+    });
+
+    if (!existingSite) {
+      throw new NotFoundException('工地不存在');
+    }
+
+    // 检查是否有关联数据
+    if (existingSite.distributors.length > 0) {
+      throw new BadRequestException('工地下还有关联的分判商，无法删除');
+    }
+
+    if (existingSite.guards.length > 0) {
+      throw new BadRequestException('工地下还有关联的门卫，无法删除');
+    }
+
+    if (existingSite.workers.length > 0) {
+      throw new BadRequestException('工地下还有关联的工人，无法删除');
+    }
+
+    if (existingSite.visitorRecords.length > 0) {
+      throw new BadRequestException('工地下还有访客记录，无法删除');
+    }
+
+    // 删除工地
+    await this.prisma.site.delete({
+      where: { id: siteId }
+    });
+
+    return {
+      siteId: existingSite.id,
+      siteName: existingSite.name,
+      deletedBy: user.username
+    };
+  }
+
   // 重置分判商密码
   async resetDistributorPassword(user: CurrentUser, distributorId: string) {
     if (user.role !== 'ADMIN') {
@@ -1260,6 +1311,43 @@ export class AdminService {
       guardName: guard.name,
       username: guard.user.username,
       oldStatus: guard.user.status,
+      newStatus: newStatus
+    };
+  }
+
+  // 切换分判商账户状态
+  async toggleDistributorStatus(user: CurrentUser, distributorId: string) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('只有管理员可以切换分判商状态');
+    }
+
+    // 查找分判商
+    const distributor = await this.prisma.distributor.findUnique({
+      where: { id: distributorId },
+      include: { user: true }
+    });
+
+    if (!distributor) {
+      throw new BadRequestException('分判商不存在');
+    }
+
+    if (!distributor.user) {
+      throw new BadRequestException('分判商没有关联的用户账号');
+    }
+
+    // 切换状态
+    const newStatus = distributor.user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    
+    const updatedUser = await this.prisma.user.update({
+      where: { id: distributor.userId },
+      data: { status: newStatus }
+    });
+
+    return {
+      distributorId: distributor.id,
+      distributorName: distributor.name,
+      username: distributor.user.username,
+      oldStatus: distributor.user.status,
       newStatus: newStatus
     };
   }
@@ -1698,7 +1786,7 @@ export class AdminService {
     }
 
     try {
-      // console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
+      // // console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
       
       // 读取Excel文件
       const workbook = XLSX.read(file.buffer, { type: 'buffer' });
@@ -1706,15 +1794,15 @@ export class AdminService {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // console.log('Excel解析结果:', jsonData.length, '行数据');
-      // console.log('第一行数据示例:', jsonData[0]);
+      // // console.log('Excel解析结果:', jsonData.length, '行数据');
+      // // console.log('第一行数据示例:', jsonData[0]);
 
       // 转换Excel数据为工人数据格式
       const workersData = jsonData.map((row: any, index: number) => {
         // 获取所有可能的字段名
         const fieldNames = Object.keys(row);
-        // console.log(`第${index + 1}行原始数据:`, row);
-        // console.log(`第${index + 1}行字段名:`, fieldNames);
+        // // console.log(`第${index + 1}行原始数据:`, row);
+        // // console.log(`第${index + 1}行字段名:`, fieldNames);
         
         // 辅助函数：处理空值，将 "-" 转换为 null
         const getValue = (value: any) => {
@@ -1730,7 +1818,7 @@ export class AdminService {
         
         // 调试信息：显示地区识别过程
         // if (rawRegion) {
-        //   console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        //   // console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
         // }
 
         const workerData = {
@@ -1748,11 +1836,11 @@ export class AdminService {
           workerId: getValue(row['工人编号'] || row['workerId'] || row['Worker ID'])
         };
         
-        // console.log(`第${index + 1}行转换后数据:`, workerData);
+        // // console.log(`第${index + 1}行转换后数据:`, workerData);
         return workerData;
       });
 
-      // console.log('转换后的工人数据示例:', workersData[0]);
+      // // console.log('转换后的工人数据示例:', workersData[0]);
 
       // 调用现有的导入方法
       return await this.importWorkers(user, workersData);

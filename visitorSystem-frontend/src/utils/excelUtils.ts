@@ -436,12 +436,12 @@ export const validateRequiredFields = (data: any, t?: (key: string) => string): 
   ];
   
   // 调试信息：显示所有字段的值
-  console.log('验证必填字段 - 数据:', data);
+  // console.log('验证必填字段 - 数据:', data);
   
   requiredFields.forEach(field => {
     const value = data[field.key];
     const isEmpty = !value || value.toString().trim() === '';
-    console.log(`${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
+    // console.log(`${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
     
     if (isEmpty) {
       errors.push(`${field.label}${requiredMessage}`);
@@ -468,22 +468,22 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
   const errors: string[] = [];
   
   // 调试信息
-  console.log(`第${rowIndex + 1}行原始数据:`, row);
-  console.log(`第${rowIndex + 1}行映射后的数据:`, {
-    workerId: String(row['Worker ID'] || row['工人编号'] || row.workerId || '').trim(),
-    name: String(row['Name'] || row['姓名'] || row.name || '').trim(),
-    gender: row['Gender'] || row['性别'] || row.gender,
-    idType: row['ID Type'] || row['证件类型'] || row.idType || 'ID_CARD',
-    idNumber: String(row['ID Number'] || row['证件号码'] || row.idNumber || row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
-    birthDate: String(row['Birth Date'] || row['出生日期'] || row.birthDate || '').trim(),
-    region: row['Region'] || row['地区'] || row.region,
-    distributorId: String(row['Distributor ID'] || row['分判商ID'] || row.distributorId || '').trim(),
-    siteId: String(row['Site ID'] || row['工地ID'] || row.siteId || '').trim(),
-    phone: String(row['Phone'] || row['联系电话'] || row.phone || '').trim(),
-    email: String(row['Email'] || row['邮箱'] || row.email || '').trim(),
-    whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
-    status: row['Status'] || row['状态'] || row.status
-  });
+  // console.log(`第${rowIndex + 1}行原始数据:`, row);
+  // console.log(`第${rowIndex + 1}行映射后的数据:`, {
+  //   workerId: String(row['Worker ID'] || row['工人编号'] || row.workerId || '').trim(),
+  //   name: String(row['Name'] || row['姓名'] || row.name || '').trim(),
+  //   gender: row['Gender'] || row['性别'] || row.gender,
+  //   idType: row['ID Type'] || row['证件类型'] || row.idType || 'ID_CARD',
+  //   idNumber: String(row['ID Number'] || row['证件号码'] || row.idNumber || row['ID Card'] || row['身份证号'] || row.idCard || '').trim(),
+  //   birthDate: String(row['Birth Date'] || row['出生日期'] || row.birthDate || '').trim(),
+  //   region: row['Region'] || row['地区'] || row.region,
+  //   distributorId: String(row['Distributor ID'] || row['分判商ID'] || row.distributorId || '').trim(),
+  //   siteId: String(row['Site ID'] || row['工地ID'] || row.siteId || '').trim(),
+  //   phone: String(row['Phone'] || row['联系电话'] || row.phone || '').trim(),
+  //   email: String(row['Email'] || row['邮箱'] || row.email || '').trim(),
+  //   whatsapp: String(row['WhatsApp'] || row.whatsapp || '').trim(),
+  //   status: row['Status'] || row['状态'] || row.status
+  // });
   
   // 获取原始值用于验证
   const rawGender = row['Gender'] || row['性别'] || row.gender;
@@ -498,7 +498,7 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
   
   // 调试信息：显示地区识别和区号保存过程
   // if (regionInput) {
-  //   console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
+  //   // console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
   // }
   
   // 数据清洗和转换
@@ -552,7 +552,7 @@ export const convertExcelToWorkerForDistributor = (row: any, rowIndex: number, t
   
   // 调试信息：显示地区识别和区号保存过程
   // if (regionInput) {
-  //   console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
+  //   // console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
   // }
   
   // 将中文列名映射为英文字段名，同时支持英文列名
@@ -583,13 +583,13 @@ export const convertExcelToWorkerForDistributor = (row: any, rowIndex: number, t
   ];
   
   // 调试信息：显示所有字段的值
-  console.log(`第${rowIndex + 1}行验证必填字段 - 数据:`, workerData);
+  // console.log(`第${rowIndex + 1}行验证必填字段 - 数据:`, workerData);
   
   const requiredMessage = t ? t('form.required') : '不能为空';
   requiredFields.forEach(field => {
     const value = (workerData as any)[field.key];
     const isEmpty = !value || value.toString().trim() === '';
-    console.log(`第${rowIndex + 1}行 ${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
+    // console.log(`第${rowIndex + 1}行 ${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
     
     if (isEmpty) {
       errors.push(`${field.label}${requiredMessage}`);
@@ -626,7 +626,7 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
   
   // 调试信息：显示地区识别和区号保存过程
   // if (regionInput) {
-  //   console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
+  //   // console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
   // }
   
   // 将中文列名映射为英文字段名，同时支持英文列名
@@ -677,13 +677,13 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
   ];
   
   // 调试信息：显示所有字段的值
-  console.log(`第${rowIndex + 1}行验证必填字段 - 数据:`, workerData);
+  // console.log(`第${rowIndex + 1}行验证必填字段 - 数据:`, workerData);
   
   const requiredMessage = t ? t('form.required') : '不能为空';
   requiredFields.forEach(field => {
     const value = (workerData as any)[field.key];
     const isEmpty = !value || value.toString().trim() === '';
-    console.log(`第${rowIndex + 1}行 ${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
+    // console.log(`第${rowIndex + 1}行 ${field.label}: "${value}" (${typeof value}) - ${isEmpty ? '空值' : '有值'}`);
     
     if (isEmpty) {
       errors.push(`${field.label}${requiredMessage}`);
@@ -726,9 +726,9 @@ export const readExcelFile = (file: File, t?: (key: string) => string, existingW
         const dataRows = jsonData.slice(1);
         
         // 调试信息
-        console.log('Excel标题行:', headers);
-        console.log('数据行数:', dataRows.length);
-        console.log('前几行数据:', dataRows.slice(0, 3));
+        // console.log('Excel标题行:', headers);
+        // console.log('数据行数:', dataRows.length);
+        // console.log('前几行数据:', dataRows.slice(0, 3));
         
         const workers: CreateWorkerRequest[] = [];
         const allErrors: string[] = [];
@@ -1285,7 +1285,7 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   ]);
   
   // 输出工地编号原始文本信息用于调试
-  // console.log(`第${rowIndex + 1}行工地编号原始文本: "${siteCodesText}"`);
+  // // console.log(`第${rowIndex + 1}行工地编号原始文本: "${siteCodesText}"`);
   
   // 使用更精确的分隔符处理
   // 先按逗号、顿号分割，再按空格分割，确保不会遗漏
@@ -1299,7 +1299,7 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
     );
     
     // 输出解析后的工地编号列表
-    // console.log(`第${rowIndex + 1}行解析后的工地编号: [${siteCodes.join(', ')}]`);
+    // // console.log(`第${rowIndex + 1}行解析后的工地编号: [${siteCodes.join(', ')}]`);
   }
   
   // 根据工地编号查找工地ID
@@ -1308,9 +1308,9 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   const matchedSites: {code: string, name: string}[] = [];
   
   // 输出可用的工地总数信息
-  // console.log(`系统中可用的工地总数: ${sites.length}`);
+  // // console.log(`系统中可用的工地总数: ${sites.length}`);
   // if (sites.length > 0) {
-  //   console.log(`工地示例: ${sites[0].code} - ${sites[0].name}`);
+  //   // console.log(`工地示例: ${sites[0].code} - ${sites[0].name}`);
   // }
   
   siteCodes.forEach((code: string) => {
@@ -1324,12 +1324,12 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   });
   
   // 输出匹配到的工地信息
-  console.log(`第${rowIndex + 1}行匹配到${matchedSites.length}个工地:`, 
-    matchedSites.map(s => `${s.code} - ${s.name}`).join(', '));
+  // console.log(`第${rowIndex + 1}行匹配到${matchedSites.length}个工地:`, 
+  //   matchedSites.map(s => `${s.code} - ${s.name}`).join(', '));
   
   // 如果有无效的工地编号，添加错误信息
   if (invalidSiteCodes.length > 0) {
-    console.log(`第${rowIndex + 1}行发现${invalidSiteCodes.length}个无效工地编号:`, invalidSiteCodes.join(', '));
+    // console.log(`第${rowIndex + 1}行发现${invalidSiteCodes.length}个无效工地编号:`, invalidSiteCodes.join(', '));
     errors.push(t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${t('siteCodesNotFound').replace('{codes}', invalidSiteCodes.join(', '))}` : `第${rowIndex + 1}行：找不到工地编号 ${invalidSiteCodes.join(', ')}`);
   }
   
@@ -1384,7 +1384,7 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   errors.push(...requiredErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   // 输出最终解析结果
-  // console.log(`第${rowIndex + 1}行分判商最终数据:`, {
+  // // console.log(`第${rowIndex + 1}行分判商最终数据:`, {
   //   name: distributorData.name,
   //   accountUsername: distributorData.accountUsername,
   //   siteIds: distributorData.siteIds,
@@ -1469,7 +1469,7 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
         const dataRows = jsonData.slice(1);
         
         // 输出表头信息用于调试
-        console.log('分判商Excel文件表头：', headers);
+        // console.log('分判商Excel文件表头：', headers);
         
         const distributors: any[] = [];
         const allErrors: string[] = [];
@@ -1489,16 +1489,16 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
           });
           
           // 调试信息：显示每一行的数据内容
-          console.log(`第${index + 2}行数据:`, rowData);
+          // console.log(`第${index + 2}行数据:`, rowData);
           
           // 检查是否有必填字段 - 支持多种可能的列名
           const nameValues = ['名称', '分判商名称', '公司名称', '名称(公司)', '公司', 'Name', 'DistributorName', 'Company Name'];
           const accountValues = ['账号', '用户名', '登录名', '账户名称', '登录账号', '账户', 'Account Username', 'Username', 'Login', 'Account', 'Account Name'];
           
           // 调试信息：显示检测到的列名
-          const nameMatch = nameValues.find(key => rowData[key] !== undefined);
-          const accountMatch = accountValues.find(key => rowData[key] !== undefined);
-          console.log(`第${index + 2}行检测：名称列=${nameMatch || '未找到'}(值=${nameMatch ? rowData[nameMatch] : '无'}), 账号列=${accountMatch || '未找到'}(值=${accountMatch ? rowData[accountMatch] : '无'})`)
+          // const nameMatch = nameValues.find(key => rowData[key] !== undefined);
+          // const accountMatch = accountValues.find(key => rowData[key] !== undefined);
+          // console.log(`第${index + 2}行检测：名称列=${nameMatch || '未找到'}(值=${nameMatch ? rowData[nameMatch] : '无'}), 账号列=${accountMatch || '未找到'}(值=${accountMatch ? rowData[accountMatch] : '无'})`)
           
           // 检查任意一个名称字段是否有值
           const hasName = nameValues.some(key => rowData[key] && rowData[key].toString().trim() !== '');
@@ -1515,7 +1515,7 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
               fields: missingFields.join('、') 
             }) : `第${index + 2}行：缺少必填字段（${missingFields.join('、')}），已跳过`;
             allErrors.push(errorMessage);
-            console.log(`跳过第${index + 2}行，缺少必填字段：`, rowData);
+            // console.log(`跳过第${index + 2}行，缺少必填字段：`, rowData);
             return;
           }
           
@@ -1820,8 +1820,8 @@ export const convertExcelToGuard = (row: any, rowIndex: number, defaultSiteId?: 
   };
   
   // 调试信息
-  console.log('Excel行数据:', row);
-  console.log('转换后的门卫数据:', guardData);
+  // console.log('Excel行数据:', row);
+  // console.log('转换后的门卫数据:', guardData);
   
   const requiredErrors = validateGuardRequiredFields(guardData, t);
   errors.push(...requiredErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
@@ -1981,18 +1981,18 @@ export const testRegionToAreaCode = (t?: (key: string) => string) => {
     '未知地区', 'Unknown', '其他', 'Other'
   ];
   
-  console.log('=== 地区识别和区号保存功能测试 ===');
-  console.log('Excel导入功能会根据地区名称自动识别并保存对应的区号');
-  console.log(`当前语言环境: ${t ? '已提供翻译函数' : '未提供翻译函数'}`);
+  // console.log('=== 地区识别和区号保存功能测试 ===');
+  // console.log('Excel导入功能会根据地区名称自动识别并保存对应的区号');
+  // console.log(`当前语言环境: ${t ? '已提供翻译函数' : '未提供翻译函数'}`);
   
   testCases.forEach(testCase => {
-    const areaCode = getAreaCodeFromRegion(testCase, t);
-    console.log(`地区: "${testCase}" -> 区号: "${areaCode}"`);
+    // const areaCode = getAreaCodeFromRegion(testCase, t);
+    // console.log(`地区: "${testCase}" -> 区号: "${areaCode}"`);
   });
   
   // 测试翻译函数提供的地区名称
   if (t) {
-    console.log('\n=== 翻译函数提供的地区名称测试 ===');
+    // console.log('\n=== 翻译函数提供的地区名称测试 ===');
     const translatedRegions = [
       t('regions.mainland'),
       t('regions.hongkong'),
@@ -2015,73 +2015,73 @@ export const testRegionToAreaCode = (t?: (key: string) => string) => {
     ];
     
     translatedRegions.forEach(region => {
-      const areaCode = getAreaCodeFromRegion(region, t);
-      console.log(`地区: "${region}" -> 区号: "${areaCode}"`);
+      // const areaCode = getAreaCodeFromRegion(region, t);
+      // console.log(`地区: "${region}" -> 区号: "${areaCode}"`);
     });
   }
   
-  console.log('\n=== 测试完成 ===');
-  console.log('注意：Excel导入时会根据地区名称自动识别并保存对应的区号到数据库中');
+  // console.log('\n=== 测试完成 ===');
+  // console.log('注意：Excel导入时会根据地区名称自动识别并保存对应的区号到数据库中');
 };
 
 // 简单测试函数 - 验证地区识别功能
 export const quickTestRegionRecognition = () => {
-  console.log('=== 快速测试地区识别功能 ===');
+  // console.log('=== 快速测试地区识别功能 ===');
   
   const testCases = ['Mainland China', 'Hong Kong', 'Macau', 'Taiwan'];
   
   testCases.forEach(testCase => {
-    const result = getAreaCodeFromRegion(testCase);
-    console.log(`输入: "${testCase}" -> 输出: "${result}"`);
+    // const result = getAreaCodeFromRegion(testCase);
+    // console.log(`输入: "${testCase}" -> 输出: "${result}"`);
   });
   
-  console.log('=== 快速测试完成 ===');
+  // console.log('=== 快速测试完成 ===');
 };
 
 // 调试函数 - 检查地区识别函数的详细过程
 export const debugRegionRecognition = (regionInput: string) => {
-  console.log('=== 调试地区识别过程 ===');
-  console.log(`输入地区: "${regionInput}"`);
+  // console.log('=== 调试地区识别过程 ===');
+  // console.log(`输入地区: "${regionInput}"`);
   
   if (!regionInput || typeof regionInput !== 'string') {
-    console.log('输入为空或不是字符串，返回默认值: +86');
+    // console.log('输入为空或不是字符串，返回默认值: +86');
     return '+86';
   }
   
   const cleanInput = regionInput.trim();
   const lowerInput = cleanInput.toLowerCase();
-  console.log(`清理后输入: "${cleanInput}"`);
-  console.log(`小写输入: "${lowerInput}"`);
+  // console.log(`清理后输入: "${cleanInput}"`);
+  // console.log(`小写输入: "${lowerInput}"`);
   
   const regionMap = getMultilingualRegionMap();
-  console.log('地区映射表:', regionMap);
+  // console.log('地区映射表:', regionMap);
   
   // 遍历所有区号和对应的地区名称列表
   for (const [areaCode, regionNames] of Object.entries(regionMap)) {
-    console.log(`检查区号: ${areaCode}`);
+    // console.log(`检查区号: ${areaCode}`);
     for (const regionName of regionNames) {
-      console.log(`  检查地区名称: "${regionName}"`);
+      // console.log(`  检查地区名称: "${regionName}"`);
       
       // 直接匹配
       if (cleanInput === regionName) {
-        console.log(`  直接匹配成功！返回: ${areaCode}`);
+        // console.log(`  直接匹配成功！返回: ${areaCode}`);
         return areaCode;
       }
       
       // 小写匹配
       if (lowerInput === regionName.toLowerCase()) {
-        console.log(`  小写匹配成功！返回: ${areaCode}`);
+        // console.log(`  小写匹配成功！返回: ${areaCode}`);
         return areaCode;
       }
       
       // 模糊匹配
       if (lowerInput.includes(regionName.toLowerCase()) || regionName.toLowerCase().includes(lowerInput)) {
-        console.log(`  模糊匹配成功！返回: ${areaCode}`);
+        // console.log(`  模糊匹配成功！返回: ${areaCode}`);
         return areaCode;
       }
     }
   }
   
-  console.log('没有找到匹配，返回默认值: +86');
+  // console.log('没有找到匹配，返回默认值: +86');
   return '+86';
 };

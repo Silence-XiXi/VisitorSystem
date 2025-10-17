@@ -13,7 +13,7 @@ export class CacheExampleService {
    */
   @Cacheable('users:list', 300) // 缓存5分钟
   async getUsersList() {
-    console.log('从数据库获取用户列表...');
+    // console.log('从数据库获取用户列表...');
     // 模拟数据库查询
     await new Promise(resolve => setTimeout(resolve, 1000));
     return [
@@ -28,7 +28,7 @@ export class CacheExampleService {
    */
   @Cacheable('user:', 600) // 缓存10分钟
   async getUserById(id: string) {
-    console.log(`从数据库获取用户 ${id}...`);
+    // console.log(`从数据库获取用户 ${id}...`);
     // 模拟数据库查询
     await new Promise(resolve => setTimeout(resolve, 500));
     return {
@@ -44,7 +44,7 @@ export class CacheExampleService {
    */
   @CacheEvict('users:list', 'user:')
   async updateUser(id: string, data: any) {
-    console.log(`更新用户 ${id}...`);
+    // console.log(`更新用户 ${id}...`);
     // 模拟数据库更新
     await new Promise(resolve => setTimeout(resolve, 200));
     
@@ -90,7 +90,7 @@ export class CacheExampleService {
     let stats = await this.redisService.get(cacheKey);
     
     if (!stats) {
-      console.log('计算系统统计数据...');
+      // console.log('计算系统统计数据...');
       // 模拟复杂的统计计算
       await new Promise(resolve => setTimeout(resolve, 2000));
       

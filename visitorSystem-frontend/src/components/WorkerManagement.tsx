@@ -191,6 +191,29 @@ const WorkerManagement: React.FC = () => {
     }
   };
 
+  // 处理批量更新工人状态
+  const handleBatchUpdateStatus = async (workers: Worker[], targetStatus: 'ACTIVE' | 'INACTIVE') => {
+    try {
+      const updatePromises = workers.map(async worker => {
+        const updateData = { status: targetStatus };
+        return apiService.updateWorker(worker.id, updateData);
+      });
+      
+      await Promise.all(updatePromises);
+      
+      // 更新本地状态
+      const newStatus = targetStatus === 'ACTIVE' ? 'active' : 'inactive';
+      setWorkers(prev => prev.map(w => 
+        workers.some(worker => worker.id === w.id)
+          ? { ...w, status: newStatus, updatedAt: new Date().toISOString() }
+          : w
+      ));
+    } catch (error) {
+      console.error('批量更新工人状态失败:', error);
+      throw error;
+    }
+  };
+
   // 处理编辑工人
   const handleEditWorker = (worker: Worker) => {
     setEditingWorker(worker);
@@ -480,7 +503,7 @@ const WorkerManagement: React.FC = () => {
   const handleImport = async (file: File) => {
     try {
       // 直接上传Excel文件给后端处理
-      console.log(`准备上传Excel文件: ${file.name}`)
+      // console.log(`准备上传Excel文件: ${file.name}`)
       const result = await apiService.importAdminWorkersFromExcel(file)
       
       // 如果有成功导入的工人，获取最新工人数据
@@ -524,7 +547,7 @@ const WorkerManagement: React.FC = () => {
         
         // 调试信息：显示地区识别过程
         // if (rawRegion) {
-        //   console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        //   // console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
         // }
 
         return {
@@ -901,6 +924,7 @@ const WorkerManagement: React.FC = () => {
           onDelete={handleDeleteWorker}
           onViewQR={handleViewQR}
           onToggleStatus={handleToggleStatus}
+          onBatchUpdateStatus={handleBatchUpdateStatus}
           loading={loading}
         />
       </Card>

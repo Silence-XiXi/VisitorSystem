@@ -2237,7 +2237,7 @@ const Guard: React.FC = () => {
   // 主页面
   if (currentView === 'main') {
     // 输出当前窗口宽度到控制台
-    // console.log('当前窗口宽度:', window.innerWidth)
+    // // console.log('当前窗口宽度:', window.innerWidth)
     
     return (
       <Layout style={{ minHeight: '100vh' }}>

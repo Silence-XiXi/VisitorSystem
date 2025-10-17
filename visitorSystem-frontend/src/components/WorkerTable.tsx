@@ -124,6 +124,7 @@ interface WorkerTableProps {
   onDelete: (id: string) => void;
   onViewQR: (worker: Worker) => void;
   onToggleStatus?: (worker: Worker) => void;
+  onBatchUpdateStatus?: (workers: Worker[], targetStatus: 'ACTIVE' | 'INACTIVE') => Promise<void>;
   loading?: boolean;
 }
 
@@ -135,6 +136,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   onDelete,
   onViewQR,
   onToggleStatus,
+  onBatchUpdateStatus,
   loading = false
 }) => {
   const { t } = useLocale();
@@ -153,6 +155,10 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   const [borrowRecords, setBorrowRecords] = useState<any[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
 
+  // 批量修改状态相关状态
+  const [batchUpdateStatusModalOpen, setBatchUpdateStatusModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<'ACTIVE' | 'INACTIVE' | ''>('');
+
   // 分页数据处理
   const paginatedWorkers = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -166,8 +172,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     if (size) {
       setPageSize(size);
     }
-    // 清空选择状态
-    setSelectedRowKeys([]);
+    // 保持选择状态，支持跨页多选
   };
 
   // 获取分判商名称
@@ -327,6 +332,118 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       okType: 'danger',
       onOk: () => onDelete(worker.id)
     });
+  };
+
+  // 批量删除工人
+  const handleBatchDeleteWorkers = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning(t('worker.pleaseSelectWorkersToDelete'));
+      return;
+    }
+
+    Modal.confirm({
+      title: t('worker.batchDeleteTitle'),
+      icon: <DeleteOutlined />,
+      content: (
+        <div>
+          <p>{t('worker.batchDeleteContent').replace('{count}', selectedRowKeys.length.toString())}</p>
+          <p style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '8px' }}>
+            {t('worker.batchDeleteWarning')}
+          </p>
+        </div>
+      ),
+      okText: t('worker.batchDeleteConfirm'),
+      cancelText: t('common.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const deletePromises = selectedRowKeys.map(workerId => 
+            onDelete(workerId as string)
+          );
+          await Promise.all(deletePromises);
+          
+          setSelectedRowKeys([]);
+          message.success(t('worker.batchDeleteSuccess').replace('{count}', selectedRowKeys.length.toString()));
+        } catch (error: any) {
+          console.error('批量删除失败:', error);
+          let errorMessage = t('worker.batchDeleteFailed');
+          
+          if (error?.response?.data?.message) {
+            errorMessage = error.response.data.message;
+          } else if (error?.message) {
+            errorMessage = error.message;
+          }
+          
+          message.error(errorMessage);
+        }
+      }
+    });
+  };
+
+  // 批量修改状态
+  const handleBatchUpdateStatus = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning(t('worker.pleaseSelectWorkersToUpdate'));
+      return;
+    }
+    setBatchUpdateStatusModalOpen(true);
+  };
+
+  // 确认批量修改状态
+  const handleConfirmBatchUpdateStatus = async () => {
+    if (!selectedStatus) {
+      message.warning(t('worker.pleaseSelectStatus'));
+      return;
+    }
+
+    try {
+      const selectedWorkers = paginatedWorkers.filter(worker => selectedRowKeys.includes(worker.id));
+      
+      // 转换状态格式进行比较：selectedStatus是大写(ACTIVE/INACTIVE)，worker.status是小写(active/inactive)
+      const targetStatus = selectedStatus === 'ACTIVE' ? 'active' : 'inactive';
+      
+      // 只对状态不匹配的工人进行更新
+      const workersToUpdate = selectedWorkers.filter(worker => worker.status !== targetStatus);
+      
+      if (workersToUpdate.length === 0) {
+        message.info(t('worker.allWorkersAlreadyInSelectedStatus'));
+        setSelectedRowKeys([]);
+        setBatchUpdateStatusModalOpen(false);
+        setSelectedStatus('');
+        return;
+      }
+      
+      // 使用批量更新状态回调，这样可以同时更新本地状态
+      if (onBatchUpdateStatus) {
+        await onBatchUpdateStatus(workersToUpdate, selectedStatus);
+      } else {
+        // 如果没有批量更新回调，回退到单个更新
+        const updatePromises = workersToUpdate.map(async worker => {
+          if (onToggleStatus) {
+            return onToggleStatus(worker);
+          }
+          return Promise.resolve();
+        });
+        
+        await Promise.all(updatePromises);
+      }
+      
+      setSelectedRowKeys([]);
+      setBatchUpdateStatusModalOpen(false);
+      setSelectedStatus('');
+      message.success(t('worker.batchUpdateStatusSuccess').replace('{count}', workersToUpdate.length.toString()));
+    } catch (error: any) {
+      console.error('批量修改状态失败:', error);
+      let errorMessage = t('worker.batchUpdateStatusFailed');
+      
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      message.error(errorMessage);
+    }
   };
 
   // 处理批量发送二维码
@@ -917,6 +1034,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
     onChange: (newSelectedRowKeys: React.Key[]) => {
       setSelectedRowKeys(newSelectedRowKeys);
     },
+    preserveSelectedRowKeys: true,
     getCheckboxProps: (record: Worker) => ({
       disabled: record.status === 'inactive', // 离职工人不可选
     }),
@@ -1185,11 +1303,26 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
             {t('worker.selectedWorkers').replace('{count}', selectedRowKeys.length.toString())}
             {selectedRowKeys.length > 0 && (
               <span style={{ color: '#999', marginLeft: '8px' }}>
-                / {t('worker.totalWorkers').replace('{count}', paginatedWorkers.length.toString())}
+                / {t('worker.totalWorkers').replace('{count}', workers.length.toString())}
               </span>
             )}
           </span>
           <Space>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />} 
+              onClick={handleBatchDeleteWorkers}
+            >
+              {t('worker.batchDeleteWorkers')}({selectedRowKeys.length})
+            </Button>
+            <Button
+              size="small"
+              icon={<CheckCircleOutlined />} 
+              onClick={handleBatchUpdateStatus}
+            >
+              {t('worker.batchUpdateStatus')}({selectedRowKeys.length})
+            </Button>
             <Button
               type="primary"
               icon={<MailOutlined />}
@@ -1212,7 +1345,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               onClick={() => setSelectedRowKeys([])}
               size="small"
             >
-              {t('worker.cancelSelection')}
+              {t('worker.cancelSelection').replace('{count}', selectedRowKeys.length.toString())}
             </Button>
           </Space>
         </div>
@@ -1421,6 +1554,55 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
             )}
           </div>
         )}
+      </Modal>
+
+      {/* 批量修改状态模态框 */}
+      <Modal
+        title={t('worker.batchUpdateStatus')}
+        open={batchUpdateStatusModalOpen}
+        onCancel={() => {
+          setBatchUpdateStatusModalOpen(false);
+          setSelectedStatus('');
+        }}
+        onOk={handleConfirmBatchUpdateStatus}
+        destroyOnClose
+        width={500}
+      >
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>{t('worker.confirmBatchUpdateStatus')}</p>
+          <p style={{ color: '#666', fontSize: '16px' }}>
+            {t('worker.selectedWorkers').replace('{count}', selectedRowKeys.length.toString())}
+          </p>
+        </div>
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{t('worker.selectStatus')}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '32px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="status"
+                value="ACTIVE"
+                checked={selectedStatus === 'ACTIVE'}
+                onChange={(e) => setSelectedStatus(e.target.value as 'ACTIVE' | 'INACTIVE' | '')}
+                style={{ marginRight: '8px' }}
+              />
+              <Tag color="green" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('worker.active')}</Tag>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="status"
+                value="INACTIVE"
+                checked={selectedStatus === 'INACTIVE'}
+                onChange={(e) => setSelectedStatus(e.target.value as 'ACTIVE' | 'INACTIVE' | '')}
+                style={{ marginRight: '8px' }}
+              />
+              <Tag color="red" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('worker.inactive')}</Tag>
+            </label>
+          </div>
+        </div>
       </Modal>
     </div>
   );

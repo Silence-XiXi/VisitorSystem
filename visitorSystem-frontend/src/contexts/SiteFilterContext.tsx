@@ -57,13 +57,13 @@ export const SiteFilterProvider: React.FC<SiteFilterProviderProps> = ({ children
       
       // 如果用户信息还在加载中，等待加载完成
       if (authLoading) {
-        console.log('Auth still loading, skipping site load')
+        // console.log('Auth still loading, skipping site load')
         return
       }
       
       // 如果没有用户信息，使用默认站点
       if (!user) {
-        console.log('No user info, using default sites')
+        // console.log('No user info, using default sites')
         const defaultSites = [
           {
             id: 'default-site',

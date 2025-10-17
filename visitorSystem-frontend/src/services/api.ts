@@ -3,7 +3,7 @@ const API_BASE_URL = (() => {
   // 首先尝试使用环境变量
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
   if (envUrl) {
-    console.log('[API Config] Using environment variable:', envUrl);
+    // console.log('[API Config] Using environment variable:', envUrl);
     return envUrl;
   }
 
@@ -22,20 +22,20 @@ const API_BASE_URL = (() => {
   if (proxyPorts.includes(currentPort) || !currentPort) {
     // 使用相对路径，让Nginx代理处理
     const url = '/api';
-    console.log('[API Config] Using relative path for Nginx proxy:', url);
+    // console.log('[API Config] Using relative path for Nginx proxy:', url);
     return url;
   }
   
   // 如果是本地开发环境（直接访问容器端口），使用localhost:3001
   if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
     const url = 'http://localhost:3001';
-    console.log('[API Config] Local development detected, using:', url);
+    // console.log('[API Config] Local development detected, using:', url);
     return url;
   } 
   
   // 其他情况：使用相对路径，让Nginx代理处理
   const url = '/api';
-  console.log('[API Config] Using relative path:', url);
+  // console.log('[API Config] Using relative path:', url);
   return url;
 })();
 
@@ -261,7 +261,7 @@ class ApiService {
       // 如果是网络错误且还有重试次数，则重试
       if (error && typeof error === 'object' && 'isNetworkError' in error && 
           (error as { isNetworkError: boolean }).isNetworkError && retryCount < this.maxRetries) {
-        console.log(`请求失败，正在重试 (${retryCount + 1}/${this.maxRetries})...`);
+        // console.log(`请求失败，正在重试 (${retryCount + 1}/${this.maxRetries})...`);
         await this.delay(this.retryDelay * (retryCount + 1)); // 递增延迟
         return this.requestWithRetry<T>(endpoint, options, retryCount + 1);
       }
@@ -311,7 +311,7 @@ class ApiService {
         
         try {
           errorData = await response.json();
-          console.log('错误响应数据:', errorData);
+          // console.log('错误响应数据:', errorData);
           errorMessage = errorData.message || errorData.error || errorMessage;
           errorCode = errorData.statusCode || response.status;
         } catch (parseError) {
@@ -327,7 +327,7 @@ class ApiService {
           case 401:
             // 检测到 token 过期，自动登出
             if (globalLogoutFunction) {
-              console.log('检测到 token 过期，自动登出');
+              // console.log('检测到 token 过期，自动登出');
               globalLogoutFunction();
             }
             errorMessage = '登录已过期，请重新登录';
@@ -564,6 +564,16 @@ class ApiService {
     });
   }
 
+  async deleteSite(siteId: string): Promise<{
+    siteId: string;
+    siteName: string;
+    deletedBy: string;
+  }> {
+    return this.requestWithRetry(`/admin/sites/${siteId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async toggleGuardStatus(guardId: string): Promise<{
     guardId: string;
     guardName: string;
@@ -572,6 +582,18 @@ class ApiService {
     newStatus: string;
   }> {
     return this.requestWithRetry(`/admin/guards/${guardId}/toggle-status`, {
+      method: 'PATCH',
+    });
+  }
+
+  async toggleDistributorStatus(distributorId: string): Promise<{
+    distributorId: string;
+    distributorName: string;
+    username: string;
+    oldStatus: string;
+    newStatus: string;
+  }> {
+    return this.requestWithRetry(`/admin/distributors/${distributorId}/toggle-status`, {
       method: 'PATCH',
     });
   }
@@ -885,7 +907,7 @@ class ApiService {
       } else {
         // 如果不是JSON，尝试解析文本响应
         const textResponse = await response.text();
-        console.log('Non-JSON response:', textResponse);
+        // console.log('Non-JSON response:', textResponse);
         
         // 尝试解析为JSON
         try {
@@ -952,7 +974,7 @@ class ApiService {
       } else {
         // 如果不是JSON，尝试解析文本响应
         const textResponse = await response.text();
-        console.log('Non-JSON response:', textResponse);
+        // console.log('Non-JSON response:', textResponse);
         
         // 尝试解析为JSON
         try {
@@ -1328,7 +1350,7 @@ class ApiService {
     borrowTime: string;
     notes?: string; // 注意：后端使用notes字段而不是remark
   }): Promise<any> {
-    console.log('API服务：发送借用记录请求:', data);
+    // console.log('API服务：发送借用记录请求:', data);
     return this.requestWithRetry('/guards/borrow-records', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1455,12 +1477,12 @@ class ApiService {
   }): Promise<{ success: boolean; message: string; error?: string; details?: any; step?: string; stack?: string }> {
     try {
       // 打印更详细的调试信息
-      console.log('发送请求到 /email/send-distributor-account API端点');
-      console.log('发送数据:', JSON.stringify(data, null, 2));
-      console.log('请求URL:', this.baseURL + '/email/send-distributor-account');
+      // console.log('发送请求到 /email/send-distributor-account API端点');
+      // console.log('发送数据:', JSON.stringify(data, null, 2));
+      // console.log('请求URL:', this.baseURL + '/email/send-distributor-account');
       
       const startTime = Date.now();
-      console.log('开始发送邮件请求...');
+      // console.log('开始发送邮件请求...');
       
       // 发送邮件
       const response = await this.requestWithRetry<{ success: boolean; message: string; error?: string; details?: any; step?: string; stack?: string }>('/email/send-distributor-account', {
@@ -1471,7 +1493,7 @@ class ApiService {
         body: JSON.stringify(data),
       });
       
-      console.log(`API响应 [${Date.now() - startTime}ms]:`, response);
+      // console.log(`API响应 [${Date.now() - startTime}ms]:`, response);
       
       if (!response.success) {
         console.warn('邮件发送失败:', response);

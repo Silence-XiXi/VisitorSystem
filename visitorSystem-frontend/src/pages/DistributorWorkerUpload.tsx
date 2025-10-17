@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
 
 const { Option } = Select
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined, SwapOutlined, CheckCircleOutlined } from '@ant-design/icons'
 
 import { Worker, Site, CreateWorkerRequest } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
@@ -65,6 +65,10 @@ const DistributorWorkerUpload: React.FC = () => {
   const [migrateModalOpen, setMigrateModalOpen] = useState(false)
   const [migrateLoading, setMigrateLoading] = useState(false)
   const [targetSiteId, setTargetSiteId] = useState<string>('')
+  
+  // 批量修改状态相关状态
+  const [batchUpdateStatusModalOpen, setBatchUpdateStatusModalOpen] = useState(false)
+  const [selectedStatus, setSelectedStatus] = useState<'ACTIVE' | 'INACTIVE' | ''>('')
   
   // 工地数据状态
   const [sites, setSites] = useState<Site[]>([])
@@ -423,6 +427,103 @@ const DistributorWorkerUpload: React.FC = () => {
       message.error(t('distributor.inviteFailed'))
     } finally {
       setSendingInviteLoading(false)
+    }
+  }
+
+  // 批量删除工人
+  const handleBatchDeleteWorkers = async () => {
+    if (selectedWorkerIds.length === 0) {
+      message.warning(t('worker.pleaseSelectWorkersToDelete'))
+      return
+    }
+
+    Modal.confirm({
+      title: t('worker.batchDeleteTitle'),
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <p>{t('worker.batchDeleteContent').replace('{count}', selectedWorkerIds.length.toString())}</p>
+          <p style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '8px' }}>
+            {t('worker.batchDeleteWarning')}
+          </p>
+        </div>
+      ),
+      okText: t('worker.batchDeleteConfirm'),
+      cancelText: t('common.cancel'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          setLoading(true)
+          
+          const deletePromises = selectedWorkerIds.map(workerId => 
+            apiService.deleteDistributorWorker(workerId)
+          )
+          await Promise.all(deletePromises)
+          
+          // 更新本地状态
+          setWorkers(prev => prev.filter(worker => !selectedWorkerIds.includes(worker.id)))
+          setSelectedWorkerIds([])
+          
+          message.success(t('worker.batchDeleteSuccess').replace('{count}', selectedWorkerIds.length.toString()))
+        } catch (error: any) {
+          console.error('批量删除失败:', error)
+          let errorMessage = t('worker.batchDeleteFailed')
+          
+          if (error?.response?.data?.message) {
+            errorMessage = error.response.data.message
+          } else if (error?.message) {
+            errorMessage = error.message
+          }
+          
+          message.error(errorMessage)
+        } finally {
+          setLoading(false)
+        }
+      }
+    })
+  }
+
+  // 批量修改状态
+  const handleBatchUpdateStatus = async (targetStatus: 'ACTIVE' | 'INACTIVE') => {
+    if (selectedWorkerIds.length === 0) {
+      message.warning(t('worker.pleaseSelectWorkersToUpdate'))
+      return
+    }
+
+    try {
+      setLoading(true)
+      
+      // 批量更新状态
+      const updatePromises = selectedWorkerIds.map(workerId => {
+        const updateData = { status: targetStatus }
+        return apiService.updateDistributorWorker(workerId, updateData)
+      })
+      
+      await Promise.all(updatePromises)
+      
+      // 更新本地状态
+      const newStatus = targetStatus === 'ACTIVE' ? 'active' : 'inactive'
+      setWorkers(prev => prev.map(worker => 
+        selectedWorkerIds.includes(worker.id)
+          ? { ...worker, status: newStatus, updatedAt: new Date().toISOString() }
+          : worker
+      ))
+      
+      setSelectedWorkerIds([])
+      message.success(t('worker.batchUpdateStatusSuccess').replace('{count}', selectedWorkerIds.length.toString()))
+    } catch (error: any) {
+      console.error('批量修改状态失败:', error)
+      let errorMessage = t('worker.batchUpdateStatusFailed')
+      
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
+      message.error(errorMessage)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1053,6 +1154,22 @@ const DistributorWorkerUpload: React.FC = () => {
                 <Space>
                   <Button
                     size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={handleBatchDeleteWorkers}
+                    loading={loading}
+                  >
+                    {t('worker.batchDeleteWorkers')}({selectedWorkerIds.length})
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    onClick={() => setBatchUpdateStatusModalOpen(true)}
+                  >
+                    {t('worker.batchUpdateStatus')}({selectedWorkerIds.length})
+                  </Button>
+                  <Button
+                    size="small"
                     type="primary"
                     icon={<MailOutlined />}
                     onClick={() => {
@@ -1060,7 +1177,7 @@ const DistributorWorkerUpload: React.FC = () => {
                     }}
                     loading={sendingEmailLoading}
                   >
-                    {t('worker.batchSendToEmail')}
+                    {t('worker.batchSendToEmail')}({selectedWorkerIds.length})
                   </Button>
                   <Button
                     size="small"
@@ -1071,7 +1188,7 @@ const DistributorWorkerUpload: React.FC = () => {
                     }}
                     loading={sendingWhatsAppLoading}
                   >
-                    {t('worker.batchSendToWhatsApp')}
+                    {t('worker.batchSendToWhatsApp')}({selectedWorkerIds.length})
                   </Button>
                   <Button
                     size="small"
@@ -1334,6 +1451,63 @@ const DistributorWorkerUpload: React.FC = () => {
           sites={distributorSites}
           loading={sendingInviteLoading}
         />
+
+      {/* 批量修改状态模态框 */}
+      <Modal
+        title={t('worker.batchUpdateStatus')}
+        open={batchUpdateStatusModalOpen}
+        onCancel={() => {
+          setBatchUpdateStatusModalOpen(false)
+          setSelectedStatus('')
+        }}
+        onOk={() => {
+          if (!selectedStatus) {
+            message.warning(t('worker.pleaseSelectStatus'))
+            return
+          }
+          handleBatchUpdateStatus(selectedStatus)
+          setBatchUpdateStatusModalOpen(false)
+          setSelectedStatus('')
+        }}
+        destroyOnClose
+        width={500}
+      >
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>{t('worker.confirmBatchUpdateStatus')}</p>
+          <p style={{ color: '#666', fontSize: '16px' }}>
+            {t('worker.selectedWorkers').replace('{count}', selectedWorkerIds.length.toString())}
+          </p>
+        </div>
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{t('worker.selectStatus')}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '32px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="status"
+                value="ACTIVE"
+                checked={selectedStatus === 'ACTIVE'}
+                onChange={(e) => setSelectedStatus(e.target.value as 'ACTIVE' | 'INACTIVE')}
+                style={{ marginRight: '8px' }}
+              />
+              <Tag color="green" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('worker.active')}</Tag>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="status"
+                value="INACTIVE"
+                checked={selectedStatus === 'INACTIVE'}
+                onChange={(e) => setSelectedStatus(e.target.value as 'ACTIVE' | 'INACTIVE')}
+                style={{ marginRight: '8px' }}
+              />
+              <Tag color="red" style={{ marginRight: '8px', fontSize: '14px', padding: '4px 8px' }}>{t('worker.inactive')}</Tag>
+            </label>
+          </div>
+        </div>
+      </Modal>
 
       {/* 迁移工人模态框 */}
       <Modal
