@@ -332,10 +332,10 @@ export class EmailController {
       // console.log('接收分判商账号邮件请求:', {
       //   email: distributorEmail, 
       //   name: distributorName,
-        username,
-        loginUrl,
-        languageProvided: !!language
-      });
+      //   username,
+      //   loginUrl,
+      //   languageProvided: !!language
+      // });
   
       // 验证必填字段
       if (!distributorEmail || !distributorName || !username || !password || !loginUrl) {
