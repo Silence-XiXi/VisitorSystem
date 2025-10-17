@@ -415,7 +415,7 @@ export class DistributorsService {
       const workerData = workersData[i];
       
       try {
-        console.log(`处理第${i + 1}行数据:`, workerData);
+        // console.log(`处理第${i + 1}行数据:`, workerData);
         
         // 检查必填字段
         if (!workerData.name || !workerData.gender || !workerData.idNumber || !workerData.phone) {
@@ -427,7 +427,7 @@ export class DistributorsService {
           
           results.errors++;
           results.errorDetails.push(`第${i + 1}行：缺少必填字段 [${missingFields.join(', ')}]`);
-          console.log(`第${i + 1}行缺少必填字段:`, missingFields);
+          // console.log(`第${i + 1}行缺少必填字段:`, missingFields);
           continue;
         }
 
@@ -643,7 +643,7 @@ export class DistributorsService {
     }
 
     try {
-      console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
+      // console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
       
       // 读取Excel文件
       const workbook = XLSX.read(file.buffer, { type: 'buffer' });
@@ -673,9 +673,9 @@ export class DistributorsService {
         const areaCode = this.getAreaCodeFromRegion(rawRegion);
         
         // 调试信息：显示地区识别过程
-        if (rawRegion) {
-          console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
-        }
+        // if (rawRegion) {
+        //   console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        // }
 
         return {
           name: getValue(row['姓名'] || row['name'] || row['Name']) || '',

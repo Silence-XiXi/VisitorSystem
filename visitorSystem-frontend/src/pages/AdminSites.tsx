@@ -1355,12 +1355,12 @@ const AdminSites: React.FC = () => {
               console.log(`跳过重复的工地: ${siteData.name} (编号: ${importData.code || '自动生成'})`)
             } else {
               // 其他错误
-              errors.push(`${siteData.name}: ${error.message || '创建失败'}`)
+              errors.push(`${siteData.name}: ${error.message || t('createFailed')}`)
             }
           }
         } catch (error: unknown) {
           const err = error as { message?: string }
-          errors.push(`${siteData.name}: ${err.message || '处理失败'}`)
+          errors.push(`${siteData.name}: ${err.message || t('processingFailed')}`)
         }
       }
 
@@ -1515,12 +1515,12 @@ const AdminSites: React.FC = () => {
               console.log(`跳过重复的分判商: ${distributorData.name} (用户名: ${importData.username})`)
             } else {
               // 其他错误
-              errors.push(`${distributorData.name}: ${error.message || '创建失败'}`)
+              errors.push(`${distributorData.name}: ${error.message || t('createFailed')}`)
             }
           }
         } catch (error: unknown) {
           const err = error as { message?: string }
-          errors.push(`${distributorData.name}: ${err.message || '处理失败'}`)
+          errors.push(`${distributorData.name}: ${err.message || t('processingFailed')}`)
         }
       }
 
@@ -1692,12 +1692,12 @@ const AdminSites: React.FC = () => {
               console.log(`跳过重复的门卫: ${guardData.name} (用户名: ${importData.username})`)
             } else {
               // 其他错误
-              errors.push(`${guardData.name}: ${error.message || '创建失败'}`)
+              errors.push(`${guardData.name}: ${error.message || t('createFailed')}`)
             }
           }
         } catch (error: unknown) {
           const err = error as { message?: string }
-          errors.push(`${guardData.name}: ${err.message || '处理失败'}`)
+          errors.push(`${guardData.name}: ${err.message || t('processingFailed')}`)
         }
       }
 

@@ -523,9 +523,9 @@ const WorkerManagement: React.FC = () => {
         const areaCode = getAreaCodeFromRegion(rawRegion, t);
         
         // 调试信息：显示地区识别过程
-        if (rawRegion) {
-          console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
-        }
+        // if (rawRegion) {
+        //   console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        // }
 
         return {
           name: String(workerData.name || ''),

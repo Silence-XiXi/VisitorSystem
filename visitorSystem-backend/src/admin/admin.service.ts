@@ -1698,7 +1698,7 @@ export class AdminService {
     }
 
     try {
-      console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
+      // console.log('开始处理Excel文件:', file.originalname, '大小:', file.size);
       
       // 读取Excel文件
       const workbook = XLSX.read(file.buffer, { type: 'buffer' });
@@ -1729,9 +1729,9 @@ export class AdminService {
         const areaCode = this.getAreaCodeFromRegion(rawRegion);
         
         // 调试信息：显示地区识别过程
-        if (rawRegion) {
-          console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
-        }
+        // if (rawRegion) {
+        //   console.log(`第${index + 1}行地区识别：输入"${rawRegion}" -> 识别为区号"${areaCode}"`);
+        // }
 
         const workerData = {
           name: getValue(row['姓名'] || row['name'] || row['Name']) || '',

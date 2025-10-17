@@ -425,7 +425,7 @@ const ItemCategoryManagement: React.FC = () => {
         
           // 验证必填字段
         if (!rowData['Name']) {
-          errors.push(`第${i + 2}行：${t('itemCategory.categoryName')}不能为空`)
+          errors.push(`${t('rowErrorPrefix').replace('{row}', (i + 2).toString())}${t('itemCategory.categoryName')}${t('cannotBeEmpty')}`)
           continue
         }
         
@@ -523,7 +523,7 @@ const ItemCategoryManagement: React.FC = () => {
           successCount++
           
         } catch (error: any) {
-          const errorMessage = error?.response?.data?.message || '创建失败'
+          const errorMessage = error?.response?.data?.message || t('createFailed')
           errors.push(`${categoryData['Name'] || 'Unknown'}: ${errorMessage}`)
         }
       }

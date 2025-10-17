@@ -497,9 +497,9 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
   const areaCode = getAreaCodeFromRegion(regionInput, t);
   
   // 调试信息：显示地区识别和区号保存过程
-  if (regionInput) {
-    console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
-  }
+  // if (regionInput) {
+  //   console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
+  // }
   
   // 数据清洗和转换
   const workerData = {
@@ -520,11 +520,11 @@ export const convertExcelToWorker = (row: any, rowIndex: number, t?: (key: strin
   
   // 验证必填字段
   const requiredErrors = validateRequiredFields(workerData, t);
-  errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  errors.push(...requiredErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   // 验证数据格式 - 已取消所有格式验证
   const formatErrors = validateDataFormat();
-  errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  errors.push(...formatErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   // 检查身份证是否重复 - 直接跳过，不添加错误信息
   if (workerData.idNumber && checkIdNumberDuplicate(workerData.idNumber, existingWorkers)) {
@@ -551,9 +551,9 @@ export const convertExcelToWorkerForDistributor = (row: any, rowIndex: number, t
   const areaCode = getAreaCodeFromRegion(regionInput, t);
   
   // 调试信息：显示地区识别和区号保存过程
-  if (regionInput) {
-    console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
-  }
+  // if (regionInput) {
+  //   console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
+  // }
   
   // 将中文列名映射为英文字段名，同时支持英文列名
   const workerData = {
@@ -598,7 +598,7 @@ export const convertExcelToWorkerForDistributor = (row: any, rowIndex: number, t
   
   // 验证数据格式 - 已取消所有格式验证
   const formatErrors = validateDataFormat();
-  errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  errors.push(...formatErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   // 检查身份证是否重复 - 直接跳过，不添加错误信息
   if (workerData.idNumber && checkIdNumberDuplicate(workerData.idNumber, existingWorkers)) {
@@ -625,9 +625,9 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
   const areaCode = getAreaCodeFromRegion(regionInput, t);
   
   // 调试信息：显示地区识别和区号保存过程
-  if (regionInput) {
-    console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
-  }
+  // if (regionInput) {
+  //   console.log(`第${rowIndex + 1}行地区识别：输入"${regionInput}" -> 识别为区号"${areaCode}"`);
+  // }
   
   // 将中文列名映射为英文字段名，同时支持英文列名
   const workerData = {
@@ -653,7 +653,7 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
     if (distributor) {
       workerData.distributorId = distributor.id;
     } else {
-      errors.push(`第${rowIndex + 1}行：找不到分判商"${distributorName}"`);
+      errors.push(t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${t('distributorNotFound').replace('{name}', distributorName)}` : `第${rowIndex + 1}行：找不到分判商"${distributorName}"`);
     }
   }
   
@@ -664,7 +664,7 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
     if (site) {
       workerData.siteId = site.id;
     } else {
-      errors.push(`第${rowIndex + 1}行：找不到工地"${siteName}"`);
+      errors.push(t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${t('siteNotFound').replace('{name}', siteName)}` : `第${rowIndex + 1}行：找不到工地"${siteName}"`);
     }
   }
   
@@ -692,7 +692,7 @@ export const convertExcelToWorkerForAdmin = (row: any, rowIndex: number, distrib
   
   // 验证数据格式 - 已取消所有格式验证
   const formatErrors = validateDataFormat();
-  errors.push(...formatErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  errors.push(...formatErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   // 检查身份证是否重复 - 直接跳过，不添加错误信息
   if (workerData.idNumber && checkIdNumberDuplicate(workerData.idNumber, existingWorkers)) {
@@ -717,7 +717,7 @@ export const readExcelFile = (file: File, t?: (key: string) => string, existingW
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
         if (jsonData.length < 2) {
-          resolve({ workers: [], errors: ['Excel文件至少需要包含标题行和一行数据'] });
+          resolve({ workers: [], errors: [t ? t('worker.excelMinDataRequired') : 'Excel文件至少需要包含标题行和一行数据'] });
           return;
         }
         
@@ -755,11 +755,11 @@ export const readExcelFile = (file: File, t?: (key: string) => string, existingW
         
         resolve({ workers, errors: allErrors });
       } catch (error) {
-        reject(new Error('Excel文件读取失败'));
+        reject(new Error(t ? t('worker.excelReadFailed') : 'Excel文件读取失败'));
       }
     };
     
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(t ? t('worker.fileReadFailed') : '文件读取失败'));
     reader.readAsArrayBuffer(file);
   });
 };
@@ -1074,11 +1074,11 @@ export const readWorkerExcelFile = (file: File, distributors?: any[], sites?: an
         
         resolve({ workers, errors: allErrors });
       } catch (error) {
-        reject(new Error('Excel文件读取失败'));
+        reject(new Error(t ? t('worker.excelReadFailed') : 'Excel文件读取失败'));
       }
     };
     
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(t ? t('worker.fileReadFailed') : '文件读取失败'));
     reader.readAsArrayBuffer(file);
   });
 };
@@ -1259,7 +1259,7 @@ export const convertExcelToSite = (row: any, rowIndex: number, t?: (key: string)
   };
   
   const requiredErrors = validateSiteRequiredFields(siteData, t);
-  errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  errors.push(...requiredErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   return { data: siteData, errors };
 };
@@ -1285,7 +1285,7 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   ]);
   
   // 输出工地编号原始文本信息用于调试
-  console.log(`第${rowIndex + 1}行工地编号原始文本: "${siteCodesText}"`);
+  // console.log(`第${rowIndex + 1}行工地编号原始文本: "${siteCodesText}"`);
   
   // 使用更精确的分隔符处理
   // 先按逗号、顿号分割，再按空格分割，确保不会遗漏
@@ -1299,7 +1299,7 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
     );
     
     // 输出解析后的工地编号列表
-    console.log(`第${rowIndex + 1}行解析后的工地编号: [${siteCodes.join(', ')}]`);
+    // console.log(`第${rowIndex + 1}行解析后的工地编号: [${siteCodes.join(', ')}]`);
   }
   
   // 根据工地编号查找工地ID
@@ -1308,10 +1308,10 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   const matchedSites: {code: string, name: string}[] = [];
   
   // 输出可用的工地总数信息
-  console.log(`系统中可用的工地总数: ${sites.length}`);
-  if (sites.length > 0) {
-    console.log(`工地示例: ${sites[0].code} - ${sites[0].name}`);
-  }
+  // console.log(`系统中可用的工地总数: ${sites.length}`);
+  // if (sites.length > 0) {
+  //   console.log(`工地示例: ${sites[0].code} - ${sites[0].name}`);
+  // }
   
   siteCodes.forEach((code: string) => {
     const site = sites.find(s => s.code === code);
@@ -1330,7 +1330,7 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   // 如果有无效的工地编号，添加错误信息
   if (invalidSiteCodes.length > 0) {
     console.log(`第${rowIndex + 1}行发现${invalidSiteCodes.length}个无效工地编号:`, invalidSiteCodes.join(', '));
-    errors.push(`第${rowIndex + 1}行：找不到工地编号 ${invalidSiteCodes.join(', ')}`);
+    errors.push(t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${t('siteCodesNotFound').replace('{codes}', invalidSiteCodes.join(', '))}` : `第${rowIndex + 1}行：找不到工地编号 ${invalidSiteCodes.join(', ')}`);
   }
   
   // 使用辅助函数获取各字段值
@@ -1381,15 +1381,15 @@ export const convertExcelToDistributor = (row: any, rowIndex: number, sites: any
   };
   
   const requiredErrors = validateDistributorRequiredFields(distributorData, t);
-  errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  errors.push(...requiredErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   // 输出最终解析结果
-  console.log(`第${rowIndex + 1}行分判商最终数据:`, {
-    name: distributorData.name,
-    accountUsername: distributorData.accountUsername,
-    siteIds: distributorData.siteIds,
-    siteCount: distributorData.siteIds.length
-  });
+  // console.log(`第${rowIndex + 1}行分判商最终数据:`, {
+  //   name: distributorData.name,
+  //   accountUsername: distributorData.accountUsername,
+  //   siteIds: distributorData.siteIds,
+  //   siteCount: distributorData.siteIds.length
+  // });
   
   return { data: distributorData, errors };
 };
@@ -1438,17 +1438,17 @@ export const readSiteExcelFile = (file: File, t?: (key: string) => string): Prom
         
         resolve({ sites, errors: allErrors });
       } catch (error) {
-        reject(new Error('Excel文件读取失败'));
+        reject(new Error(t ? t('worker.excelReadFailed') : 'Excel文件读取失败'));
       }
     };
     
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(t ? t('worker.fileReadFailed') : '文件读取失败'));
     reader.readAsArrayBuffer(file);
   });
 };
 
 // 读取分判商Excel文件
-export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key: string) => string): Promise<{ distributors: any[]; errors: string[] }> => {
+export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key: string, params?: Record<string, string>) => string): Promise<{ distributors: any[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -1508,9 +1508,13 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
           if (!hasName || !hasAccount) {
             // 如果缺少必填字段，记录警告信息
             const missingFields = [];
-            if (!hasName) missingFields.push('名称');
-            if (!hasAccount) missingFields.push('账号');
-            allErrors.push(`第${index + 2}行：缺少必填字段（${missingFields.join('、')}），已跳过`);
+            if (!hasName) missingFields.push(t ? t('common.name') : '名称');
+            if (!hasAccount) missingFields.push(t ? t('common.account') : '账号');
+            const errorMessage = t ? t('worker.missingFieldsError', { 
+              row: (index + 2).toString(), 
+              fields: missingFields.join('、') 
+            }) : `第${index + 2}行：缺少必填字段（${missingFields.join('、')}），已跳过`;
+            allErrors.push(errorMessage);
             console.log(`跳过第${index + 2}行，缺少必填字段：`, rowData);
             return;
           }
@@ -1525,11 +1529,11 @@ export const readDistributorExcelFile = (file: File, sites: any[] = [], t?: (key
         
         resolve({ distributors, errors: allErrors });
       } catch (error) {
-        reject(new Error('Excel文件读取失败'));
+        reject(new Error(t ? t('worker.excelReadFailed') : 'Excel文件读取失败'));
       }
     };
     
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(t ? t('worker.fileReadFailed') : '文件读取失败'));
     reader.readAsArrayBuffer(file);
   });
 };
@@ -1820,7 +1824,7 @@ export const convertExcelToGuard = (row: any, rowIndex: number, defaultSiteId?: 
   console.log('转换后的门卫数据:', guardData);
   
   const requiredErrors = validateGuardRequiredFields(guardData, t);
-  errors.push(...requiredErrors.map(error => `第${rowIndex + 1}行：${error}`));
+  errors.push(...requiredErrors.map(error => t ? `${t('rowErrorPrefix').replace('{row}', (rowIndex + 1).toString())}${error}` : `第${rowIndex + 1}行：${error}`));
   
   return { data: guardData, errors };
 };
@@ -1869,11 +1873,11 @@ export const readGuardExcelFile = (file: File, defaultSiteId?: string, t?: (key:
         
         resolve({ guards, errors: allErrors });
       } catch (error) {
-        reject(new Error('Excel文件读取失败'));
+        reject(new Error(t ? t('worker.excelReadFailed') : 'Excel文件读取失败'));
       }
     };
     
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(t ? t('worker.fileReadFailed') : '文件读取失败'));
     reader.readAsArrayBuffer(file);
   });
 };

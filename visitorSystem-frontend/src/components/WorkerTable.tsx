@@ -230,7 +230,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         activities.push({
           time: record.borrowTime || dayjs(record.borrowDate).format('HH:mm'),
           event: t('guard.borrowItem'),
-          detail: record.item?.name ? `${t('borrowRecords.itemName')}: ${record.item.name}` : `编号#${record.id}`,
+          detail: record.item?.name ? `${t('borrowRecords.itemName')}: ${record.item.name}` : t('worker.itemNumber', { id: record.id }),
           color: 'orange',
           type: 'borrow'
         });
@@ -239,7 +239,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         activities.push({
           time: record.returnTime || dayjs(record.returnDate).format('HH:mm'),
           event: t('guard.returnItem'),
-          detail: record.item?.name ? `${t('borrowRecords.itemName')}: ${record.item.name}` : `编号#${record.id}`,
+          detail: record.item?.name ? `${t('borrowRecords.itemName')}: ${record.item.name}` : t('worker.itemNumber', { id: record.id }),
           color: 'gold',
           type: 'return'
         });
@@ -290,7 +290,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       setVisitorRecords(visitorRecordsData);
       setBorrowRecords(borrowRecordsData);
     } catch (error) {
-      console.error('获取工人记录失败:', error);
+      console.error(t('worker.getWorkerRecordsFailed'), error);
       // 不显示错误消息，因为详情页面仍然可以显示其他信息
     } finally {
       setRecordsLoading(false);
@@ -373,7 +373,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               qrCodeDataUrl: qrCodeData.qrCodeDataUrl
             };
           } catch (err) {
-            console.error(`生成工人[${worker.name}]的二维码失败:`, err);
+            console.error(t('worker.generateQRCodeFailed', { name: worker.name }), err);
             return null;
           }
         });
@@ -391,7 +391,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         const currentLocale = localStorage.getItem('locale') || 'zh-CN';
         
         // 分批发送，避免请求过大
-        const BATCH_SIZE = 10; // 每批10个工人
+        const BATCH_SIZE = 10; // {t('worker.batchSize', { count: '10' })}
         let successCount = 0;
         let failedCount = 0;
         let allFailedItems: any[] = [];
@@ -407,7 +407,10 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           content: t('worker.batchProcessingInfo', { 
             batches: String(batches.length), 
             total: String(validWorkerData.length)
-          }) || `将分${batches.length}批处理${validWorkerData.length}个工人数据`,
+          }) || t('worker.batchProcessingInfo', { 
+            batches: batches.length.toString(), 
+            total: validWorkerData.length.toString() 
+          }),
           key: loadingKey 
         });
         
@@ -417,7 +420,11 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           
           // 更新加载消息
           message.loading({ 
-            content: `处理第${i+1}/${batches.length}批 (${batch.length}个工人)`, 
+            content: t('worker.processingBatch', { 
+              current: (i+1).toString(), 
+              total: batches.length.toString(), 
+              count: batch.length.toString() 
+            }), 
             key: loadingKey 
           });
           
@@ -440,13 +447,21 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
             
             // 更新进度消息
             message.loading({ 
-              content: `已完成${i+1}/${batches.length}批，成功${successCount}个，失败${failedCount}个`, 
+              content: t('worker.batchProgress', { 
+                current: (i+1).toString(), 
+                total: batches.length.toString(), 
+                success: successCount.toString(), 
+                failed: failedCount.toString() 
+              }), 
               key: loadingKey 
             });
           } else {
             // 整批失败
             message.error({ 
-              content: `第${i+1}批发送失败: ${result.message || t('worker.batchSendFailed')}`, 
+              content: t('worker.batchSendFailed', { 
+                current: (i+1).toString(), 
+                message: result.message || t('worker.batchSendFailed') 
+              }), 
               key: loadingKey 
             });
             failedCount += batch.length;
@@ -525,7 +540,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                             qrCodeDataUrl: qrCodeData.qrCodeDataUrl
                           };
                         } catch (err) {
-                          console.error(`生成工人[${worker.name}]的二维码失败:`, err);
+                          console.error(t('worker.generateQRCodeFailed', { name: worker.name }), err);
                           return null;
                         }
                       });
@@ -556,7 +571,10 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                       
                       // 显示批次信息
                       message.info({ 
-                        content: `将分${resendBatches.length}批重发${validWorkerData.length}个工人数据`,
+                        content: t('worker.batchResendInfo', { 
+                          batches: resendBatches.length.toString(), 
+                          total: validWorkerData.length.toString() 
+                        }),
                         key: resendKey 
                       });
                       
@@ -569,7 +587,10 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                         
                         // 更新重发进度
                         message.loading({ 
-                          content: `重发进度: ${i+1}/${resendBatches.length}批`, 
+                          content: t('worker.resendProgress', { 
+                            current: (i+1).toString(), 
+                            total: resendBatches.length.toString() 
+                          }), 
                           key: resendKey 
                         });
                         
@@ -663,7 +684,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
                         });
                       }
                     } catch (error) {
-                      console.error('重新发送二维码邮件失败:', error);
+                      console.error(t('worker.resendEmailFailed'), error);
                       message.error({ 
                         content: typeof error === 'string' ? error : t('worker.resendFailed'),
                         key: resendKey
@@ -684,7 +705,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
             message.error({ content: t('messages.batchSendFailed'), key: loadingKey });
           }
       } catch (error) {
-        console.error('批量发送二维码邮件失败:', error);
+        console.error(t('worker.batchSendEmailFailed'), error);
         message.error({ 
           content: typeof error === 'string' ? error : t('messages.batchSendFailed'), 
           key: loadingKey 
@@ -705,7 +726,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       // 显示加载中的消息
       const loadingKey = 'sendingQRCodesWhatsApp';
       message.loading({ 
-        content: t('worker.sendingQRCodesToWhatsApp', { count: String(selectedWorkers.length) }) || `正在发送二维码到${selectedWorkers.length}个工人的WhatsApp`, 
+        content: t('worker.sendingQRCodesToWhatsApp', { count: String(selectedWorkers.length) }), 
         key: loadingKey 
       });
       
@@ -728,7 +749,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
               qrCodeDataUrl: qrCodeData.qrCodeDataUrl
             };
           } catch (err) {
-            console.error(`生成工人[${worker.name}]的二维码失败:`, err);
+            console.error(t('worker.generateQRCodeFailed', { name: worker.name }), err);
             return null;
           }
         });
@@ -746,7 +767,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         const currentLocale = localStorage.getItem('locale') || 'zh-CN';
         
         // 分批发送，避免请求过大
-        const BATCH_SIZE = 10; // 每斑10个工人
+        const BATCH_SIZE = 10; // {t('worker.batchSize', { count: '10' })}
         let successCount = 0;
         let failedCount = 0;
         let allFailedItems: any[] = [];
@@ -762,7 +783,10 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           content: t('worker.batchProcessingInfo', { 
             batches: String(batches.length), 
             total: String(validWorkerData.length)
-          }) || `将分${batches.length}批处理${validWorkerData.length}个工人数据`,
+          }) || t('worker.batchProcessingInfo', { 
+            batches: batches.length.toString(), 
+            total: validWorkerData.length.toString() 
+          }),
           key: loadingKey 
         });
         
@@ -772,7 +796,11 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           
           // 更新加载消息
           message.loading({ 
-            content: `处理第${i+1}/${batches.length}批 (${batch.length}个工人)`, 
+            content: t('worker.processingBatch', { 
+              current: (i+1).toString(), 
+              total: batches.length.toString(), 
+              count: batch.length.toString() 
+            }), 
             key: loadingKey 
           });
           
@@ -795,13 +823,21 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
             
             // 更新进度消息
             message.loading({ 
-              content: `已完成${i+1}/${batches.length}批，成功${successCount}个，失败${failedCount}个`, 
+              content: t('worker.batchProgress', { 
+                current: (i+1).toString(), 
+                total: batches.length.toString(), 
+                success: successCount.toString(), 
+                failed: failedCount.toString() 
+              }), 
               key: loadingKey 
             });
           } else {
             // 整批失败
             message.error({ 
-              content: `第${i+1}批发送失败: ${result.message || t('worker.batchSendFailed')}`, 
+              content: t('worker.batchSendFailed', { 
+                current: (i+1).toString(), 
+                message: result.message || t('worker.batchSendFailed') 
+              }), 
               key: loadingKey 
             });
             failedCount += batch.length;
@@ -864,7 +900,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           message.error({ content: t('worker.batchSendFailed'), key: loadingKey });
         }
       } catch (error) {
-        console.error('批量发送二维码到WhatsApp失败:', error);
+        console.error(t('worker.batchSendWhatsAppFailed'), error);
         message.error({ 
           content: typeof error === 'string' ? error : t('messages.batchSendFailed'), 
           key: loadingKey 
