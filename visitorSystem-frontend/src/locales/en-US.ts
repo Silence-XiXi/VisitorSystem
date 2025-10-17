@@ -1401,4 +1401,101 @@ export default {
       templateNameRequired: 'Please enter template name',
     },
   },
+  messages: {
+    // General error messages
+    loadDataFailed: 'Failed to load data, please try again',
+    loadDataFailedWithLocalData: 'Failed to load data, using local data',
+    operationFailed: 'Operation failed, please try again',
+    unknownError: 'Unknown error',
+    someEmailsFailed: 'Some emails failed to send ({count})',
+    
+    // Distributor related
+    distributorInfoFailed: 'Unable to get distributor information',
+    distributorInfoLoadFailed: 'Failed to get distributor information',
+    distributorInfoGetFailed: 'Failed to get distributor information, please login again',
+    loadSitesFailed: 'Failed to load site data',
+    loadWorkersFailed: 'Failed to load worker data',
+    refreshSuccess: 'Data refreshed successfully',
+    refreshFailed: 'Data refresh failed',
+    pleaseSelectSite: 'Please select a site',
+    targetSiteNotExists: 'Target site does not exist',
+    pleaseSelectWorkersToMigrate: 'Please select workers to migrate first',
+    pleaseSelectTargetSite: 'Please select target site',
+    pleaseSelectWorkersToExport: 'Please select workers to export first',
+    pleaseSelectWorkersToSend: 'Please select workers to send QR codes to first',
+    pleaseSelectItemsToResend: 'Please select items to resend',
+    
+    // Import/Export related
+    importCompletedWithErrors: 'Import completed: {success} successful, {skipped} skipped, {errors} failed',
+    importSuccessWithCount: 'Import successful: {success} successful, {skipped} skipped',
+    excelImportSuccess: 'Excel import successful',
+    excelImportFailed: 'Excel import failed: {error}',
+    noValidSiteData: 'No valid site data found in Excel file, please check file format and content',
+    noValidDistributorData: 'No valid distributor data found in Excel file, please check file format and content',
+    noValidGuardData: 'No valid guard data found in Excel file, please check file format and content',
+    fileReadFailed: 'File read failed',
+    
+    // Email sending related
+    emailAddressRequired: 'Email address cannot be empty',
+    emailSendFailed: 'Email sending failed',
+    emailSendSuccess: 'Email sent successfully',
+    
+    // Site management related
+    siteNameOrCodeExists: 'Site name or code already exists, please use a different name or code',
+    insufficientPermissions: 'Insufficient permissions, unable to create site',
+    createSiteFailed: 'Failed to create site, please try again',
+    inputDataError: 'Input data error, please check form',
+    
+    // Distributor management related
+    guardIdOrUsernameExists: 'Guard ID or username already exists, please use a different ID or username',
+    insufficientPermissionsForGuard: 'Insufficient permissions, unable to operate guard',
+    guardNotExists: 'Guard does not exist',
+    createGuardFailed: 'Failed to create guard, please try again',
+    pleaseSelectSitesToExport: 'Please select sites to export first',
+    pleaseSelectDistributorsToExport: 'Please select distributors to export first',
+    pleaseSelectGuardsToExport: 'Please select guards to export first',
+    pleaseSelectDistributorsToSend: 'Please select distributors to send to first',
+    noEmailDistributors: 'Selected distributors have no email contact information',
+    noWhatsAppDistributors: 'Selected distributors have no WhatsApp contact information',
+    
+    // File upload related
+    onlyExcelFiles: 'Only Excel files can be uploaded!',
+    fileSizeLimit: 'File size cannot exceed 5MB!',
+    selectExcelFile: 'Please select an Excel file to import first',
+    insufficientPermissionsForWorker: 'Insufficient permissions: You do not have permission to create worker data, please contact administrator',
+    importFailedWithError: 'Import failed: {error}',
+    templateDownloadFailed: 'Template download failed: {error}',
+    
+    // Worker management related
+    idCardExists: 'ID card number already exists',
+    workerIdExists: 'Worker ID already exists',
+    loadSitesDataFailed: 'Failed to load site data',
+    
+    // Guard related
+    workerNotFound: 'Worker information not found',
+    workerAlreadyOnSite: 'Worker is already on site, please check status',
+    workerInactiveCannotEnter: 'Worker status is inactive, entry is prohibited. Please contact administrator to activate worker status.',
+    itemAlreadyInList: 'Item has been added to borrowing list',
+    itemAddedToList: 'Item added to borrowing list',
+    itemRemovedFromList: 'Item removed from borrowing list',
+    pleaseSelectItemsToReturn: 'Please select items to return',
+    workerNotOnSiteCannotBorrow: 'Worker is not on site, cannot borrow items',
+    workerNotFoundOrNotOnSite: 'Worker not found or not on site, please confirm worker ID or physical card number',
+    pleaseAddAtLeastOneItem: 'Please add at least one item to borrowing list',
+    workerNotOnSiteCannotExit: 'Worker is not on site, cannot exit',
+    passwordMismatch: 'New password and confirm password do not match',
+    passwordChangeSuccess: 'Password changed successfully',
+    
+    // Success messages
+    returnItemsSuccess: 'Successfully returned {count} items',
+    borrowRegistrationSuccess: 'Borrowing registration completed, borrowed {count} items in total',
+    returnItemsSuccessCount: 'Successfully returned {count} items',
+    
+    // Others
+    allGenerationFailed: 'All QR code generation failed',
+    batchSendFailed: 'Batch send failed',
+    noValidEmailWarning: 'Selected workers have invalid email addresses',
+    noValidWhatsappWarning: 'Selected workers have invalid WhatsApp numbers',
+    operationFailedGeneric: 'Operation failed',
+  },
 } as const;

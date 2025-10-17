@@ -20,7 +20,7 @@ import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
 import LocaleSwitcher from '../components/LocaleSwitcher'
-import WorkerManagement from './WorkerManagement'
+import WorkerManagement from '../components/WorkerManagement'
 
 import AdminSites from './AdminSites'
 import ItemCategoryManagement from './ItemCategoryManagement'

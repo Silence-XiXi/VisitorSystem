@@ -1401,4 +1401,101 @@ export default {
       templateNameRequired: '请输入模板名称',
     },
   },
+  messages: {
+    // 通用错误消息
+    loadDataFailed: '加载数据失败，请重试',
+    loadDataFailedWithLocalData: '加载数据失败，使用本地数据',
+    operationFailed: '操作失败，请重试',
+    unknownError: '未知错误',
+    someEmailsFailed: '部分邮件发送失败 ({count}个)',
+    
+    // 分判商相关
+    distributorInfoFailed: '无法获取分判商信息',
+    distributorInfoLoadFailed: '获取分判商信息失败',
+    distributorInfoGetFailed: '分判商信息获取失败，请重新登录',
+    loadSitesFailed: '加载工地数据失败',
+    loadWorkersFailed: '加载工人数据失败',
+    refreshSuccess: '数据刷新成功',
+    refreshFailed: '数据刷新失败',
+    pleaseSelectSite: '请选择工地',
+    targetSiteNotExists: '目标工地不存在',
+    pleaseSelectWorkersToMigrate: '请先选择要迁移的工人',
+    pleaseSelectTargetSite: '请选择目标工地',
+    pleaseSelectWorkersToExport: '请先选择要导出的工人',
+    pleaseSelectWorkersToSend: '请先选择要发送二维码的工人',
+    pleaseSelectItemsToResend: '请选择要重新发送的项',
+    
+    // 导入导出相关
+    importCompletedWithErrors: '导入完成：成功 {success} 条，跳过 {skipped} 条，失败 {errors} 条',
+    importSuccessWithCount: '导入成功：成功 {success} 条，跳过 {skipped} 条',
+    excelImportSuccess: 'Excel导入成功',
+    excelImportFailed: 'Excel导入失败：{error}',
+    noValidSiteData: 'Excel文件中没有找到有效的工地数据，请检查文件格式和内容',
+    noValidDistributorData: 'Excel文件中没有找到有效的分判商数据，请检查文件格式和内容',
+    noValidGuardData: 'Excel文件中没有找到有效的保安数据，请检查文件格式和内容',
+    fileReadFailed: '文件读取失败',
+    
+    // 邮件发送相关
+    emailAddressRequired: '邮箱地址不能为空',
+    emailSendFailed: '邮件发送失败',
+    emailSendSuccess: '邮件发送成功',
+    
+    // 工地管理相关
+    siteNameOrCodeExists: '工地名称或代码已存在，请使用其他名称或代码',
+    insufficientPermissions: '权限不足，无法创建工地',
+    createSiteFailed: '创建工地失败，请重试',
+    inputDataError: '输入数据有误，请检查表单',
+    
+    // 分判商管理相关
+    guardIdOrUsernameExists: '门卫ID或用户名已存在，请使用其他ID或用户名',
+    insufficientPermissionsForGuard: '权限不足，无法操作门卫',
+    guardNotExists: '门卫不存在',
+    createGuardFailed: '创建门卫失败，请重试',
+    pleaseSelectSitesToExport: '请先选择要导出的工地',
+    pleaseSelectDistributorsToExport: '请先选择要导出的分判商',
+    pleaseSelectGuardsToExport: '请先选择要导出的门卫',
+    pleaseSelectDistributorsToSend: '请先选择要发送的分判商',
+    noEmailDistributors: '选中的分判商都没有填写Email联系方式',
+    noWhatsAppDistributors: '选中的分判商都没有填写WhatsApp联系方式',
+    
+    // 文件上传相关
+    onlyExcelFiles: '只能上传Excel文件！',
+    fileSizeLimit: '文件大小不能超过5MB！',
+    selectExcelFile: '请先选择要导入的Excel文件',
+    insufficientPermissionsForWorker: '权限不足：您没有创建工人数据的权限，请联系管理员',
+    importFailedWithError: '导入失败：{error}',
+    templateDownloadFailed: '模板下载失败：{error}',
+    
+    // 工人管理相关
+    idCardExists: '证件号码已存在',
+    workerIdExists: '工人编号已存在',
+    loadSitesDataFailed: '加载工地数据失败',
+    
+    // 门卫相关
+    workerNotFound: '未找到该工人资料',
+    workerAlreadyOnSite: '该工人已入场，请检查状态',
+    workerInactiveCannotEnter: '该工人状态为停用，禁止入场。请联系管理员激活工人状态。',
+    itemAlreadyInList: '该物品已添加到借用列表中',
+    itemAddedToList: '物品已添加到借用列表',
+    itemRemovedFromList: '物品已从借用列表中移除',
+    pleaseSelectItemsToReturn: '请选择要归还的物品',
+    workerNotOnSiteCannotBorrow: '该工人未在场内，无法借物',
+    workerNotFoundOrNotOnSite: '未找到工人或工人未入场，请确认工号或实体卡编号',
+    pleaseAddAtLeastOneItem: '请至少添加一个物品到借用列表',
+    workerNotOnSiteCannotExit: '该工人未在场内，无法离场',
+    passwordMismatch: '新密码和确认密码不一致',
+    passwordChangeSuccess: '密码修改成功',
+    
+    // 成功消息
+    returnItemsSuccess: '成功归还 {count} 个物品',
+    borrowRegistrationSuccess: '借物登记完成，共借用 {count} 个物品',
+    returnItemsSuccessCount: '成功归还 {count} 件物品',
+    
+    // 其他
+    allGenerationFailed: '所有二维码生成失败',
+    batchSendFailed: '批量发送失败',
+    noValidEmailWarning: '选中的工人中有无效邮箱地址',
+    noValidWhatsappWarning: '选中的工人中有无效WhatsApp号码',
+    operationFailedGeneric: '操作失败',
+  },
 } as const;

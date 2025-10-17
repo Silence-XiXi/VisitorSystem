@@ -38,7 +38,7 @@ const FailedItemsContent: React.FC<FailedItemsContentProps> = ({ failedItems, on
   // 处理重新发送
   const handleResend = () => {
     if (selectedRowKeys.length === 0) {
-      message.warning(t('worker.pleaseSelectItemsToResend'));
+      message.warning(t('messages.pleaseSelectItemsToResend'));
       return;
     }
 
@@ -332,7 +332,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
   // 处理批量发送二维码
   const handleBatchSendQRCode = async (method: 'email' | 'whatsapp') => {
     if (selectedRowKeys.length === 0) {
-      message.warning(t('worker.pleaseSelectWorkersToSend'));
+      message.warning(t('messages.pleaseSelectWorkersToSend'));
       return;
     }
 
@@ -343,7 +343,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       // 检查是否所有选中的工人都有电子邮件地址
       const workersWithoutEmail = selectedWorkers.filter(w => !w.email);
       if (workersWithoutEmail.length > 0) {
-        message.warning(t('worker.noValidEmailWarning'));
+        message.warning(t('messages.noValidEmailWarning'));
         return;
       }
       
@@ -383,7 +383,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         const validWorkerData = workerDataResults.filter(data => data !== null);
         
         if (validWorkerData.length === 0) {
-          message.error({ content: t('qrcode.allGenerationFailed'), key: loadingKey });
+          message.error({ content: t('messages.allGenerationFailed'), key: loadingKey });
           return;
         }
         
@@ -681,12 +681,12 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
           // 批量发送成功后清除选择
           setSelectedRowKeys([]);
           } else {
-            message.error({ content: t('worker.batchSendFailed'), key: loadingKey });
+            message.error({ content: t('messages.batchSendFailed'), key: loadingKey });
           }
       } catch (error) {
         console.error('批量发送二维码邮件失败:', error);
         message.error({ 
-          content: typeof error === 'string' ? error : t('worker.batchSendFailed'), 
+          content: typeof error === 'string' ? error : t('messages.batchSendFailed'), 
           key: loadingKey 
         });
       }       finally {
@@ -698,7 +698,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       // 检查是否所有选中的工人都有WhatsApp号码
       const workersWithoutWhatsApp = selectedWorkers.filter(w => !w.whatsapp);
       if (workersWithoutWhatsApp.length > 0) {
-        message.warning(t('worker.noValidWhatsappWarning'));
+        message.warning(t('messages.noValidWhatsappWarning'));
         return;
       }
       
@@ -738,7 +738,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
         const validWorkerData = workerDataResults.filter(data => data !== null);
         
         if (validWorkerData.length === 0) {
-          message.error({ content: t('qrcode.allGenerationFailed'), key: loadingKey });
+          message.error({ content: t('messages.allGenerationFailed'), key: loadingKey });
           return;
         }
         
@@ -866,7 +866,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       } catch (error) {
         console.error('批量发送二维码到WhatsApp失败:', error);
         message.error({ 
-          content: typeof error === 'string' ? error : t('worker.batchSendFailed'), 
+          content: typeof error === 'string' ? error : t('messages.batchSendFailed'), 
           key: loadingKey 
         });
       } finally {

@@ -35,7 +35,7 @@ const DistributorAccountSettings: React.FC = () => {
           })
         } catch (error) {
           console.error('获取分判商资料失败:', error)
-          message.error('获取分判商资料失败')
+          message.error(t('messages.distributorInfoLoadFailed'))
           
           // 如果API调用失败，使用本地存储的数据
           const raw = localStorage.getItem('distributor_account_settings')

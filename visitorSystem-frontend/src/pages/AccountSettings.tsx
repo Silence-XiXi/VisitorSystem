@@ -149,11 +149,11 @@ const AccountSettings: React.FC = () => {
       console.error('密码修改失败:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
       if (errorMessage.includes('当前密码错误')) {
-        message.error('当前密码错误，请重新输入')
+        message.error(t('messages.passwordMismatch'))
       } else if (errorMessage.includes('新密码长度至少6位')) {
-        message.error('新密码长度至少6位')
+        message.error(t('distributor.passwordMinLength'))
       } else {
-        message.error('密码修改失败，请重试')
+        message.error(t('messages.operationFailed'))
       }
     }
   }

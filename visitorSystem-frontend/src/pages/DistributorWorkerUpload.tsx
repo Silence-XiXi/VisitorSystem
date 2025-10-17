@@ -90,7 +90,7 @@ const DistributorWorkerUpload: React.FC = () => {
       setSites(sitesData)
     } catch (error) {
       console.error('加载工地数据失败:', error)
-      message.error('加载工地数据失败')
+      message.error(t('messages.loadSitesFailed'))
     } finally {
       setSitesLoading(false)
     }
@@ -158,7 +158,7 @@ const DistributorWorkerUpload: React.FC = () => {
       setWorkers(mappedWorkers)
     } catch (error) {
       console.error('加载工人数据失败:', error)
-      message.error(t('distributor.loadWorkersFailed'))
+      message.error(t('messages.loadWorkersFailed'))
       // 降级到模拟数据
       setWorkers(mockWorkers.filter(w => w.distributorId === currentDistributor.id))
     } finally {
@@ -170,10 +170,10 @@ const DistributorWorkerUpload: React.FC = () => {
   const handleRefresh = useCallback(async () => {
     try {
       await Promise.all([loadWorkers(), loadSites()])
-      message.success(t('distributor.refreshSuccess'))
+      message.success(t('messages.refreshSuccess'))
     } catch (error) {
       // console.error('刷新数据失败:', error)
-      message.error(t('distributor.refreshFailed'))
+      message.error(t('messages.refreshFailed'))
     }
   }, [loadWorkers, loadSites, t])
 
@@ -274,12 +274,12 @@ const DistributorWorkerUpload: React.FC = () => {
         const selectedSiteId = values.siteId
         
         if (!user?.distributor) {
-          message.error('分判商信息获取失败，请重新登录')
+          message.error(t('messages.distributorInfoGetFailed'))
           return
         }
         
         if (!selectedSiteId) {
-          message.error('请选择工地')
+          message.error(t('messages.pleaseSelectSite'))
           return
         }
         
@@ -367,7 +367,7 @@ const DistributorWorkerUpload: React.FC = () => {
         const currentDistributor = user?.distributor
         
         if (!currentDistributor?.id) {
-          message.error('分判商信息获取失败，请重新登录')
+          message.error(t('messages.distributorInfoGetFailed'))
           return
         }
         
@@ -386,7 +386,7 @@ const DistributorWorkerUpload: React.FC = () => {
           if (failed === 0) {
             message.success(t('distributor.inviteSuccess') + ` (${succeeded}/${total})`)
           } else {
-            message.warning(`邀请发送完成: 成功 ${succeeded} 个，失败 ${failed} 个`)
+            message.warning(t('messages.importCompletedWithErrors', { success: succeeded.toString(), skipped: '0', errors: failed.toString() }))
             
             // 显示失败详情
             if (result.results.details) {
@@ -429,18 +429,18 @@ const DistributorWorkerUpload: React.FC = () => {
   // 处理工人迁移
   const handleMigrateWorkers = async () => {
     if (selectedWorkerIds.length === 0) {
-      message.warning(t('distributor.pleaseSelectWorkersToMigrate'))
+      message.warning(t('messages.pleaseSelectWorkersToMigrate'))
       return
     }
     
     if (!targetSiteId) {
-      message.warning(t('distributor.pleaseSelectTargetSite'))
+      message.warning(t('messages.pleaseSelectTargetSite'))
       return
     }
     
     const targetSite = sites.find(site => site.id === targetSiteId)
     if (!targetSite) {
-      message.error('目标工地不存在')
+      message.error(t('messages.targetSiteNotExists'))
       return
     }
     
@@ -495,7 +495,7 @@ const DistributorWorkerUpload: React.FC = () => {
     const currentDistributor = user?.distributor
     
     if (!currentDistributor?.id) {
-      message.error('分判商信息获取失败，请重新登录')
+      message.error(t('messages.distributorInfoGetFailed'))
       return
     }
     
@@ -813,7 +813,7 @@ const DistributorWorkerUpload: React.FC = () => {
                   setWorkers(prev => prev.filter(w => w.id !== record.id))
                 } catch (error) {
                   console.error('删除工人失败:', error)
-                  message.error(t('distributor.operationFailed'))
+                  message.error(t('messages.operationFailedGeneric'))
                 } finally {
                   setLoading(false)
                 }
@@ -944,7 +944,7 @@ const DistributorWorkerUpload: React.FC = () => {
                     exportWorkersToExcel(dataToExport, user?.distributor ? [user.distributor] : [], sites)
                     message.success(t('distributor.exportedWorkers', { count: dataToExport.length.toString() }))
                   } else {
-                    message.warning(t('distributor.pleaseSelectWorkersToExport'))
+                    message.warning(t('messages.pleaseSelectWorkersToExport'))
                   }
                 }}
               >
@@ -1303,22 +1303,22 @@ const DistributorWorkerUpload: React.FC = () => {
             if (result.success !== undefined) {
               const { success, skipped, errors } = result
               if (errors > 0) {
-                message.warning(`导入完成：成功 ${success} 条，跳过 ${skipped} 条，失败 ${errors} 条`)
+                message.warning(t('messages.importCompletedWithErrors', { success: success.toString(), skipped: skipped.toString(), errors: errors.toString() }))
               } else {
-                message.success(`导入成功：成功 ${success} 条，跳过 ${skipped} 条`)
+                message.success(t('messages.importSuccessWithCount', { success: success.toString(), skipped: skipped.toString() }))
               }
               
               // 刷新工人列表
               await loadWorkers()
             } else {
-              message.success('Excel导入成功')
+              message.success(t('messages.excelImportSuccess'))
               // 刷新工人列表
               await loadWorkers()
             }
           } catch (error: unknown) {
             console.error('Excel导入失败:', error)
             const errorMessage = (error instanceof Error ? error.message : '导入失败，请检查文件格式')
-            message.error(`Excel导入失败：${errorMessage}`)
+            message.error(t('messages.excelImportFailed', { error: errorMessage }))
           } finally {
             setLoading(false)
           }

@@ -36,13 +36,13 @@ const ExcelImportExportModal: React.FC<ExcelImportExportModalProps> = ({
                     file.type === 'application/vnd.ms-excel';
     
     if (!isExcel) {
-      message.error('只能上传Excel文件！');
+      message.error(t('messages.onlyExcelFiles'));
       return false;
     }
     
     const isLt5M = file.size / 1024 / 1024 < 5;
     if (!isLt5M) {
-      message.error('文件大小不能超过5MB！');
+      message.error(t('messages.fileSizeLimit'));
       return false;
     }
     
@@ -53,7 +53,7 @@ const ExcelImportExportModal: React.FC<ExcelImportExportModalProps> = ({
   // 处理导入
   const handleImport = async () => {
     if (!importFile) {
-      message.warning('请先选择要导入的Excel文件');
+      message.warning(t('messages.selectExcelFile'));
       return;
     }
 
@@ -83,9 +83,9 @@ const ExcelImportExportModal: React.FC<ExcelImportExportModalProps> = ({
           errorMessage.includes('权限') || 
           errorMessage.includes('permission') ||
           errorMessage.includes('unauthorized')) {
-        message.error('权限不足：您没有创建工人数据的权限，请联系管理员');
+        message.error(t('messages.insufficientPermissionsForWorker'));
       } else {
-        message.error('导入失败：' + errorMessage);
+        message.error(t('messages.importFailedWithError', { error: errorMessage }));
       }
     } finally {
       setImportLoading(false);
@@ -98,7 +98,7 @@ const ExcelImportExportModal: React.FC<ExcelImportExportModalProps> = ({
       generateImportTemplate();
       message.success(t('distributor.templateDownloaded'));
     } catch (error) {
-      message.error('模板下载失败：' + (error as Error).message);
+      message.error(t('messages.templateDownloadFailed', { error: (error as Error).message }));
     }
   };
 

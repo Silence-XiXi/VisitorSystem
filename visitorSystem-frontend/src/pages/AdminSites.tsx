@@ -201,7 +201,7 @@ const AdminSites: React.FC = () => {
       setGuardPagination(prev => ({ ...prev, total: transformedGuards.length }))
     } catch (error) {
       console.error('Failed to load data:', error)
-      message.error('加载数据失败，使用本地数据')
+      message.error(t('messages.loadDataFailedWithLocalData'))
       // 如果API调用失败，继续使用mock数据
     } finally {
       setLoading(false)
@@ -237,7 +237,7 @@ const AdminSites: React.FC = () => {
         
         // 检查必填字段
         if (!requestData.distributorEmail) {
-          message.error({ content: '邮箱地址不能为空', key: 'sendEmail' })
+          message.error({ content: t('messages.emailAddressRequired'), key: 'sendEmail' })
           return
         }
         
@@ -656,7 +656,7 @@ const AdminSites: React.FC = () => {
   // 批量发送账号密码到Email
   const handleBatchSendEmail = () => {
     if (selectedDistributorIds.length === 0) {
-      message.warning(t('admin.pleaseSelectDistributorsToSend'))
+      message.warning(t('messages.pleaseSelectDistributorsToSend'))
       return
     }
 
@@ -665,7 +665,7 @@ const AdminSites: React.FC = () => {
     const noEmailDistributors = selectedDistributors.filter(d => !d.email || !d.email.trim())
 
     if (hasEmailDistributors.length === 0) {
-      message.warning(t('admin.noEmailDistributors'))
+      message.warning(t('messages.noEmailDistributors'))
       return
     }
 
@@ -834,13 +834,13 @@ const AdminSites: React.FC = () => {
       
       const err = error as { statusCode?: number; message?: string }
       if (err.statusCode === 400) {
-        message.error('输入数据有误，请检查表单')
+        message.error(t('messages.inputDataError'))
       } else if (err.statusCode === 409) {
-        message.error('工地名称或代码已存在，请使用其他名称或代码')
+        message.error(t('messages.siteNameOrCodeExists'))
       } else if (err.statusCode === 403) {
-        message.error('权限不足，无法创建工地')
+        message.error(t('messages.insufficientPermissions'))
       } else {
-        message.error('创建工地失败，请重试')
+        message.error(t('messages.createSiteFailed'))
       }
     }
   }
@@ -862,10 +862,10 @@ const AdminSites: React.FC = () => {
           username: v.accountUsername // 添加用户名更新
         }
         
-        console.log('准备更新分判商，数据:', updateData)
+        // console.log('准备更新分判商，数据:', updateData)
         
         const updatedDistributor = await apiService.updateDistributor(editingDistributor.id, updateData)
-        console.log('分判商更新成功:', updatedDistributor)
+        // console.log('分判商更新成功:', updatedDistributor)
         
         // 转换数据格式以匹配前端期望
         const transformedDistributor = {
@@ -1045,15 +1045,15 @@ const AdminSites: React.FC = () => {
       
       const err = error as { statusCode?: number; message?: string }
       if (err.statusCode === 400) {
-        message.error('输入数据有误，请检查表单')
+        message.error(t('messages.inputDataError'))
       } else if (err.statusCode === 409) {
-        message.error('门卫ID或用户名已存在，请使用其他ID或用户名')
+        message.error(t('messages.guardIdOrUsernameExists'))
       } else if (err.statusCode === 403) {
-        message.error('权限不足，无法操作门卫')
+        message.error(t('messages.insufficientPermissionsForGuard'))
       } else if (err.statusCode === 404) {
-        message.error('门卫不存在')
+        message.error(t('messages.guardNotExists'))
       } else {
-        const errorMessage = editingGuard ? '更新门卫失败，请重试' : '创建门卫失败，请重试'
+        const errorMessage = editingGuard ? t('messages.operationFailed') : t('messages.createGuardFailed')
         message.error(errorMessage)
       }
     }
@@ -1064,7 +1064,7 @@ const AdminSites: React.FC = () => {
     const dataToExport = exportAll ? sites : sites.filter(site => selectedSiteIds.includes(site.id))
     
     if (!exportAll && selectedSiteIds.length === 0) {
-      message.warning(t('admin.pleaseSelectSitesToExport'))
+      message.warning(t('messages.pleaseSelectSitesToExport'))
       return
     }
     
@@ -1077,7 +1077,7 @@ const AdminSites: React.FC = () => {
     const dataToExport = exportAll ? distributors : distributors.filter(distributor => selectedDistributorIds.includes(distributor.id))
     
     if (!exportAll && selectedDistributorIds.length === 0) {
-      message.warning(t('admin.pleaseSelectDistributorsToExport'))
+      message.warning(t('messages.pleaseSelectDistributorsToExport'))
       return
     }
     
@@ -1252,7 +1252,7 @@ const AdminSites: React.FC = () => {
       }
       
       if (importedSites.length === 0) {
-        message.warning('Excel文件中没有找到有效的工地数据，请检查文件格式和内容')
+        message.warning(t('messages.noValidSiteData'))
         return
       }
       
@@ -1387,7 +1387,7 @@ const AdminSites: React.FC = () => {
       }
       
       if (importedDistributors.length === 0) {
-        message.warning('Excel文件中没有找到有效的分判商数据，请检查文件格式和内容')
+        message.warning(t('messages.noValidDistributorData'))
         return
       }
       
@@ -1559,7 +1559,7 @@ const AdminSites: React.FC = () => {
       }
       
       if (importedGuards.length === 0) {
-        message.warning('Excel文件中没有找到有效的保安数据，请检查文件格式和内容')
+        message.warning(t('messages.noValidGuardData'))
         return
       }
 

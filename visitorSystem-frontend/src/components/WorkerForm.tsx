@@ -67,7 +67,7 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
           setSitesData(sitesFromApi);
         } catch (error) {
           console.error('加载工地数据失败:', error);
-          message.error('加载工地数据失败');
+          message.error(t('messages.loadSitesDataFailed'));
         } finally {
           setSitesLoading(false);
         }
@@ -132,10 +132,10 @@ const WorkerForm = forwardRef<WorkerFormRef, WorkerFormProps>(({
       // 检查是否是证件号码重复错误
       if (error && typeof error === 'object' && 'message' in error && 
           typeof error.message === 'string' && error.message.includes('证件号码已存在')) {
-        message.error('证件号码已存在');
+        message.error(t('messages.idCardExists'));
       } else if (error && typeof error === 'object' && 'message' in error && 
                  typeof error.message === 'string' && error.message.includes('工人编号已存在')) {
-        message.error('工人编号已存在');
+        message.error(t('messages.workerIdExists'));
       } else {
         message.error(t(isEdit ? 'worker.updateFailed' : 'worker.createFailed'));
       }

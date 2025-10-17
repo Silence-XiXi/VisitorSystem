@@ -242,7 +242,7 @@ const Guard: React.FC = () => {
       setTodayReturnedItems(todayReturns.length)
       
     } catch (error) {
-      message.error('加载统计数据失败')
+      message.error(t('messages.loadDataFailed'))
     } finally {
       setLoading(false)
     }
@@ -396,7 +396,7 @@ const Guard: React.FC = () => {
       
       setVisitorRecords(enrichedRecords)
     } catch (error) {
-      message.error('加载访客记录失败')
+      message.error(t('messages.loadDataFailed'))
     } finally {
       setVisitorRecordsLoading(false)
     }
@@ -842,7 +842,7 @@ const Guard: React.FC = () => {
       
       // 检查工人状态，如果是INACTIVE则禁止入场
       if (worker.status === 'INACTIVE') {
-        message.error(t('guard.workerInactiveCannotEnter') || '该工人已禁用，无法入场')
+        message.error(t('messages.workerInactiveCannotEnter'))
         setSelectedWorker(null)
         setScannedWorkerId('')
         return
@@ -992,7 +992,7 @@ const Guard: React.FC = () => {
         worker = await apiService.getWorkerByIdentifier(input)
       } catch (error) {
         // 如果工人信息查询失败，显示错误并返回
-        message.error(t('guard.workerNotFound') || '未找到工人信息')
+        message.error(t('messages.workerNotFound'))
         setSelectedWorker(null)
         return
       }
@@ -1065,7 +1065,7 @@ const Guard: React.FC = () => {
     )
 
     if (existingItem) {
-      message.error(t('guard.itemAlreadyInList'))
+      message.error(t('messages.itemAlreadyInList'))
       return
     }
 
@@ -1082,18 +1082,18 @@ const Guard: React.FC = () => {
     setSelectedItemType('')
     setItemNumber('')
     
-    message.success(t('guard.itemAddedToList'))
+    message.success(t('messages.itemAddedToList'))
   }
 
   const handleRemoveItemFromList = (index: number) => {
     const newList = borrowItemsList.filter((_, i) => i !== index)
     setBorrowItemsList(newList)
-    message.success(t('guard.itemRemovedFromList'))
+    message.success(t('messages.itemRemovedFromList'))
   }
 
   const handleBorrowReturnItems = async () => {
     if (selectedReturnItems.length === 0) {
-      message.error(t('guard.pleaseSelectItemsToReturn'))
+      message.error(t('messages.pleaseSelectItemsToReturn'))
       return
     }
 
@@ -1155,7 +1155,7 @@ const Guard: React.FC = () => {
     }
 
     if (borrowItemsList.length === 0) {
-      message.error(t('guard.pleaseAddAtLeastOneItem'))
+      message.error(t('messages.pleaseAddAtLeastOneItem'))
       return
     }
 
@@ -1167,7 +1167,7 @@ const Guard: React.FC = () => {
         // 这个API会验证工人是否有有效的入场记录，如果没有会抛出错误
         await apiService.checkWorkerEntryRecord(selectedWorker.workerId)
       } catch (error: any) {
-        message.error(t('guard.workerNotOnSiteCannotBorrow'))
+        message.error(t('messages.workerNotOnSiteCannotBorrow'))
         setLoading(false)
         return
       }
@@ -1538,12 +1538,12 @@ const Guard: React.FC = () => {
 
   const handlePasswordChange = async (values: { oldPassword: string; newPassword: string; confirmPassword: string }) => {
     if (values.newPassword !== values.confirmPassword) {
-      message.error(t('guard.passwordMismatch'))
+      message.error(t('messages.passwordMismatch'))
       return
     }
     
     // 模拟密码修改
-    message.success(t('guard.passwordChangeSuccess'))
+    message.success(t('messages.passwordChangeSuccess'))
     setUserCenterModalVisible(false)
     passwordForm.resetFields()
   }
@@ -1563,7 +1563,7 @@ const Guard: React.FC = () => {
     const totalPages = Math.ceil(totalRecords / pagination.pageSize)
     
     if (isNaN(pageNumber) || pageNumber < 1 || pageNumber > totalPages) {
-      message.error(`请输入 1 到 ${totalPages} 之间的页码`)
+      message.error(t('messages.inputDataError'))
       return
     }
     
@@ -1636,7 +1636,7 @@ const Guard: React.FC = () => {
       
       setItemBorrowRecords(formattedRecords)
     } catch (error) {
-      message.error('获取今日相关物品记录失败')
+      message.error(t('messages.loadDataFailed'))
     } finally {
       setItemRecordsLoading(false)
     }
@@ -1683,7 +1683,7 @@ const Guard: React.FC = () => {
       
       setItemBorrowRecords(formattedRecords)
     } catch (error) {
-      message.error('获取今日归还物品记录失败')
+      message.error(t('messages.loadDataFailed'))
     } finally {
       setItemRecordsLoading(false)
     }
@@ -1723,7 +1723,7 @@ const Guard: React.FC = () => {
   // 归还选中物品
   const handleReturnItems = async () => {
     if (!selectedWorker || selectedBorrowedItems.length === 0) {
-      message.error(t('guard.pleaseSelectItemsToReturn'))
+      message.error(t('messages.pleaseSelectItemsToReturn'))
       return
     }
 
@@ -1821,7 +1821,7 @@ const Guard: React.FC = () => {
       }
 
       if (!isOnSite) {
-        message.error(t('guard.workerNotOnSiteCannotBorrow'))
+        message.error(t('messages.workerNotOnSiteCannotBorrow'))
         return
       }
 

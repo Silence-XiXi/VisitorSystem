@@ -1401,4 +1401,101 @@ export default {
       templateNameRequired: '請輸入模板名稱',
     },
   },
+  messages: {
+    // 通用錯誤消息
+    loadDataFailed: '加載數據失敗，請重試',
+    loadDataFailedWithLocalData: '加載數據失敗，使用本地數據',
+    operationFailed: '操作失敗，請重試',
+    unknownError: '未知錯誤',
+    someEmailsFailed: '部分郵件發送失敗 ({count}個)',
+    
+    // 分判商相關
+    distributorInfoFailed: '無法獲取分判商信息',
+    distributorInfoLoadFailed: '獲取分判商信息失敗',
+    distributorInfoGetFailed: '分判商信息獲取失敗，請重新登錄',
+    loadSitesFailed: '加載工地數據失敗',
+    loadWorkersFailed: '加載工人數據失敗',
+    refreshSuccess: '數據刷新成功',
+    refreshFailed: '數據刷新失敗',
+    pleaseSelectSite: '請選擇工地',
+    targetSiteNotExists: '目標工地不存在',
+    pleaseSelectWorkersToMigrate: '請先選擇要遷移的工人',
+    pleaseSelectTargetSite: '請選擇目標工地',
+    pleaseSelectWorkersToExport: '請先選擇要導出的工人',
+    pleaseSelectWorkersToSend: '請先選擇要發送二維碼的工人',
+    pleaseSelectItemsToResend: '請選擇要重新發送的項',
+    
+    // 導入導出相關
+    importCompletedWithErrors: '導入完成：成功 {success} 條，跳過 {skipped} 條，失敗 {errors} 條',
+    importSuccessWithCount: '導入成功：成功 {success} 條，跳過 {skipped} 條',
+    excelImportSuccess: 'Excel導入成功',
+    excelImportFailed: 'Excel導入失敗：{error}',
+    noValidSiteData: 'Excel文件中沒有找到有效的工地數據，請檢查文件格式和內容',
+    noValidDistributorData: 'Excel文件中沒有找到有效的分判商數據，請檢查文件格式和內容',
+    noValidGuardData: 'Excel文件中沒有找到有效的保安數據，請檢查文件格式和內容',
+    fileReadFailed: '文件讀取失敗',
+    
+    // 郵件發送相關
+    emailAddressRequired: '郵箱地址不能為空',
+    emailSendFailed: '郵件發送失敗',
+    emailSendSuccess: '郵件發送成功',
+    
+    // 工地管理相關
+    siteNameOrCodeExists: '工地名稱或代碼已存在，請使用其他名稱或代碼',
+    insufficientPermissions: '權限不足，無法創建工地',
+    createSiteFailed: '創建工地失敗，請重試',
+    inputDataError: '輸入數據有誤，請檢查表單',
+    
+    // 分判商管理相關
+    guardIdOrUsernameExists: '門衛ID或用戶名已存在，請使用其他ID或用戶名',
+    insufficientPermissionsForGuard: '權限不足，無法操作門衛',
+    guardNotExists: '門衛不存在',
+    createGuardFailed: '創建門衛失敗，請重試',
+    pleaseSelectSitesToExport: '請先選擇要導出的工地',
+    pleaseSelectDistributorsToExport: '請先選擇要導出的分判商',
+    pleaseSelectGuardsToExport: '請先選擇要導出的門衛',
+    pleaseSelectDistributorsToSend: '請先選擇要發送的分判商',
+    noEmailDistributors: '選中的分判商都沒有填寫Email聯繫方式',
+    noWhatsAppDistributors: '選中的分判商都沒有填寫WhatsApp聯繫方式',
+    
+    // 文件上傳相關
+    onlyExcelFiles: '只能上傳Excel文件！',
+    fileSizeLimit: '文件大小不能超過5MB！',
+    selectExcelFile: '請先選擇要導入的Excel文件',
+    insufficientPermissionsForWorker: '權限不足：您沒有創建工人數據的權限，請聯繫管理員',
+    importFailedWithError: '導入失敗：{error}',
+    templateDownloadFailed: '模板下載失敗：{error}',
+    
+    // 工人管理相關
+    idCardExists: '證件號碼已存在',
+    workerIdExists: '工人編號已存在',
+    loadSitesDataFailed: '加載工地數據失敗',
+    
+    // 門衛相關
+    workerNotFound: '未找到該工人資料',
+    workerAlreadyOnSite: '該工人已入場，請檢查狀態',
+    workerInactiveCannotEnter: '該工人狀態為停用，禁止入場。請聯繫管理員激活工人狀態。',
+    itemAlreadyInList: '該物品已添加到借用列表中',
+    itemAddedToList: '物品已添加到借用列表',
+    itemRemovedFromList: '物品已從借用列表中移除',
+    pleaseSelectItemsToReturn: '請選擇要歸還的物品',
+    workerNotOnSiteCannotBorrow: '該工人未在場內，無法借物',
+    workerNotFoundOrNotOnSite: '未找到工人或工人未入場，請確認工號或實體卡編號',
+    pleaseAddAtLeastOneItem: '請至少添加一個物品到借用列表',
+    workerNotOnSiteCannotExit: '該工人未在場內，無法離場',
+    passwordMismatch: '新密碼和確認密碼不一致',
+    passwordChangeSuccess: '密碼修改成功',
+    
+    // 成功消息
+    returnItemsSuccess: '成功歸還 {count} 個物品',
+    borrowRegistrationSuccess: '借物登記完成，共借用 {count} 個物品',
+    returnItemsSuccessCount: '成功歸還 {count} 件物品',
+    
+    // 其他
+    allGenerationFailed: '所有二維碼生成失敗',
+    batchSendFailed: '批量發送失敗',
+    noValidEmailWarning: '選中的工人中有無效郵箱地址',
+    noValidWhatsappWarning: '選中的工人中有無效WhatsApp號碼',
+    operationFailedGeneric: '操作失敗',
+  },
 } as const;

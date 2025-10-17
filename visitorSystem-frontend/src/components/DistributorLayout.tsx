@@ -67,11 +67,11 @@ const DistributorLayout: React.FC = () => {
             setDistributorInfo(profile.distributor)
           } else {
             console.warn('用户资料中没有分判商信息')
-            message.error('无法获取分判商信息')
+            message.error(t('messages.distributorInfoFailed'))
           }
         } catch (error) {
           console.error('获取分判商信息失败:', error)
-          message.error('获取分判商信息失败')
+          message.error(t('messages.distributorInfoLoadFailed'))
         }
       }
     }

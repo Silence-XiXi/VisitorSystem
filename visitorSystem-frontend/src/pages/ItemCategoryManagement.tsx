@@ -40,7 +40,7 @@ const ItemCategoryManagement: React.FC = () => {
       setCategories(data)
     } catch (error) {
       console.error('加载分类数据失败:', error)
-      message.error('加载分类数据失败')
+      message.error(t('messages.loadDataFailed'))
     } finally {
       setLoading(false)
     }
@@ -102,7 +102,7 @@ const ItemCategoryManagement: React.FC = () => {
           message.success(t('itemCategory.deleteSuccess').replace('{name}', record.name))
         } catch (error: any) {
           console.error('删除分类失败:', error)
-          const errorMessage = error?.response?.data?.message || '删除分类失败'
+          const errorMessage = error?.response?.data?.message || t('messages.operationFailed')
           message.error(errorMessage)
         }
       }
@@ -281,7 +281,7 @@ const ItemCategoryManagement: React.FC = () => {
       form.resetFields()
     } catch (error: any) {
       console.error('提交失败:', error)
-      const errorMessage = error?.response?.data?.message || '操作失败'
+      const errorMessage = error?.response?.data?.message || t('messages.operationFailed')
       message.error(errorMessage)
     }
   }
@@ -433,7 +433,7 @@ const ItemCategoryManagement: React.FC = () => {
       }
       
       if (importedCategories.length === 0) {
-        message.warning('Excel文件中没有找到有效的物品类别数据，请检查文件格式和内容')
+        message.warning(t('messages.noValidSiteData'))
         return
       }
       

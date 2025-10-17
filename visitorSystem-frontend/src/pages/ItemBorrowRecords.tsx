@@ -228,7 +228,7 @@ const ItemBorrowRecords: React.FC = () => {
       }
     } catch (error) {
       console.error('加载物品借用记录失败:', error)
-      message.error('加载数据失败')
+      message.error(t('messages.loadDataFailed'))
     } finally {
       setLoading(false)
     }

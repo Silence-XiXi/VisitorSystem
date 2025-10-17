@@ -128,7 +128,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
       console.error('发送邮件失败:', error);
       const errorMessage = error instanceof Error ? error.message : t('qrcode.emailSendFailed');
       message.error(`${t('qrcode.emailSendFailed')}: ${errorMessage}`);
-      message.warning('请检查系统邮件配置是否正确，或联系管理员');
+      message.warning(t('messages.emailSendFailed'));
     } finally {
       setSendingEmail(false);
     }

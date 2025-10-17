@@ -243,7 +243,7 @@ const WorkerSelfRegistration: React.FC = () => {
         }
       }
       
-      message.success('信息提交成功！');
+      message.success(t('worker.registrationSuccessTitle'));
       setSubmitted(true);
       
       // 获取返回的工人ID并生成二维码
@@ -254,7 +254,7 @@ const WorkerSelfRegistration: React.FC = () => {
       }
     } catch (err) {
       console.error('提交信息失败:', err);
-      message.error('提交信息失败，请检查您的输入或联系管理员');
+      message.error(t('messages.operationFailed'));
     } finally {
       setSubmitting(false);
     }

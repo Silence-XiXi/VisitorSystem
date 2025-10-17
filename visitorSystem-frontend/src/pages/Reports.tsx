@@ -218,7 +218,7 @@ const Reports: React.FC = () => {
       setDistributors(distributorsData)
     } catch (error) {
       // console.error('加载数据失败:', error)
-      message.error('加载数据失败，请重试')
+      message.error(t('messages.loadDataFailed'))
     } finally {
       setLoading(false)
     }
