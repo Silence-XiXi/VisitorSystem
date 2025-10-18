@@ -965,7 +965,7 @@ const WorkerManagement: React.FC = () => {
             {editingWorker ? t('common.save') : t('common.add')}
           </Button>
         ]}
-        width="90vw"
+        width={800}
         style={{ 
           top: 20, 
           maxWidth: '1200px',
@@ -973,7 +973,7 @@ const WorkerManagement: React.FC = () => {
         }}
         styles={{
           body: {
-            height: 'calc(100vh - 280px)', 
+            height: 'calc(100vh - 320px)', 
             overflowY: 'auto',
             padding: '20px'
           }

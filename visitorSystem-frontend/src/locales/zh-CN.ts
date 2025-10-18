@@ -71,6 +71,8 @@ export default {
     phone: '联系电话',
     email: '邮箱',
     whatsapp: 'WhatsApp',
+    whatsappAreaCode: '区号',
+    whatsappNumberPlaceholder: '请输入WhatsApp号码',
     status: '状态',
     active: '启用',
     inactive: '停用',

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
 
 const { Option } = Select
@@ -61,6 +61,16 @@ const DistributorWorkerUpload: React.FC = () => {
   const [quickInviteModalOpen, setQuickInviteModalOpen] = useState(false)
   const [sendingInviteLoading, setSendingInviteLoading] = useState(false)
   
+  // 跟踪是否已经进行过第一次联系电话到WhatsApp的同步
+  const [hasSyncedPhoneToWhatsApp, setHasSyncedPhoneToWhatsApp] = useState(false)
+  
+  // 跟踪是否已经进行过第一次地区选择到WhatsApp区号的同步
+  const [hasSyncedRegionToWhatsApp, setHasSyncedRegionToWhatsApp] = useState(false)
+  
+  // 防抖定时器引用
+  const phoneSyncTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const regionSyncTimerRef = useRef<NodeJS.Timeout | null>(null)
+  
   // 迁移功能状态
   const [migrateModalOpen, setMigrateModalOpen] = useState(false)
   const [migrateLoading, setMigrateLoading] = useState(false)
@@ -98,7 +108,7 @@ const DistributorWorkerUpload: React.FC = () => {
     } finally {
       setSitesLoading(false)
     }
-  }, [])
+  }, [t])
 
   // 加载分判商关联的工地信息
   const loadDistributorSites = useCallback(() => {
@@ -110,7 +120,7 @@ const DistributorWorkerUpload: React.FC = () => {
       if ('sites' in distributor && Array.isArray(distributor.sites) && distributor.sites.length > 0) {
         // 从site_distributors关联表中获取工地信息
         sitesList = distributor.sites.map((siteDistributor: unknown) => {
-          const site = (siteDistributor as any).site || siteDistributor
+          const site = (siteDistributor as { site?: Site }).site || (siteDistributor as Site)
           return {
             id: site.id,
             name: site.name,
@@ -192,6 +202,18 @@ const DistributorWorkerUpload: React.FC = () => {
     loadDistributorSites()
   }, [loadDistributorSites])
 
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (phoneSyncTimerRef.current) {
+        clearTimeout(phoneSyncTimerRef.current)
+      }
+      if (regionSyncTimerRef.current) {
+        clearTimeout(regionSyncTimerRef.current)
+      }
+    }
+  }, [])
+
   // 筛选后的工人数据
   const filteredWorkers = useMemo(() => {
     return workers.filter(worker => {
@@ -232,6 +254,16 @@ const DistributorWorkerUpload: React.FC = () => {
       const values = await workerForm.validateFields()
       setLoading(true)
       
+      // 处理WhatsApp字段
+      let whatsapp = '';
+      if (values.whatsappAreaCode && values.whatsappNumber) {
+        whatsapp = `${values.whatsappAreaCode} ${values.whatsappNumber}`;
+      } else if (values.whatsappAreaCode) {
+        whatsapp = values.whatsappAreaCode;
+      } else if (values.whatsappNumber) {
+        whatsapp = values.whatsappNumber;
+      }
+      
       if (editingWorker) {
         // 编辑工人
         const updateData = {
@@ -245,7 +277,7 @@ const DistributorWorkerUpload: React.FC = () => {
           siteId: values.siteId,
           birthDate: values.birthDate ? values.birthDate.toISOString() : null,
           email: values.email || null,
-          whatsapp: values.whatsapp || null
+          whatsapp: whatsapp || null
         }
         
         await apiService.updateDistributorWorker(editingWorker.id, updateData)
@@ -266,7 +298,7 @@ const DistributorWorkerUpload: React.FC = () => {
                 site: w.site?.id === values.siteId ? w.site : sites.find(s => s.id === values.siteId),
                 birthDate: values.birthDate ? values.birthDate.toISOString() : null,
                 email: values.email || '',
-                whatsapp: values.whatsapp || '',
+                whatsapp: whatsapp || '',
                 updatedAt: new Date().toISOString()
               }
             : w
@@ -297,9 +329,9 @@ const DistributorWorkerUpload: React.FC = () => {
           siteId: selectedSiteId,
           distributorId: currentDistributor?.id || 'default-distributor',
           status: (values.status?.toUpperCase() || 'ACTIVE') as 'ACTIVE' | 'INACTIVE',
-          birthDate: values.birthDate ? values.birthDate.toISOString() : null,
-          email: values.email || null,
-          whatsapp: values.whatsapp || null
+          birthDate: values.birthDate ? values.birthDate.toISOString() : undefined,
+          email: values.email || undefined,
+          whatsapp: whatsapp || undefined
         }
         
         const newWorker = await apiService.createDistributorWorker(createData)
@@ -311,7 +343,7 @@ const DistributorWorkerUpload: React.FC = () => {
           status: mapWorkerStatus(newWorker.status) as 'active' | 'inactive',
           region: newWorker.region || values.region || '',
           email: newWorker.email || values.email || '',
-          whatsapp: newWorker.whatsapp || values.whatsapp || '',
+          whatsapp: newWorker.whatsapp || whatsapp || '',
           distributor: newWorker.distributor ? {
             ...newWorker.distributor,
             distributorId: newWorker.distributor.distributorId || newWorker.distributor.id
@@ -465,14 +497,15 @@ const DistributorWorkerUpload: React.FC = () => {
           setSelectedWorkerIds([])
           
           message.success(t('worker.batchDeleteSuccess').replace('{count}', selectedWorkerIds.length.toString()))
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('批量删除失败:', error)
           let errorMessage = t('worker.batchDeleteFailed')
           
-          if (error?.response?.data?.message) {
-            errorMessage = error.response.data.message
-          } else if (error?.message) {
-            errorMessage = error.message
+          if (error && typeof error === 'object' && 'response' in error) {
+            const errorWithResponse = error as { response: { data: { message: string } } }
+            errorMessage = errorWithResponse.response.data.message
+          } else if (error && typeof error === 'object' && 'message' in error) {
+            errorMessage = (error as { message: string }).message
           }
           
           message.error(errorMessage)
@@ -511,14 +544,15 @@ const DistributorWorkerUpload: React.FC = () => {
       
       setSelectedWorkerIds([])
       message.success(t('worker.batchUpdateStatusSuccess').replace('{count}', selectedWorkerIds.length.toString()))
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('批量修改状态失败:', error)
       let errorMessage = t('worker.batchUpdateStatusFailed')
       
-      if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message
-      } else if (error?.message) {
-        errorMessage = error.message
+      if (error && typeof error === 'object' && 'response' in error) {
+        const errorWithResponse = error as { response: { data: { message: string } } }
+        errorMessage = errorWithResponse.response.data.message
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = (error as { message: string }).message
       }
       
       message.error(errorMessage)
@@ -674,25 +708,27 @@ const DistributorWorkerUpload: React.FC = () => {
 
   // 获取性别标签
   const getGenderTag = (gender: string) => {
+    if (!gender) return <Tag color="default">-</Tag>
+    
+    const normalizedGender = gender.toLowerCase()
     const map: Record<string, { color: string; text: string }> = { 
       male: { color: 'blue', text: t('distributor.male') }, 
-      female: { color: 'pink', text: t('distributor.female') },
-      MALE: { color: 'blue', text: t('distributor.male') }, 
-      FEMALE: { color: 'pink', text: t('distributor.female') }
+      female: { color: 'pink', text: t('distributor.female') }
     }
-    const cfg = map[gender] || { color: 'default', text: gender || '-' }
+    const cfg = map[normalizedGender] || { color: 'default', text: gender }
     return <Tag color={cfg.color}>{cfg.text}</Tag>
   }
 
   // 获取状态标签
   const getStatusTag = (status: string) => {
+    if (!status) return <Tag color="default">-</Tag>
+    
+    const normalizedStatus = status.toLowerCase()
     const map: Record<string, { color: string; text: string }> = { 
       active: { color: 'green', text: t('distributor.active') }, 
-      inactive: { color: 'red', text: t('distributor.inactive') },
-      ACTIVE: { color: 'green', text: t('distributor.active') }, 
-      INACTIVE: { color: 'red', text: t('distributor.inactive') }
+      inactive: { color: 'red', text: t('distributor.inactive') }
     }
-    const cfg = map[status] || { color: 'default', text: status || '-' }
+    const cfg = map[normalizedStatus] || { color: 'default', text: status }
     return <Tag color={cfg.color}>{cfg.text}</Tag>
   }
 
@@ -856,16 +892,30 @@ const DistributorWorkerUpload: React.FC = () => {
     { title: t('distributor.phone'), dataIndex: 'phone', key: 'phone', width: 130, ellipsis: true, sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone) },
     { title: t('distributor.email'), dataIndex: 'email', key: 'email', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email) },
     { title: t('distributor.whatsapp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 130, render: (whatsapp: string) => {
-      if (!whatsapp) return '-';
-      const parts = whatsapp.split(' ');
-      if (parts.length === 2) {
-        return (
-          <div style={{ lineHeight: '1.2' }}>
-            <span style={{ color: '#666' }}>{parts[0]}</span> <span>{parts[1]}</span>
-          </div>
-        );
+      if (!whatsapp || whatsapp.trim() === '') return '-';
+      
+      // 处理WhatsApp号码显示
+      const trimmedWhatsapp = whatsapp.trim();
+      
+      // 如果包含空格，按空格分割显示
+      if (trimmedWhatsapp.includes(' ')) {
+        const parts = trimmedWhatsapp.split(' ');
+        if (parts.length >= 2) {
+          return (
+            <div style={{ lineHeight: '1.2' }}>
+              <div style={{ color: '#666', fontSize: '12px' }}>{parts[0]}</div>
+              <div style={{ fontSize: '13px' }}>{parts.slice(1).join(' ')}</div>
+            </div>
+          );
+        }
       }
-      return whatsapp;
+      
+      // 如果没有空格，直接显示
+      return (
+        <div style={{ fontSize: '13px' }}>
+          {trimmedWhatsapp}
+        </div>
+      );
     }, ellipsis: true, sorter: (a: Worker, b: Worker) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
     { title: t('distributor.status'), dataIndex: 'status', key: 'status', width: 90, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
     { title: t('common.actions'), key: 'actions', width: 120, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
@@ -875,14 +925,39 @@ const DistributorWorkerUpload: React.FC = () => {
           icon={<EditOutlined />} 
           onClick={() => { 
             setEditingWorker(record)
+            setHasSyncedPhoneToWhatsApp(true) // 编辑模式下标记为已同步，避免自动同步
+            setHasSyncedRegionToWhatsApp(true) // 编辑模式下标记地区为已同步，避免自动同步
+            // 解析WhatsApp字段
+            let whatsappAreaCode = '';
+            let whatsappNumber = '';
+            if (record.whatsapp) {
+              const whatsappParts = record.whatsapp.split(' ');
+              if (whatsappParts.length >= 2) {
+                whatsappAreaCode = whatsappParts[0];
+                whatsappNumber = whatsappParts.slice(1).join(' ');
+              } else {
+                // 如果没有空格分隔，尝试从开头提取区号
+                const match = record.whatsapp.match(/^(\+\d{1,4})(.*)$/);
+                if (match) {
+                  whatsappAreaCode = match[1];
+                  whatsappNumber = match[2];
+                } else {
+                  whatsappNumber = record.whatsapp;
+                }
+              }
+            }
+            
             workerForm.setFieldsValue({
               ...record,
               workerId: record.workerId, // 确保工号被设置
               idType: record.idType, // 设置证件类型
               idNumber: record.idNumber, // 设置证件号码
+              gender: record.gender?.toLowerCase(), // 将性别转换为小写以匹配表单选项
               birthDate: record.birthDate ? dayjs(record.birthDate) : undefined,
               siteId: record.siteId, // 确保工地ID被设置
-              region: record.region // 直接使用数据库原始值（区号）
+              region: record.region, // 直接使用数据库原始值（区号）
+              whatsappAreaCode,
+              whatsappNumber
             })
             setWorkerModalOpen(true) 
           }}
@@ -1056,17 +1131,30 @@ const DistributorWorkerUpload: React.FC = () => {
                 icon={<PlusOutlined />} 
                 onClick={() => { 
                   setEditingWorker(null)
+                  setHasSyncedPhoneToWhatsApp(false) // 重置联系电话同步状态
+                  setHasSyncedRegionToWhatsApp(false) // 重置地区同步状态
+                  // 清理定时器
+                  if (phoneSyncTimerRef.current) {
+                    clearTimeout(phoneSyncTimerRef.current)
+                    phoneSyncTimerRef.current = null
+                  }
+                  if (regionSyncTimerRef.current) {
+                    clearTimeout(regionSyncTimerRef.current)
+                    regionSyncTimerRef.current = null
+                  }
                   workerForm.resetFields()
                   // 设置新增工人的默认值
                   const defaultSiteId = sites.length > 0 ? sites[0].id : null
+                  const defaultAreaCode = getDefaultAreaCode();
                   workerForm.setFieldsValue({
                     status: 'active',
                     idType: 'ID_CARD', // 设置默认证件类型为身份证
-                    region: getDefaultAreaCode(), // 根据当前语言设置默认区号
+                    region: defaultAreaCode, // 根据当前语言设置默认区号
                     siteId: defaultSiteId, // 设置默认工地为第一个工地
                     birthDate: null, // 初始日期为空
                     email: '', // 初始邮箱为空
-                    whatsapp: '' // 初始WhatsApp为空
+                    whatsappAreaCode: defaultAreaCode, // 设置默认WhatsApp区号
+                    whatsappNumber: '' // 初始WhatsApp号码为空
                   })
                   setWorkerModalOpen(true) 
                 }}
@@ -1281,7 +1369,10 @@ const DistributorWorkerUpload: React.FC = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="gender" label={t('distributor.gender')} rules={[{ required: true, message: t('distributor.pleaseSelectGender') }]}>
-                <Select placeholder={t('distributor.genderPlaceholder')} options={[{ value: 'male', label: t('distributor.male') }, { value: 'female', label: t('distributor.female') }]} />
+                <Select placeholder={t('distributor.genderPlaceholder')}>
+                  <Option value="male">{t('distributor.male')}</Option>
+                  <Option value="female">{t('distributor.female')}</Option>
+                </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1328,6 +1419,29 @@ const DistributorWorkerUpload: React.FC = () => {
                 <Select 
                   placeholder={t('distributor.areaCodePlaceholder')}
                   showSearch
+                  onChange={(value) => {
+                    // 清除之前的定时器
+                    if (regionSyncTimerRef.current) {
+                      clearTimeout(regionSyncTimerRef.current)
+                    }
+                    
+                    // 只在新增工人时且第一次选择地区时自动同步到WhatsApp区号
+                    if (!editingWorker && !hasSyncedRegionToWhatsApp && value) {
+                      // 设置防抖定时器，等待用户停止选择500ms后再同步
+                      regionSyncTimerRef.current = setTimeout(() => {
+                        workerForm.setFieldsValue({
+                          whatsappAreaCode: value
+                        });
+                        // 标记已经进行过第一次同步
+                        setHasSyncedRegionToWhatsApp(true)
+                      }, 500) // 500ms延迟，比电话号码稍短
+                    } else if (editingWorker) {
+                      // 编辑模式下直接同步，不设置防抖
+                      workerForm.setFieldsValue({
+                        whatsappAreaCode: value
+                      });
+                    }
+                  }}
                   filterOption={(input, option) =>
                     (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
                   }
@@ -1367,7 +1481,35 @@ const DistributorWorkerUpload: React.FC = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="phone" label={t('distributor.phone')} rules={[{ required: true, message: t('distributor.pleaseEnterPhone') }]}>
-                <Input placeholder={t('distributor.phonePlaceholder')} />
+                <Input 
+                  placeholder={t('distributor.phonePlaceholder')} 
+                  onChange={(e) => {
+                    // 清除之前的定时器
+                    if (phoneSyncTimerRef.current) {
+                      clearTimeout(phoneSyncTimerRef.current)
+                    }
+                    
+                    // 只在新增工人时且第一次填写联系电话时自动同步到WhatsApp号码
+                    if (!editingWorker && !hasSyncedPhoneToWhatsApp) {
+                      const phoneValue = e.target.value
+                      
+                      // 设置防抖定时器，等待用户停止输入1秒后再同步
+                      phoneSyncTimerRef.current = setTimeout(() => {
+                        // 检查输入值是否有效（至少3位数字）
+                        if (phoneValue.trim() && phoneValue.trim().length >= 3) {
+                          // 自动设置WhatsApp区号为当前选择的区号
+                          const currentAreaCode = workerForm.getFieldValue('region') || getDefaultAreaCode()
+                          workerForm.setFieldsValue({
+                            whatsappAreaCode: currentAreaCode,
+                            whatsappNumber: phoneValue
+                          })
+                          // 标记已经进行过第一次同步
+                          setHasSyncedPhoneToWhatsApp(true)
+                        }
+                      }, 1000) // 1秒延迟
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1380,15 +1522,65 @@ const DistributorWorkerUpload: React.FC = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="whatsapp" label={t('distributor.whatsapp')}>
-                <Input placeholder={t('distributor.whatsappPlaceholder')} />
+                <Input.Group compact>
+                  <Form.Item
+                    name="whatsappAreaCode"
+                    noStyle
+                    rules={[{ required: false }]}
+                  >
+                    <Select
+                      style={{ width: '40%' }}
+                      placeholder={t('worker.whatsappAreaCode')}
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                      }
+                    >
+                      {[
+                        { value: '+86', label: `+86 (${t('distributor.areaCodeChina')})` },
+                        { value: '+852', label: `+852 (${t('distributor.areaCodeHongKong')})` },
+                        { value: '+853', label: `+853 (${t('distributor.areaCodeMacau')})` },
+                        { value: '+886', label: `+886 (${t('distributor.areaCodeTaiwan')})` },
+                        { value: '+65', label: `+65 (${t('distributor.areaCodeSingapore')})` },
+                        { value: '+60', label: `+60 (${t('distributor.areaCodeMalaysia')})` },
+                        { value: '+66', label: `+66 (${t('distributor.areaCodeThailand')})` },
+                        { value: '+63', label: `+63 (${t('distributor.areaCodePhilippines')})` },
+                        { value: '+62', label: `+62 (${t('distributor.areaCodeIndonesia')})` },
+                        { value: '+84', label: `+84 (${t('distributor.areaCodeVietnam')})` },
+                        { value: '+1', label: `+1 (${t('distributor.areaCodeUSCanada')})` },
+                        { value: '+44', label: `+44 (${t('distributor.areaCodeUK')})` },
+                        { value: '+49', label: `+49 (${t('distributor.areaCodeGermany')})` },
+                        { value: '+33', label: `+33 (${t('distributor.areaCodeFrance')})` },
+                        { value: '+81', label: `+81 (${t('distributor.areaCodeJapan')})` },
+                        { value: '+82', label: `+82 (${t('distributor.areaCodeKorea')})` },
+                        { value: '+91', label: `+91 (${t('distributor.areaCodeIndia')})` },
+                        { value: '+61', label: `+61 (${t('distributor.areaCodeAustralia')})` },
+                      ].map(option => (
+                        <Option key={option.value} value={option.value} label={option.label}>
+                          {option.label}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                  <Form.Item
+                    name="whatsappNumber"
+                    noStyle
+                    rules={[{ required: false }]}
+                  >
+                    <Input
+                      style={{ width: '60%' }}
+                      placeholder={t('worker.whatsappNumberPlaceholder')}
+                    />
+                  </Form.Item>
+                </Input.Group>
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="status" label={t('distributor.status')} initialValue="active">
-                <Select options={[
-                  { value: 'active', label: t('distributor.active') },
-                  { value: 'inactive', label: t('distributor.inactive') }
-                ]} />
+                <Select>
+                  <Option value="active">{t('distributor.active')}</Option>
+                  <Option value="inactive">{t('distributor.inactive')}</Option>
+                </Select>
               </Form.Item>
             </Col>
           </Row>

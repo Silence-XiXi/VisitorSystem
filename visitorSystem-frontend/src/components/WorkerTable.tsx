@@ -860,7 +860,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
             }
             
             return {
-              workerWhatsApp: worker.whatsapp,
+              workerWhatsApp: worker.whatsapp.replace(/\s+/g, ''), // 去除所有空格
               workerName: worker.name,
               workerId: worker.workerId,
               qrCodeDataUrl: qrCodeData.qrCodeDataUrl
@@ -1125,7 +1125,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.region'),
       dataIndex: 'region',
       key: 'region',
-      width: 120,
+      width: 110,
       sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region),
       render: (region: string) => {
         const areaCodeMap: Record<string, string> = {
@@ -1192,7 +1192,7 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       title: t('worker.email'),
       dataIndex: 'email',
       key: 'email',
-      width: 180,
+      width: 220,
       sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email),
     },
     {
@@ -1202,17 +1202,30 @@ const WorkerTable: React.FC<WorkerTableProps> = ({
       width: 130,
       sorter: (a: Worker, b: Worker) => (a.whatsapp || '').localeCompare(b.whatsapp || ''),
       render: (whatsapp: string) => {
-        if (!whatsapp) return '-';
-        const parts = whatsapp.split(' ');
-        if (parts.length === 2) {
-          return (
-            <div style={{ lineHeight: '1.2' }}>
-              <div style={{ color: '#666' }}>{parts[0]}</div>
-              <div>{parts[1]}</div>
-            </div>
-          );
+        if (!whatsapp || whatsapp.trim() === '') return '-';
+        
+        // 处理WhatsApp号码显示
+        const trimmedWhatsapp = whatsapp.trim();
+        
+        // 如果包含空格，按空格分割显示
+        if (trimmedWhatsapp.includes(' ')) {
+          const parts = trimmedWhatsapp.split(' ');
+          if (parts.length >= 2) {
+            return (
+              <div style={{ lineHeight: '1.2' }}>
+                <div style={{ color: '#666', fontSize: '12px' }}>{parts[0]}</div>
+                <div style={{ fontSize: '13px' }}>{parts.slice(1).join(' ')}</div>
+              </div>
+            );
+          }
         }
-        return whatsapp;
+        
+        // 如果没有空格，直接显示
+        return (
+          <div style={{ fontSize: '13px' }}>
+            {trimmedWhatsapp}
+          </div>
+        );
       },
     },
     {

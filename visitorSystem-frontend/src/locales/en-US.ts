@@ -71,6 +71,8 @@ export default {
     phone: 'Phone',
     email: 'Email',
     whatsapp: 'WhatsApp',
+    whatsappAreaCode: 'Area Code',
+    whatsappNumberPlaceholder: 'Enter WhatsApp number',
     status: 'Status',
     active: 'Active',
     inactive: 'Inactive',

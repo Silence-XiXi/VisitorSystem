@@ -58,8 +58,8 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  // console.log(`应用运行在: http://localhost:${port}`);
-  // console.log(`API文档: http://localhost:${port}/api`);
+  console.log(`应用运行在: http://localhost:${port}`);
+  console.log(`API文档: http://localhost:${port}/api`);
 }
 
 bootstrap();

@@ -151,7 +151,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
       const currentLocale = localStorage.getItem('locale') || 'zh-CN';
       
       const result = await apiService.sendQRCodeWhatsApp({
-        workerWhatsApp: worker.whatsapp,
+        workerWhatsApp: worker.whatsapp.replace(/\s+/g, ''), // 去除所有空格
         workerName: worker.name,
         workerId: worker.workerId,
         qrCodeDataUrl: qrCodeDataUrl,

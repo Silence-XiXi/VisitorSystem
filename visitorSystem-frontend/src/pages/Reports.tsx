@@ -657,7 +657,7 @@ const Reports: React.FC = () => {
   ]
 
   const attendanceColumns = [
-    { title: t('reports.date'), dataIndex: 'date', key: 'date', width: 90, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.date.localeCompare(b.date) },
+    { title: t('reports.date'), dataIndex: 'date', key: 'date', width: 100, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.date.localeCompare(b.date) },
     { title: t('worker.name'), dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.name.localeCompare(b.name) },
     { title: t('reports.distributor'), dataIndex: 'distributorName', key: 'distributorName', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.distributorName.localeCompare(b.distributorName) },
     { title: t('reports.contact'), dataIndex: 'contact', key: 'contact', width: 120, sorter: (a: AttendanceRecord, b: AttendanceRecord) => a.contact.localeCompare(b.contact) },
@@ -675,7 +675,7 @@ const Reports: React.FC = () => {
     { 
       title: t('reports.checkInTime'), 
       key: 'checkIn', 
-      width: 120,
+      width: 135,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkIn || '').localeCompare(b.checkIn || ''),
       render: (_: any, record: AttendanceRecord) => {
         if (!record.checkIn) return '-';
@@ -697,7 +697,7 @@ const Reports: React.FC = () => {
     { 
       title: t('reports.checkOutTime'), 
       key: 'checkOut', 
-      width: 120,
+      width: 135,
       sorter: (a: AttendanceRecord, b: AttendanceRecord) => (a.checkOut || '').localeCompare(b.checkOut || ''),
       render: (_: any, record: AttendanceRecord) => {
         if (!record.checkOut) return '-';

@@ -6,7 +6,7 @@ import type { RadioChangeEvent } from 'antd';
 import { useLocale } from '../contexts/LocaleContext';
 import { useSearchParams } from 'react-router-dom';
 import type { Site, WorkerFormData } from '../types/worker';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 
 const { Title, Text } = Typography;
@@ -25,6 +25,14 @@ const WorkerSelfRegistration: React.FC = () => {
   const [, setWorkerId] = useState<string>('');
   const [workerName, setWorkerName] = useState<string>('');
   const [qrLoading, setQrLoading] = useState(false);
+  
+  // 同步状态跟踪
+  const [phoneSynced, setPhoneSynced] = useState(false);
+  const [areaSynced, setAreaSynced] = useState(false);
+  
+  // 防抖定时器引用
+  const phoneDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const areaDebounceRef = useRef<NodeJS.Timeout | null>(null);
   
   // 根据语言确定默认区号
   const getDefaultAreaCode = () => {
@@ -60,8 +68,9 @@ const WorkerSelfRegistration: React.FC = () => {
   // 动态获取API基础地址
   const getApiBaseUrl = (): string => {
     // 优先使用环境变量
-    if ((import.meta as any).env?.VITE_API_BASE_URL) {
-      return (import.meta as any).env.VITE_API_BASE_URL;
+    const metaEnv = (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } }).env;
+    if (metaEnv?.VITE_API_BASE_URL) {
+      return metaEnv.VITE_API_BASE_URL;
     }
     
     // 自动使用当前窗口的主机名和端口
@@ -95,16 +104,38 @@ const WorkerSelfRegistration: React.FC = () => {
     message.success(t('login.languageChanged') || '语言已切换');
   };
 
-  // 联系电话变化时自动填入WhatsApp
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 联系电话变化时自动填入WhatsApp（带防抖）
+  const handlePhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const phoneValue = e.target.value;
-    const currentWhatsapp = form.getFieldValue('whatsapp');
     
-    // 如果WhatsApp字段为空，自动填入联系电话
-    if (!currentWhatsapp && phoneValue) {
-      form.setFieldsValue({ whatsapp: phoneValue });
+    // 清除之前的定时器
+    if (phoneDebounceRef.current) {
+      clearTimeout(phoneDebounceRef.current);
     }
-  };
+    
+    // 设置新的防抖定时器（1秒）
+    phoneDebounceRef.current = setTimeout(() => {
+      const currentWhatsappNumber = form.getFieldValue('whatsappNumber');
+      
+      // 只在第一次输入且WhatsApp号码字段为空时同步
+      if (!phoneSynced && !currentWhatsappNumber && phoneValue) {
+        form.setFieldsValue({ whatsappNumber: phoneValue });
+        setPhoneSynced(true);
+      }
+    }, 1000);
+  }, [phoneSynced, form]);
+  
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (phoneDebounceRef.current) {
+        clearTimeout(phoneDebounceRef.current);
+      }
+      if (areaDebounceRef.current) {
+        clearTimeout(areaDebounceRef.current);
+      }
+    };
+  }, []);
   
   // 检查身份证号码是否已存在
   const checkIdNumberExists = async (idNumber: string) => {
@@ -169,7 +200,7 @@ const WorkerSelfRegistration: React.FC = () => {
   }, [distributorId, siteId, apiBaseUrl]);
 
   // 表单提交处理
-  const handleSubmit = async (values: WorkerFormData) => {
+  const handleSubmit = async (values: WorkerFormData & { whatsappAreaCode?: string; whatsappNumber?: string }) => {
     if (!distributorId || !siteId) {
       message.error(t('worker.registrationIncomplete') || '注册信息不完整，无法提交');
       return;
@@ -189,18 +220,19 @@ const WorkerSelfRegistration: React.FC = () => {
 
     setSubmitting(true);
     try {
+      // 处理WhatsApp字段，合并区号和号码
+      let whatsappNumber = null;
+      if (values.whatsappAreaCode && values.whatsappNumber) {
+        whatsappNumber = `${values.whatsappAreaCode} ${values.whatsappNumber}`;
+      } else if (values.whatsappAreaCode) {
+        whatsappNumber = values.whatsappAreaCode;
+      } else if (values.whatsappNumber) {
+        whatsappNumber = values.whatsappNumber;
+      }
+
       // 根据选中的地区名称找到对应的区号
       const selectedArea = areaCodeOptions.find(option => option.value === values.areaCode);
-      const areaCode = selectedArea?.areaCode || '+86'; // 默认使用+86
-      
-      // 处理WhatsApp号码，如果填写了WhatsApp但没有区号，自动添加地区区号
-      let whatsappNumber = values.whatsapp || null;
-      if (whatsappNumber && areaCode) {
-        // 如果WhatsApp号码不以+开头，添加区号
-        if (!whatsappNumber.startsWith('+')) {
-          whatsappNumber = `${areaCode}${whatsappNumber}`;
-        }
-      }
+      const regionCode = selectedArea?.areaCode || values.areaCode;
 
       // 准备提交数据
       const submitData = {
@@ -209,7 +241,7 @@ const WorkerSelfRegistration: React.FC = () => {
         idType: values.idType,
         idNumber: values.idNumber,
         gender: values.gender.toUpperCase(),
-        region: values.areaCode, // 保存地区名称（翻译键的内容）
+        region: regionCode, // 保存区号（如+86）
         siteId: siteId,
         distributorId: distributorId,
         birthDate: values.birthDate ? values.birthDate.format('YYYY-MM-DD') : null,
@@ -421,7 +453,8 @@ const WorkerSelfRegistration: React.FC = () => {
           onFinish={handleSubmit}
           requiredMark={true}
           initialValues={{
-            areaCode: getDefaultAreaCode()
+            areaCode: getDefaultAreaCode(),
+            whatsappAreaCode: areaCodeOptions.find(option => option.value === getDefaultAreaCode())?.areaCode || '+86'
           }}
         >
           <Form.Item
@@ -451,6 +484,27 @@ const WorkerSelfRegistration: React.FC = () => {
             <Select 
               placeholder={t('form.selectPlaceholder') + (t('distributor.areaCode') || '地区')}
               showSearch
+              onChange={(value) => {
+                // 清除之前的定时器
+                if (areaDebounceRef.current) {
+                  clearTimeout(areaDebounceRef.current);
+                }
+                
+                // 设置新的防抖定时器（500ms）
+                areaDebounceRef.current = setTimeout(() => {
+                  // 根据选中的地区名称找到对应的区号
+                  const selectedArea = areaCodeOptions.find(option => option.value === value);
+                  const areaCode = selectedArea?.areaCode;
+                  
+                  // 只在第一次选择时同步到WhatsApp区号
+                  if (!areaSynced && areaCode) {
+                    form.setFieldsValue({
+                      whatsappAreaCode: areaCode
+                    });
+                    setAreaSynced(true);
+                  }
+                }, 500);
+              }}
               filterOption={(input, option) =>
                 (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
               }
@@ -530,7 +584,38 @@ const WorkerSelfRegistration: React.FC = () => {
             label={t('worker.whatsapp') || 'WhatsApp'}
             // help={t('distributor.whatsappPlaceholder') || '例如: +86 13800138000'}
           >
-            <Input placeholder={(t('form.inputPlaceholder') || '请输入') + 'WhatsApp' + '（' + (t('form.optional') || '可选') + '）'} />
+            <Input.Group compact>
+              <Form.Item
+                name="whatsappAreaCode"
+                noStyle
+                rules={[{ required: false }]}
+              >
+                <Select
+                  style={{ width: '40%' }}
+                  placeholder={t('worker.whatsappAreaCode') || '区号'}
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                  }
+                >
+                  {areaCodeOptions.map(option => (
+                    <Option key={option.areaCode} value={option.areaCode} label={option.label}>
+                      {option.label}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item
+                name="whatsappNumber"
+                noStyle
+                rules={[{ required: false }]}
+              >
+                <Input
+                  style={{ width: '60%' }}
+                  placeholder={t('worker.whatsappNumberPlaceholder') || '请输入WhatsApp号码'}
+                />
+              </Form.Item>
+            </Input.Group>
           </Form.Item>
 
           <Form.Item

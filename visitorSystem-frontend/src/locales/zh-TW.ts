@@ -71,6 +71,8 @@ export default {
     phone: '聯繫電話',
     email: '郵箱',
     whatsapp: 'WhatsApp',
+    whatsappAreaCode: '區號',
+    whatsappNumberPlaceholder: '請輸入WhatsApp號碼',
     status: '狀態',
     active: '啟用',
     inactive: '停用',

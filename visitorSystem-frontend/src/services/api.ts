@@ -3,7 +3,7 @@ const API_BASE_URL = (() => {
   // 首先尝试使用环境变量
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
   if (envUrl) {
-    // console.log('[API Config] Using environment variable:', envUrl);
+    console.log('[API Config] Using environment variable:', envUrl);
     return envUrl;
   }
 
@@ -11,31 +11,31 @@ const API_BASE_URL = (() => {
   const currentHost = window.location.hostname;
   const currentPort = window.location.port;
   
-  // console.log('[API Config] Current location:', {
-  //   hostname: currentHost,
-  //   port: currentPort,
-  //   href: window.location.href
-  // });
+  console.log('[API Config] Current location:', {
+    hostname: currentHost,
+    port: currentPort,
+    href: window.location.href
+  });
   
   // 检测是否通过nginx代理访问（端口9017、8081、8082等）
   const proxyPorts = ['80', '443', '9017', '8081', '8082'];
   if (proxyPorts.includes(currentPort) || !currentPort) {
     // 使用相对路径，让Nginx代理处理
     const url = '/api';
-    // console.log('[API Config] Using relative path for Nginx proxy:', url);
+    console.log('[API Config] Using relative path for Nginx proxy:', url);
     return url;
   }
   
   // 如果是本地开发环境（直接访问容器端口），使用localhost:3001
   if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
     const url = 'http://localhost:3001';
-    // console.log('[API Config] Local development detected, using:', url);
+    console.log('[API Config] Local development detected, using:', url);
     return url;
   } 
   
   // 其他情况：使用相对路径，让Nginx代理处理
   const url = '/api';
-  // console.log('[API Config] Using relative path:', url);
+  console.log('[API Config] Using relative path:', url);
   return url;
 })();
 
