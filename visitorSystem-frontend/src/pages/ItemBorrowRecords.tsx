@@ -727,7 +727,7 @@ const ItemBorrowRecords: React.FC = () => {
           {/* 选择状态显示 */}
           {selectedRowKeys.length > 0 && (
             <div style={{ 
-              marginBottom: 8, 
+              marginBottom: 1, 
               padding: '8px 16px', 
               backgroundColor: '#f6ffed', 
               border: '1px solid #b7eb8f',
@@ -786,6 +786,29 @@ const ItemBorrowRecords: React.FC = () => {
                 onChange: setSelectedRowKeys,
                 preserveSelectedRowKeys: true
               }}
+              onRow={(record) => ({
+                onClick: (event) => {
+                  // 如果点击的是复选框或复选框的父元素，不处理行点击
+                  const target = event.target as HTMLElement;
+                  if (target.closest('.ant-checkbox-wrapper') || target.closest('.ant-checkbox')) {
+                    return;
+                  }
+                  
+                  // 如果点击的是操作列中的按钮，不处理行点击
+                  if (target.closest('button') || target.closest('.ant-btn')) {
+                    return;
+                  }
+                  
+                  // 切换选中状态
+                  const isSelected = selectedRowKeys.includes(record.key);
+                  if (isSelected) {
+                    setSelectedRowKeys(prev => prev.filter(key => key !== record.key));
+                  } else {
+                    setSelectedRowKeys(prev => [...prev, record.key]);
+                  }
+                },
+                style: { cursor: 'pointer' }
+              })}
               locale={{
                 emptyText: loading ? '加载中...' : '暂无数据'
               }}

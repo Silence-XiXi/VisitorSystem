@@ -258,9 +258,10 @@ export class AdminController {
   @ApiResponse({ status: 403, description: '权限不足' })
   async resetDistributorPassword(
     @GetCurrentUser() user: CurrentUser,
-    @Param('id') distributorId: string
+    @Param('id') distributorId: string,
+    @Body() body?: { language?: string }
   ) {
-    return this.adminService.resetDistributorPassword(user, distributorId);
+    return this.adminService.resetDistributorPassword(user, distributorId, body?.language);
   }
 
   @Post('guards/:id/reset-password')
@@ -271,9 +272,10 @@ export class AdminController {
   @ApiResponse({ status: 403, description: '权限不足' })
   async resetGuardPassword(
     @GetCurrentUser() user: CurrentUser,
-    @Param('id') guardId: string
+    @Param('id') guardId: string,
+    @Body() body?: { language?: string }
   ) {
-    return this.adminService.resetGuardPassword(user, guardId);
+    return this.adminService.resetGuardPassword(user, guardId, body?.language);
   }
 
   @Put('guards/:id')

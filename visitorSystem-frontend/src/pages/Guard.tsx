@@ -1533,7 +1533,7 @@ const Guard: React.FC = () => {
   // 语言切换处理函数
   const handleLanguageChange = (newLocale: string) => {
     setLocale(newLocale as 'zh-CN' | 'zh-TW' | 'en-US')
-    message.success(t('login.languageChanged'))
+    // message.success(t('login.languageChanged'))
   }
 
   const handlePasswordChange = async (values: { oldPassword: string; newPassword: string; confirmPassword: string }) => {

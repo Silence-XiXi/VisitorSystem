@@ -170,15 +170,15 @@ export class WhatsAppService {
    */
   private async loadConfigFromDatabase(): Promise<void> {
     try {
-      this.logger.log('延迟加载WhatsApp配置...');
+      // this.logger.log('延迟加载WhatsApp配置...');
       
       // 使用SystemConfigService获取并自动解密配置
       try {
         const apiKeyValue = await this.systemConfigService.getConfigValue('WHATSAPP_API_TOKEN');
         if (apiKeyValue) {
-          this.logger.log('成功从SystemConfigService获取API密钥');
+          // this.logger.log('成功从SystemConfigService获取API密钥');
           this.apiKey = apiKeyValue;
-          this.logger.log(`API密钥长度: ${this.apiKey.length}`);
+          // this.logger.log(`API密钥长度: ${this.apiKey.length}`);
         } else {
           this.logger.warn('SystemConfigService返回的API密钥为空');
         }
@@ -197,7 +197,7 @@ export class WhatsAppService {
             // 尝试解密
             const decryptedKey = this.decryptValue(apiKeyConfig.config_value);
             if (decryptedKey) {
-              this.logger.log('成功解密API密钥');
+              // this.logger.log('成功解密API密钥');
               this.apiKey = decryptedKey;
             } else {
               this.logger.warn('API密钥解密失败');
@@ -234,12 +234,12 @@ export class WhatsAppService {
       }
 
       // 验证最终配置结果
-      this.logger.log(`延迟加载完成 - API密钥状态: ${this.apiKey ? '已配置' : '未配置'}`);
+      // this.logger.log(`延迟加载完成 - API密钥状态: ${this.apiKey ? '已配置' : '未配置'}`);
       if (this.apiKey) {
-        this.logger.log(`API密钥长度: ${this.apiKey.length}`);
-        this.logger.log(`API密钥前四位: ${this.apiKey.substring(0, 4)}...`);
+        // this.logger.log(`API密钥长度: ${this.apiKey.length}`);
+        // this.logger.log(`API密钥前四位: ${this.apiKey.substring(0, 4)}...`);
       }
-      this.logger.log(`发送方号码: ${this.fromPhoneNumber}`);
+      // this.logger.log(`发送方号码: ${this.fromPhoneNumber}`);
     } catch (error) {
       this.logger.error('延迟加载WhatsApp配置失败:', error);
       // 保留默认值，不要覆盖
@@ -353,10 +353,10 @@ export class WhatsAppService {
           languageCode = 'zh_HK';
           templateSuffix = '_tw';
         }
-        this.logger.log(`使用请求中指定的语言: ${language}`);
+        // this.logger.log(`使用请求中指定的语言: ${language}`);
       } else {
         // 如果没有指定语言，使用默认语言（繁体中文）
-        this.logger.log('未指定语言，使用默认语言（繁体中文）');
+        // this.logger.log('未指定语言，使用默认语言（繁体中文）');
       }
       
       // 从系统配置获取WhatsApp模板名称基础部分
@@ -364,7 +364,7 @@ export class WhatsAppService {
       // 由于默认模板名称已经包含后缀，如果使用默认值则不需要再添加后缀
       const templateName = templateBase === 'worker_qrcode_tw' ? templateBase : templateBase + templateSuffix;
       
-      this.logger.log(`使用WhatsApp模板: ${templateName}, 语言: ${languageCode}`);
+      // this.logger.log(`使用WhatsApp模板: ${templateName}, 语言: ${languageCode}`);
       
       const payload = {
         type: 'template',
@@ -380,7 +380,7 @@ export class WhatsAppService {
         from: this.fromPhoneNumber
       };
       
-      this.logger.log(`发送WhatsApp消息，使用mediaId: ${mediaId}`);
+      // this.logger.log(`发送WhatsApp消息，使用mediaId: ${mediaId}`);
       
       // 同样使用axios直接调用
       const response = await axios({
@@ -410,7 +410,7 @@ export class WhatsAppService {
   async sendQRCode(workerWhatsApp: string, workerName: string, qrCodeDataUrl: string, language?: string): Promise<{ success: boolean; message: string }> {
     try {
       // 延迟初始化：确保配置已加载
-      this.logger.log('开始发送QRCode，检查配置状态...');
+      // this.logger.log('开始发送QRCode，检查配置状态...');
       await this.ensureConfigLoaded();
       
       // 验证API密钥有效性
@@ -423,9 +423,9 @@ export class WhatsAppService {
       }
       
       // 记录API密钥信息以便调试
-      this.logger.log(`API密钥长度: ${this.apiKey.length}`);
-      this.logger.log(`API密钥前四位: ${this.apiKey.substring(0, 4)}`);
-      this.logger.log(`API密钥后四位: ${this.apiKey.substring(this.apiKey.length - 4)}`);
+      // this.logger.log(`API密钥长度: ${this.apiKey.length}`);
+      // this.logger.log(`API密钥前四位: ${this.apiKey.substring(0, 4)}`);
+      // this.logger.log(`API密钥后四位: ${this.apiKey.substring(this.apiKey.length - 4)}`);
       // 检查是否有不可见字符
       const containsInvisible = /[\u0000-\u001F\u007F-\u009F\s]/.test(this.apiKey);
       if (containsInvisible) {
@@ -444,11 +444,11 @@ export class WhatsAppService {
       try {
         // 2. 上传媒体文件到YCloud
         const mediaId = await this.uploadMediaToYCloud(tempFilePath);
-        this.logger.log(`媒体文件已上传到YCloud, media ID: ${mediaId}`);
+        // this.logger.log(`媒体文件已上传到YCloud, media ID: ${mediaId}`);
         
         // 3. 发送WhatsApp消息
         const result = await this.sendWhatsAppMessage(workerWhatsApp, workerName, mediaId, language);
-        this.logger.log(`WhatsApp消息已发送: ${JSON.stringify(result)}`);
+        // this.logger.log(`WhatsApp消息已发送: ${JSON.stringify(result)}`);
         
         return { 
           success: true, 

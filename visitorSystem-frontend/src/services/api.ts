@@ -325,12 +325,17 @@ class ApiService {
             errorMessage = errorData?.message || '请求参数错误';
             break;
           case 401:
-            // 检测到 token 过期，自动登出
-            if (globalLogoutFunction) {
-              // console.log('检测到 token 过期，自动登出');
-              globalLogoutFunction();
+            // 检查是否是登录请求，如果是则显示原始错误信息
+            if (endpoint === '/auth/login') {
+              errorMessage = errorData?.message || '用户名或密码错误';
+            } else {
+              // 其他401错误视为token过期，自动登出
+              if (globalLogoutFunction) {
+                // console.log('检测到 token 过期，自动登出');
+                globalLogoutFunction();
+              }
+              errorMessage = '登录已过期，请重新登录';
             }
-            errorMessage = '登录已过期，请重新登录';
             break;
           case 403:
             errorMessage = '没有权限访问此资源';
@@ -508,25 +513,29 @@ class ApiService {
     });
   }
 
-  async resetDistributorPassword(distributorId: string): Promise<{
+  async resetDistributorPassword(distributorId: string, language?: string): Promise<{
     distributorId: string;
     distributorName: string;
     username: string;
     newPassword: string;
+    emailSent?: boolean;
   }> {
     return this.requestWithRetry(`/admin/distributors/${distributorId}/reset-password`, {
       method: 'POST',
+      body: language ? JSON.stringify({ language }) : undefined,
     });
   }
 
-  async resetGuardPassword(guardId: string): Promise<{
+  async resetGuardPassword(guardId: string, language?: string): Promise<{
     guardId: string;
     guardName: string;
     username: string;
     newPassword: string;
+    emailSent?: boolean;
   }> {
     return this.requestWithRetry(`/admin/guards/${guardId}/reset-password`, {
       method: 'POST',
+      body: language ? JSON.stringify({ language }) : undefined,
     });
   }
 
@@ -1465,11 +1474,44 @@ class ApiService {
     });
   }
   
+  // 发送门卫账号密码到邮箱
+  async sendGuardAccountEmail(data: {
+    guardEmail: string;
+    guardName: string;
+    contactName: string;
+    username: string;
+    password: string;
+    loginUrl: string;
+    language?: string;
+  }): Promise<{ success: boolean; message: string; error?: string; details?: any; step?: string; stack?: string }> {
+    try {
+      // 打印更详细的调试信息
+      // console.log('发送请求到 /email/send-guard-account API端点');
+      
+      const response = await this.requestWithRetry<{ success: boolean; message: string; error?: string; details?: any; step?: string; stack?: string }>('/email/send-guard-account', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      // console.log('门卫账号邮件发送响应:', response);
+      return response;
+    } catch (error) {
+      console.error('发送门卫账号邮件失败:', error);
+      return {
+        success: false,
+        message: '发送门卫账号邮件失败',
+        error: error instanceof Error ? error.message : '未知错误',
+        step: 'api_call'
+      };
+    }
+  }
+
   // 发送分判商账号密码到邮箱
   
   async sendDistributorAccountEmail(data: {
     distributorEmail: string;
     distributorName: string;
+    contactName: string;
     username: string;
     password: string;
     loginUrl: string;
@@ -1521,11 +1563,66 @@ class ApiService {
     }
   }
   
+  // 批量发送门卫账号密码到邮箱
+  async batchSendGuardAccountEmails(data: {
+    guards: Array<{
+      guardEmail: string;
+      guardName: string;
+      contactName: string;
+      username: string;
+      password: string;
+    }>;
+    loginUrl: string;
+    language?: string;
+  }): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results?: {
+      total: number;
+      success: number;
+      failed: number;
+      results: Array<{
+        email: string; 
+        success: boolean;
+        error?: string;
+      }>;
+    } 
+  }> {
+    try {
+      const response = await this.requestWithRetry('/email/batch-send-guard-accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('门卫批量邮件发送失败:', error);
+      return {
+        success: false,
+        message: '门卫批量邮件发送失败',
+        results: {
+          total: data.guards.length,
+          success: 0,
+          failed: data.guards.length,
+          results: data.guards.map(guard => ({
+            email: guard.guardEmail,
+            success: false,
+            error: error instanceof Error ? error.message : '未知错误'
+          }))
+        }
+      };
+    }
+  }
+
   // 批量发送分判商账号密码到邮箱
   async batchSendDistributorAccountEmails(data: {
     distributors: Array<{
       email: string;
       name: string;
+      contactName: string;
       username: string;
       password: string;
     }>;
@@ -1666,6 +1763,259 @@ class ApiService {
       },
       body: JSON.stringify(data),
     });
+  }
+
+  // 异步批量发送工人二维码邮件
+  async asyncBatchSendQRCodeEmail(data: {
+    workers: Array<{
+      workerEmail: string;
+      workerName: string;
+      workerId: string;
+      qrCodeDataUrl: string;
+    }>;
+    language?: string;
+  }): Promise<{ success: boolean; message: string; jobId: string; total: number }> {
+    try {
+      const response = await this.requestWithRetry<{ success: boolean; message: string; jobId: string; total: number }>('/email/async-batch-send-qrcode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      return response;
+    } catch (error: any) {
+      console.error('异步批量发送二维码邮件失败:', error);
+      throw new Error(error.message || '异步批量发送二维码邮件失败');
+    }
+  }
+
+  // 异步批量发送分判商账号邮件
+  async asyncBatchSendDistributorAccountEmails(data: {
+    distributors: Array<{
+      email: string;
+      name: string;
+      contactName: string;
+      username: string;
+      password: string;
+    }>;
+    loginUrl: string;
+    language?: string;
+  }): Promise<{ success: boolean; message: string; jobId: string; total: number }> {
+    try {
+      const response = await this.requestWithRetry<{ success: boolean; message: string; jobId: string; total: number }>('/email/async-batch-send-distributor-accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      return response;
+    } catch (error: any) {
+      console.error('异步批量发送分判商账号邮件失败:', error);
+      throw new Error(error.message || '异步批量发送分判商账号邮件失败');
+    }
+  }
+
+  // 异步批量发送门卫账号邮件
+  async asyncBatchSendGuardAccountEmails(data: {
+    guards: Array<{
+      guardEmail: string;
+      guardName: string;
+      contactName: string;
+      username: string;
+      password: string;
+    }>;
+    loginUrl: string;
+    language?: string;
+  }): Promise<{ success: boolean; message: string; jobId: string; total: number }> {
+    try {
+      const response = await this.requestWithRetry<{ success: boolean; message: string; jobId: string; total: number }>('/email/async-batch-send-guard-accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      return response;
+    } catch (error: any) {
+      console.error('异步批量发送门卫账号邮件失败:', error);
+      throw new Error(error.message || '异步批量发送门卫账号邮件失败');
+    }
+  }
+
+  // 获取邮件任务进度
+  async getEmailJobProgress(jobId: string): Promise<{
+    success: boolean;
+    progress: {
+      jobId: string;
+      status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+      progress: number;
+      total: number;
+      success: number;
+      failed: number;
+      errors: Array<{ email: string; error: string }>;
+      estimatedTimeRemaining?: number;
+    };
+  }> {
+    try {
+      const response = await this.requestWithRetry<{
+        success: boolean;
+        progress: {
+          jobId: string;
+          status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+          progress: number;
+          total: number;
+          success: number;
+          failed: number;
+          errors: Array<{ email: string; error: string }>;
+          estimatedTimeRemaining?: number;
+        };
+      }>(`/email/job-progress/${jobId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return response;
+    } catch (error: any) {
+      console.error('获取邮件任务进度失败:', error);
+      throw new Error(error.message || '获取邮件任务进度失败');
+    }
+  }
+
+  // 取消邮件任务
+  async cancelEmailJob(jobId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.requestWithRetry<{ success: boolean; message: string }>(`/email/cancel-job/${jobId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response;
+    } catch (error: any) {
+      console.error('取消邮件任务失败:', error);
+      throw new Error(error.message || '取消邮件任务失败');
+    }
+  }
+
+  // 测试SMTP连接
+  async testSMTPConnection(): Promise<{
+    success: boolean;
+    message: string;
+    config?: any;
+    error?: string;
+    details?: any;
+  }> {
+    try {
+      const response = await this.requestWithRetry<{
+        success: boolean;
+        message: string;
+        config?: any;
+        error?: string;
+        details?: any;
+      }>('/email/test-smtp-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response;
+    } catch (error: any) {
+      console.error('测试SMTP连接失败:', error);
+      throw new Error(error.message || '测试SMTP连接失败');
+    }
+  }
+
+  // 异步批量发送工人二维码到WhatsApp
+  async asyncBatchSendQRCodeWhatsApp(data: {
+    workers: Array<{
+      workerWhatsApp: string;
+      workerName: string;
+      workerId: string;
+      qrCodeDataUrl: string;
+    }>;
+    language?: string;
+  }): Promise<{ success: boolean; message: string; jobId: string }> {
+    try {
+      const response = await this.requestWithRetry<{ success: boolean; message: string; jobId: string }>('/whatsapp/async-batch-send-qrcode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      return response;
+    } catch (error: any) {
+      console.error('异步批量发送WhatsApp失败:', error);
+      throw new Error(error.message || '异步批量发送WhatsApp失败');
+    }
+  }
+
+  // 获取WhatsApp任务进度
+  async getWhatsAppJobProgress(jobId: string): Promise<{
+    success: boolean;
+    progress: {
+      jobId: string;
+      status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+      progress: number;
+      total: number;
+      success: number;
+      failed: number;
+      errors: Array<{ whatsapp: string; error: string }>;
+      estimatedTimeRemaining?: number;
+    };
+  }> {
+    try {
+      const response = await this.requestWithRetry<{
+        success: boolean;
+        progress: {
+          jobId: string;
+          status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+          progress: number;
+          total: number;
+          success: number;
+          failed: number;
+          errors: Array<{ whatsapp: string; error: string }>;
+          estimatedTimeRemaining?: number;
+        };
+      }>(`/whatsapp/job-progress/${jobId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return response;
+    } catch (error: any) {
+      console.error('获取WhatsApp任务进度失败:', error);
+      throw new Error(error.message || '获取WhatsApp任务进度失败');
+    }
+  }
+
+  // 取消WhatsApp任务
+  async cancelWhatsAppJob(jobId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.requestWithRetry<{ success: boolean; message: string }>(`/whatsapp/cancel-job/${jobId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response;
+    } catch (error: any) {
+      console.error('取消WhatsApp任务失败:', error);
+      throw new Error(error.message || '取消WhatsApp任务失败');
+    }
   }
 
 }

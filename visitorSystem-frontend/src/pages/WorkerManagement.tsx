@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Card, Button, Space, Input, Select, message, Modal, Upload } from 'antd';
 import { PlusOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import Draggable from 'react-draggable';
-import WorkerForm, { WorkerFormRef } from './WorkerForm';
-import WorkerTable from './WorkerTable';
-import QRCodeModal from './QRCodeModal';
+import WorkerForm, { WorkerFormRef } from '../components/WorkerForm';
+import WorkerTable from '../components/WorkerTable';
+import QRCodeModal from '../components/QRCodeModal';
 import { Worker, CreateWorkerRequest, UpdateWorkerRequest, Distributor, Site } from '../types/worker';
 import { mockDistributors, mockSites, mockWorkers } from '../data/mockData';
 import { useLocale } from '../contexts/LocaleContext';

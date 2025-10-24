@@ -60,6 +60,8 @@ export const useAuth = () => {
       'auth.logoutSuccess': '登出成功',
       'auth.parsingUserDataError': '解析用户数据时发生错误',
       'auth.tokenExpired': '登录已过期，请重新登录',
+      'auth.invalidCredentials': '用户名或密码错误',
+      'auth.accountDisabled': '账户已被禁用',
       'auth.alreadyLoggedIn': '您已经登录，无需重复登录',
     }
     t = (key: string) => translations[key] || key
@@ -167,7 +169,15 @@ export const useAuth = () => {
       if (error && typeof error === 'object' && 'statusCode' in error) {
         errorCode = (error as { statusCode: number }).statusCode
         if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
-          errorMessage = (error as { message: string }).message
+          const message = (error as { message: string }).message
+          // 根据错误信息选择合适的翻译
+          if (message.includes('用户名或密码错误')) {
+            errorMessage = t('auth.invalidCredentials')
+          } else if (message.includes('账户已被禁用')) {
+            errorMessage = t('auth.accountDisabled')
+          } else {
+            errorMessage = message
+          }
         }
       } else if (error && typeof error === 'object' && 'isNetworkError' in error) {
         errorMessage = t('auth.networkConnectionFailed')

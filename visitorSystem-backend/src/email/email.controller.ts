@@ -3,12 +3,14 @@ import {
   Post,
   Get,
   Body,
+  Param,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
 import { IsEmail, IsString, IsNotEmpty, IsArray, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { EmailService } from './email.service';
+import { EmailQueueService } from './email-queue.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -35,14 +37,18 @@ export class SendQRCodeEmailDto {
   language?: string; // 可选的语言参数
 }
 
-export class SendDistributorAccountDto {
+export class SendGuardAccountDto {
   @IsEmail()
   @IsNotEmpty()
-  distributorEmail: string;
+  guardEmail: string;
 
   @IsString()
   @IsNotEmpty()
-  distributorName: string;
+  guardName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  contactName: string;
 
   @IsString()
   @IsNotEmpty()
@@ -60,6 +66,50 @@ export class SendDistributorAccountDto {
   language?: string; // 可选的语言参数
 }
 
+export class SendDistributorAccountDto {
+  @IsEmail()
+  @IsNotEmpty()
+  distributorEmail: string;
+
+  @IsString()
+  @IsNotEmpty()
+  distributorName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  contactName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  loginUrl: string;
+  
+  @IsString()
+  language?: string; // 可选的语言参数
+}
+
+export class BatchSendGuardAccountDto {
+  @IsArray()
+  @ArrayMinSize(1, { message: '至少需要一个门卫数据' })
+  @ValidateNested({ each: true })
+  @Type(() => GuardAccountDto)
+  guards: GuardAccountDto[];
+  
+  @IsString()
+  @IsNotEmpty()
+  loginUrl: string;
+  
+  @IsString()
+  language?: string;
+}
+
 export class BatchSendDistributorAccountDto {
   @IsArray()
   @ArrayMinSize(1, { message: '至少需要一个分判商数据' })
@@ -75,6 +125,28 @@ export class BatchSendDistributorAccountDto {
   language?: string;
 }
 
+class GuardAccountDto {
+  @IsEmail()
+  @IsNotEmpty()
+  guardEmail: string;
+
+  @IsString()
+  @IsNotEmpty()
+  guardName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  contactName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+
 class DistributorAccountDto {
   @IsEmail()
   @IsNotEmpty()
@@ -83,6 +155,10 @@ class DistributorAccountDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  contactName: string;
   
   @IsString()
   @IsNotEmpty()
@@ -126,7 +202,10 @@ export class BatchSendQRCodeEmailDto {
 @Controller('email')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EmailController {
-  constructor(private readonly emailService: EmailService) {}
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly emailQueueService: EmailQueueService,
+  ) {}
 
   @Post('send-qrcode')
   @Roles(UserRole.ADMIN, UserRole.DISTRIBUTOR, UserRole.GUARD)
@@ -323,11 +402,88 @@ export class EmailController {
   }
   
   
+  @Post('send-guard-account')
+  @Roles(UserRole.ADMIN)
+  async sendGuardAccountEmail(@Body() body: SendGuardAccountDto) {
+    try {
+      const { guardEmail, guardName, contactName, username, password, loginUrl, language } = body;
+      
+      // 验证必填字段
+      if (!guardEmail || !guardName || !username || !password || !loginUrl) {
+        console.error('缺少必填字段', { 
+          hasEmail: !!guardEmail, 
+          hasName: !!guardName, 
+          hasUsername: !!username,
+          hasPassword: !!password,
+          hasLoginUrl: !!loginUrl
+        });
+        return {
+          success: false,
+          message: '缺少必填字段',
+          details: { missingFields: [
+            !guardEmail && 'guardEmail',
+            !guardName && 'guardName',
+            !username && 'username',
+            !password && 'password',
+            !loginUrl && 'loginUrl',
+          ].filter(Boolean) }
+        };
+      }
+
+      // 验证邮箱格式
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(guardEmail)) {
+        console.error('邮箱格式不正确', { email: guardEmail });
+        return {
+          success: false,
+          message: '邮箱格式不正确',
+          details: { email: guardEmail }
+        };
+      }
+
+      // 选择语言
+      const selectedLanguage = language || 'zh-CN';
+      
+      // 发送门卫账号邮件
+      const success = await this.emailService.sendGuardAccountEmail(
+        guardEmail,
+        guardName,
+        contactName,
+        username,
+        password,
+        loginUrl,
+        selectedLanguage,
+      );
+
+      if (success) {
+        return {
+          success: true,
+          message: '门卫账号邮件发送成功'
+        };
+      } else {
+        return {
+          success: false,
+          message: '门卫账号邮件发送失败',
+          step: 'email_send'
+        };
+      }
+    } catch (error) {
+      console.error('发送门卫账号邮件时出错:', error);
+      return {
+        success: false,
+        message: '发送门卫账号邮件时出错',
+        error: error.message,
+        stack: error.stack,
+        step: 'config'
+      };
+    }
+  }
+
   @Post('send-distributor-account')
   @Roles(UserRole.ADMIN)
   async sendDistributorAccountEmail(@Body() body: SendDistributorAccountDto) {
     try {
-      const { distributorEmail, distributorName, username, password, loginUrl, language } = body;
+      const { distributorEmail, distributorName, contactName, username, password, loginUrl, language } = body;
       
       // console.log('接收分判商账号邮件请求:', {
       //   email: distributorEmail, 
@@ -393,6 +549,7 @@ export class EmailController {
         const success = await this.emailService.sendDistributorAccountEmail(
           distributorEmail,
           distributorName,
+          contactName,
           username,
           password,
           loginUrl,
@@ -434,6 +591,84 @@ export class EmailController {
     }
   }
   
+  @Post('batch-send-guard-accounts')
+  @Roles(UserRole.ADMIN)
+  async batchSendGuardAccountEmails(@Body() body: BatchSendGuardAccountDto) {
+    try {
+      const { guards, loginUrl, language } = body;
+      
+      // 验证必填字段
+      if (!guards || guards.length === 0) {
+        return {
+          success: false,
+          message: '没有门卫数据需要发送',
+          results: {
+            total: 0,
+            success: 0,
+            failed: 0,
+            results: []
+          }
+        };
+      }
+
+      if (!loginUrl) {
+        return {
+          success: false,
+          message: '缺少登录链接',
+          results: {
+            total: guards.length,
+            success: 0,
+            failed: guards.length,
+            results: guards.map(guard => ({
+              email: guard.guardEmail,
+              success: false,
+              error: '缺少登录链接'
+            }))
+          }
+        };
+      }
+
+      // 选择语言
+      const selectedLanguage = language || 'zh-CN';
+      
+      // 批量发送门卫账号邮件
+      const results = await this.emailService.batchSendGuardAccountEmails(
+        guards,
+        loginUrl,
+        selectedLanguage,
+      );
+
+      return {
+        success: true,
+        message: `批量发送完成，成功：${results.success}，失败：${results.failed}`,
+        results: {
+          total: results.total,
+          success: results.success,
+          failed: results.failed,
+          results: results.results
+        }
+      };
+    } catch (error) {
+      console.error('批量发送门卫账号邮件时出错:', error);
+      return {
+        success: false,
+        message: '批量发送门卫账号邮件时出错',
+        error: error.message,
+        stack: error.stack,
+        results: {
+          total: body.guards?.length || 0,
+          success: 0,
+          failed: body.guards?.length || 0,
+          results: body.guards?.map(guard => ({
+            email: guard.guardEmail,
+            success: false,
+            error: error.message
+          })) || []
+        }
+      };
+    }
+  }
+
   @Post('batch-send-distributor-accounts')
   @Roles(UserRole.ADMIN)
   async batchSendDistributorAccountEmails(@Body() body: BatchSendDistributorAccountDto) {
@@ -468,6 +703,189 @@ export class EmailController {
       };
     } catch (error) {
       throw new BadRequestException(`批量发送分判商账号邮件失败: ${error.message}`);
+    }
+  }
+
+  // 异步批量发送工人二维码邮件
+  @Post('async-batch-send-qrcode')
+  @Roles(UserRole.ADMIN, UserRole.DISTRIBUTOR)
+  async asyncBatchSendQRCodeEmail(@Body() body: BatchSendQRCodeEmailDto) {
+    const { workers, language } = body;
+
+    // 验证批量发送请求
+    if (!workers || !Array.isArray(workers) || workers.length === 0) {
+      throw new BadRequestException('工人数据不能为空');
+    }
+
+    // 限制一次最多发送数量
+    const MAX_BATCH_SIZE = 100;
+    if (workers.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(`一次最多发送${MAX_BATCH_SIZE}个二维码`);
+    }
+
+    // 验证语言参数
+    const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
+    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-TW';
+
+    // 创建异步任务
+    const jobId = await this.emailQueueService.createEmailJob(
+      'worker-qr',
+      { workers, language: selectedLanguage },
+      workers.length,
+    );
+
+    return {
+      success: true,
+      message: '邮件发送任务已创建，正在后台处理',
+      jobId,
+      total: workers.length,
+    };
+  }
+
+  // 异步批量发送分判商账号邮件
+  @Post('async-batch-send-distributor-accounts')
+  @Roles(UserRole.ADMIN)
+  async asyncBatchSendDistributorAccountEmails(@Body() body: BatchSendDistributorAccountDto) {
+    const { distributors, loginUrl, language } = body;
+
+    if (!distributors || !Array.isArray(distributors) || distributors.length === 0) {
+      throw new BadRequestException('分判商数据不能为空');
+    }
+
+    const MAX_BATCH_SIZE = 100;
+    if (distributors.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(`一次最多发送${MAX_BATCH_SIZE}个账号邮件`);
+    }
+
+    const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
+    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-TW';
+
+    const jobId = await this.emailQueueService.createEmailJob(
+      'distributor-account',
+      { distributors, loginUrl, language: selectedLanguage },
+      distributors.length,
+    );
+
+    return {
+      success: true,
+      message: '分判商账号邮件发送任务已创建，正在后台处理',
+      jobId,
+      total: distributors.length,
+    };
+  }
+
+  // 异步批量发送门卫账号邮件
+  @Post('async-batch-send-guard-accounts')
+  @Roles(UserRole.ADMIN)
+  async asyncBatchSendGuardAccountEmails(@Body() body: BatchSendGuardAccountDto) {
+    const { guards, loginUrl, language } = body;
+
+    if (!guards || !Array.isArray(guards) || guards.length === 0) {
+      throw new BadRequestException('门卫数据不能为空');
+    }
+
+    const MAX_BATCH_SIZE = 100;
+    if (guards.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(`一次最多发送${MAX_BATCH_SIZE}个账号邮件`);
+    }
+
+    const validLanguages = ['zh-TW', 'zh-CN', 'en-US'];
+    const selectedLanguage = language && validLanguages.includes(language) ? language : 'zh-TW';
+
+    const jobId = await this.emailQueueService.createEmailJob(
+      'guard-account',
+      { guards, loginUrl, language: selectedLanguage },
+      guards.length,
+    );
+
+    return {
+      success: true,
+      message: '门卫账号邮件发送任务已创建，正在后台处理',
+      jobId,
+      total: guards.length,
+    };
+  }
+
+  // 获取邮件任务进度
+  @Get('job-progress/:jobId')
+  @Roles(UserRole.ADMIN, UserRole.DISTRIBUTOR)
+  async getJobProgress(@Param('jobId') jobId: string) {
+    
+    if (!jobId) {
+      throw new BadRequestException('任务ID不能为空');
+    }
+
+    const progress = this.emailQueueService.getJobProgress(jobId);
+    
+    if (!progress) {
+      throw new BadRequestException('任务不存在或已过期');
+    }
+
+    return {
+      success: true,
+      progress,
+    };
+  }
+
+  // 获取所有邮件任务状态
+  @Get('jobs-status')
+  @Roles(UserRole.ADMIN, UserRole.DISTRIBUTOR)
+  async getAllJobsStatus() {
+    const jobs = this.emailQueueService.getAllJobs();
+    
+    return {
+      success: true,
+      jobs,
+    };
+  }
+
+  // 取消邮件任务
+  @Post('cancel-job/:jobId')
+  @Roles(UserRole.ADMIN, UserRole.DISTRIBUTOR)
+  async cancelJob(@Param('jobId') jobId: string) {
+    const success = this.emailQueueService.cancelJob(jobId);
+    
+    if (success) {
+      return {
+        success: true,
+        message: '邮件任务已取消',
+      };
+    } else {
+      throw new BadRequestException('无法取消该任务（任务不存在或已完成）');
+    }
+  }
+
+  // 测试SMTP连接
+  @Post('test-smtp-connection')
+  @Roles(UserRole.ADMIN, UserRole.DISTRIBUTOR)
+  async testSMTPConnection() {
+    try {
+      const transporter = await this.emailService.getTransporter();
+      const config = await this.emailService.getEmailConfig();
+      
+      // 测试连接
+      await transporter.verify();
+      
+      return {
+        success: true,
+        message: 'SMTP连接测试成功',
+        config: {
+          host: config.host,
+          port: config.port,
+          secure: config.port === 465,
+          from: config.from,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'SMTP连接测试失败',
+        error: error.message,
+        details: {
+          code: error.code,
+          response: error.response?.substring(0, 200),
+        },
+      };
     }
   }
 }

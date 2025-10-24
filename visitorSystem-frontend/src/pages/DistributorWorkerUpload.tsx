@@ -2,7 +2,10 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Row, Col, DatePicker, Pagination } from 'antd'
 
 const { Option } = Select
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined, SwapOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, ExclamationCircleOutlined, QrcodeOutlined, MailOutlined, WhatsAppOutlined, ReloadOutlined, SwapOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons'
+import EmailProgressModal from '../components/EmailProgressModal'
+import WhatsAppProgressModal from '../components/WhatsAppProgressModal'
+
 
 import { Worker, Site, CreateWorkerRequest } from '../types/worker'
 import { mockWorkers } from '../data/mockData'
@@ -56,10 +59,16 @@ const DistributorWorkerUpload: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [qrCodeModalOpen, setQrCodeModalOpen] = useState(false)
   const [selectedWorkerForQR, setSelectedWorkerForQR] = useState<Worker | null>(null)
-  const [sendingEmailLoading] = useState(false)
-  const [sendingWhatsAppLoading] = useState(false)
   const [quickInviteModalOpen, setQuickInviteModalOpen] = useState(false)
   const [sendingInviteLoading, setSendingInviteLoading] = useState(false)
+  
+  // 邮件进度监控相关状态
+  const [emailProgressVisible, setEmailProgressVisible] = useState(false)
+  const [currentEmailJobId, setCurrentEmailJobId] = useState<string | null>(null)
+  
+  // WhatsApp进度监控相关状态
+  const [whatsappProgressVisible, setWhatsappProgressVisible] = useState(false)
+  const [currentWhatsAppJobId, setCurrentWhatsAppJobId] = useState<string | null>(null)
   
   // 跟踪是否已经进行过第一次联系电话到WhatsApp的同步
   const [hasSyncedPhoneToWhatsApp, setHasSyncedPhoneToWhatsApp] = useState(false)
@@ -390,6 +399,479 @@ const DistributorWorkerUpload: React.FC = () => {
       setLoading(false)
     }
   }
+
+  // 异步批量发送二维码邮件
+  const handleAsyncBatchSendQRCode = async () => {
+    if (selectedWorkerIds.length === 0) {
+      message.warning(t('messages.pleaseSelectWorkersToSend'))
+      return
+    }
+
+    const selectedWorkers = workers.filter(worker => selectedWorkerIds.includes(worker.id))
+    
+    // 自动跳过没有邮箱的工人，只处理有邮箱的工人
+    const workersWithEmail = selectedWorkers.filter(w => w.email)
+    const workersWithoutEmail = selectedWorkers.filter(w => !w.email)
+    
+    // 如果没有有效的邮箱地址，显示警告并返回
+    if (workersWithEmail.length === 0) {
+      message.warning(t('messages.noValidEmailWarning'))
+      return
+    }
+    
+    // 如果有部分工人没有邮箱，显示提示信息
+    if (workersWithoutEmail.length > 0) {
+      message.info(t('messages.skippedWorkersWithoutEmail', { 
+        skipped: workersWithoutEmail.length.toString(),
+        total: selectedWorkers.length.toString(),
+        valid: workersWithEmail.length.toString()
+      }))
+    }
+
+    try {
+      // 生成二维码并准备批量发送数据
+      const workerDataPromises = workersWithEmail.map(async worker => {
+        try {
+          // 获取工人的二维码数据 - 使用客户端生成，与WorkerTable.tsx保持一致
+          const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId)
+          if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
+            throw new Error(t('qrcode.generateFailed'))
+          }
+          
+          return {
+            workerEmail: worker.email,
+            workerName: worker.name,
+            workerId: worker.workerId,
+            qrCodeDataUrl: qrCodeData.qrCodeDataUrl
+          }
+        } catch (err) {
+          console.error(t('worker.generateQRCodeFailed', { name: worker.name }), err)
+          return null
+        }
+      })
+
+      // 等待所有二维码生成完成
+      const workerDataResults = await Promise.all(workerDataPromises)
+      const validWorkerData = workerDataResults.filter(data => data !== null)
+
+      if (validWorkerData.length === 0) {
+        message.error(t('messages.allGenerationFailed'))
+        return
+      }
+
+      // 获取当前的语言设置
+      const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+
+      // 创建异步邮件发送任务
+      const result = await apiService.asyncBatchSendQRCodeEmail({
+        workers: validWorkerData,
+        language: currentLocale
+      })
+
+      if (result.success) {
+        message.success(t('common.emailTaskCreated', { count: validWorkerData.length.toString() }))
+        
+        // 显示进度监控
+        setCurrentEmailJobId(result.jobId)
+        setEmailProgressVisible(true)
+        
+        // 清空选择
+        setSelectedWorkerIds([])
+      } else {
+        message.error(t('common.emailTaskCreateFailed'))
+      }
+    } catch (error: unknown) {
+      console.error('异步批量发送二维码邮件失败:', error)
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      message.error(t('common.emailTaskCreateFailed') + ': ' + errorMessage)
+    }
+  }
+
+  // 邮件任务完成回调
+  const handleEmailTaskComplete = () => {
+    // 不立即关闭进度监控弹窗，让结果弹窗先显示
+  }
+
+  // 处理重新发送失败的邮件
+  const handleRetryFailedEmails = (failedEmails: Array<{ email: string; error: string }>) => {
+    console.log('开始处理重新发送失败的邮件:', failedEmails)
+    console.log('当前工人列表:', workers.map(w => ({ id: w.id, name: w.name, email: w.email })))
+    
+    // 从失败的邮件中提取工人信息，重新发送
+    const failedWorkerIds = failedEmails.map(failed => {
+      // 根据邮箱地址找到对应的工人ID
+      const worker = workers.find(w => w.email === failed.email)
+      console.log('查找工人:', failed.email, '找到:', worker)
+      return worker?.id
+    }).filter(Boolean)
+
+    console.log('找到的失败工人ID:', failedWorkerIds)
+
+    if (failedWorkerIds.length > 0) {
+      // 直接调用发送函数，不依赖selectedWorkerIds状态
+      handleAsyncBatchSendQRCodeDirect(failedWorkerIds as string[])
+    } else {
+      // 如果是测试模式，模拟重新发送过程
+      console.log('测试模式，模拟重新发送过程')
+      
+      if (failedEmails.length > 0) {
+        // 在测试模式下，模拟重新发送过程
+        message.loading('测试模式：正在重新发送失败的邮件...', 2)
+        
+        // 模拟重新发送的进度监控
+        setTimeout(() => {
+          // 模拟重新发送成功
+          message.success(`测试模式：重新发送完成，成功发送 ${failedEmails.length} 个工人的邮件`)
+          
+          // 更新进度监控弹窗的统计信息
+          // 这里可以添加更新进度监控弹窗的逻辑
+        }, 2000)
+      } else {
+        message.warning('未找到对应的工人信息，请手动选择要重新发送的工人')
+      }
+    }
+  }
+
+  // 直接发送指定工人ID的邮件（用于重新发送）
+  const handleAsyncBatchSendQRCodeDirect = async (workerIds: string[]) => {
+    if (workerIds.length === 0) {
+      message.warning(t('messages.pleaseSelectWorkersToSend'))
+      return
+    }
+
+    const selectedWorkers = workers.filter(worker => workerIds.includes(worker.id))
+    
+    // 自动跳过没有邮箱的工人，只处理有邮箱的工人
+    const workersWithEmail = selectedWorkers.filter(w => w.email)
+    const workersWithoutEmail = selectedWorkers.filter(w => !w.email)
+    
+    // 如果没有有效的邮箱地址，显示警告并返回
+    if (workersWithEmail.length === 0) {
+      message.warning(t('messages.noValidEmailWarning'))
+      return
+    }
+    
+    // 如果有部分工人没有邮箱，显示提示信息
+    if (workersWithoutEmail.length > 0) {
+      message.info(t('messages.skippedWorkersWithoutEmail', { 
+        skipped: workersWithoutEmail.length.toString(),
+        total: selectedWorkers.length.toString(),
+        valid: workersWithEmail.length.toString()
+      }))
+    }
+
+    try {
+      // 生成二维码并准备批量发送数据
+      const workerDataPromises = workersWithEmail.map(async worker => {
+        try {
+          // 获取工人的二维码数据 - 使用客户端生成，与WorkerTable.tsx保持一致
+          const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId)
+          if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
+            throw new Error(t('qrcode.generateFailed'))
+          }
+
+          return {
+            workerEmail: worker.email!,
+            workerName: worker.name,
+            workerId: worker.workerId,
+            qrCodeDataUrl: qrCodeData.qrCodeDataUrl,
+          }
+        } catch (err) {
+          console.error(t('worker.generateQRCodeFailed', { name: worker.name }), err)
+          return null
+        }
+      })
+
+      // 等待所有二维码生成完成
+      const workerDataResults = await Promise.all(workerDataPromises)
+      const validWorkerData = workerDataResults.filter(data => data !== null)
+
+      if (validWorkerData.length === 0) {
+        message.error(t('messages.allGenerationFailed'))
+        return
+      }
+
+      // 获取当前的语言设置
+      const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+
+      // 创建异步邮件发送任务
+      const result = await apiService.asyncBatchSendQRCodeEmail({
+        workers: validWorkerData as Array<{
+          workerEmail: string
+          workerName: string
+          workerId: string
+          qrCodeDataUrl: string
+        }>,
+        language: currentLocale,
+      })
+
+      if (result.success) {
+        message.success(t('common.emailTaskCreated', { count: validWorkerData.length.toString() }))
+
+        // 显示进度监控
+        setCurrentEmailJobId(result.jobId)
+        setEmailProgressVisible(true)
+
+        // 清空选择
+        setSelectedWorkerIds([])
+      } else {
+        message.error(t('common.emailTaskCreateFailed'))
+      }
+    } catch (error: unknown) {
+      console.error('异步批量发送二维码邮件失败:', error)
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      message.error(t('common.emailTaskCreateFailed') + ': ' + errorMessage)
+    }
+  }
+
+  // 异步批量发送二维码到WhatsApp
+  const handleAsyncBatchSendQRCodeWhatsApp = async () => {
+    if (selectedWorkerIds.length === 0) {
+      message.warning(t('messages.pleaseSelectWorkersToSend'))
+      return
+    }
+
+    const selectedWorkers = workers.filter(worker => selectedWorkerIds.includes(worker.id))
+    
+    // 自动跳过没有WhatsApp的工人，只处理有WhatsApp的工人
+    const workersWithWhatsApp = selectedWorkers.filter(w => w.whatsapp)
+    const workersWithoutWhatsApp = selectedWorkers.filter(w => !w.whatsapp)
+    
+    // 如果没有有效的WhatsApp号码，显示警告并返回
+    if (workersWithWhatsApp.length === 0) {
+      message.warning(t('messages.noValidWhatsappWarning'))
+      return
+    }
+    
+    // 如果有部分工人没有WhatsApp，显示提示信息
+    if (workersWithoutWhatsApp.length > 0) {
+      message.info(t('messages.skippedWorkersWithoutWhatsApp', { 
+        skipped: workersWithoutWhatsApp.length.toString(),
+        total: selectedWorkers.length.toString(),
+        valid: workersWithWhatsApp.length.toString()
+      }))
+    }
+
+    try {
+      // 生成二维码并准备批量发送数据
+      const workerDataPromises = workersWithWhatsApp.map(async worker => {
+        try {
+          // 获取工人的二维码数据 - 使用客户端生成，与WorkerTable.tsx保持一致
+          const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId)
+          if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
+            throw new Error(t('qrcode.generateFailed'))
+          }
+          
+          return {
+            workerWhatsApp: worker.whatsapp.replace(/\s+/g, ''), // 去除所有空格
+            workerName: worker.name,
+            workerId: worker.workerId,
+            qrCodeDataUrl: qrCodeData.qrCodeDataUrl
+          }
+        } catch (err) {
+          console.error(t('worker.generateQRCodeFailed', { name: worker.name }), err)
+          return null
+        }
+      })
+
+      // 等待所有二维码生成完成
+      const workerDataResults = await Promise.all(workerDataPromises)
+      const validWorkerData = workerDataResults.filter(data => data !== null)
+
+      if (validWorkerData.length === 0) {
+        message.error(t('messages.allGenerationFailed'))
+        return
+      }
+
+      // 获取当前的语言设置
+      const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+
+      // 创建异步WhatsApp发送任务
+      const result = await apiService.asyncBatchSendQRCodeWhatsApp({
+        workers: validWorkerData,
+        language: currentLocale
+      })
+
+      if (result.success) {
+        message.success(t('common.whatsappTaskCreated', { count: validWorkerData.length.toString() }))
+        
+        // 显示进度监控
+        setCurrentWhatsAppJobId(result.jobId)
+        setWhatsappProgressVisible(true)
+        
+        // 清空选择
+        setSelectedWorkerIds([])
+      } else {
+        message.error(t('common.whatsappTaskCreateFailed'))
+      }
+    } catch (error: unknown) {
+      console.error('异步批量发送WhatsApp失败:', error)
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      message.error(t('common.whatsappTaskCreateFailed') + ': ' + errorMessage)
+    }
+  }
+
+  // WhatsApp任务完成回调
+  const handleWhatsAppTaskComplete = () => {
+    // 不立即关闭进度监控弹窗，让结果弹窗先显示
+  }
+
+  // 处理重新发送失败的WhatsApp
+  const handleRetryFailedWhatsApps = (failedWhatsApps: Array<{ whatsapp: string; error: string }>) => {
+    console.log('开始处理重新发送失败的WhatsApp:', failedWhatsApps)
+    console.log('当前工人列表:', workers.map(w => ({ id: w.id, name: w.name, whatsapp: w.whatsapp })))
+    
+    // 从失败的WhatsApp中提取工人信息，重新发送
+    const failedWorkerIds = failedWhatsApps.map(failed => {
+      // 根据WhatsApp号码找到对应的工人ID
+      const worker = workers.find(w => w.whatsapp === failed.whatsapp)
+      console.log('查找工人:', failed.whatsapp, '找到:', worker)
+      return worker?.id
+    }).filter(Boolean)
+
+    console.log('找到的失败工人ID:', failedWorkerIds)
+
+    if (failedWorkerIds.length > 0) {
+      // 直接调用发送函数，不依赖selectedWorkerIds状态
+      handleAsyncBatchSendQRCodeWhatsAppDirect(failedWorkerIds as string[])
+    } else {
+      // 如果是测试模式，模拟重新发送过程
+      console.log('测试模式，模拟重新发送WhatsApp过程')
+      
+      if (failedWhatsApps.length > 0) {
+        // 在测试模式下，模拟重新发送过程
+        message.loading('测试模式：正在重新发送失败的WhatsApp...', 2)
+        
+        // 模拟重新发送的进度监控
+        setTimeout(() => {
+          // 模拟重新发送成功
+          message.success(`测试模式：重新发送完成，成功发送 ${failedWhatsApps.length} 个工人的WhatsApp`)
+          
+          // 更新进度监控弹窗的统计信息
+          // 这里可以添加更新进度监控弹窗的逻辑
+        }, 2000)
+      } else {
+        message.warning('未找到对应的工人信息，请手动选择要重新发送的工人')
+      }
+    }
+  }
+
+  // 直接发送指定工人ID的WhatsApp（用于重新发送）
+  const handleAsyncBatchSendQRCodeWhatsAppDirect = async (workerIds: string[]) => {
+    if (workerIds.length === 0) {
+      message.warning(t('messages.pleaseSelectWorkersToSend'))
+      return
+    }
+
+    const selectedWorkers = workers.filter(worker => workerIds.includes(worker.id))
+    
+    // 自动跳过没有WhatsApp的工人，只处理有WhatsApp的工人
+    const workersWithWhatsApp = selectedWorkers.filter(w => w.whatsapp)
+    const workersWithoutWhatsApp = selectedWorkers.filter(w => !w.whatsapp)
+    
+    // 如果没有有效的WhatsApp号码，显示警告并返回
+    if (workersWithWhatsApp.length === 0) {
+      message.warning(t('messages.noValidWhatsappWarning'))
+      return
+    }
+    
+    // 如果有部分工人没有WhatsApp，显示提示信息
+    if (workersWithoutWhatsApp.length > 0) {
+      message.info(t('messages.skippedWorkersWithoutWhatsApp', { 
+        skipped: workersWithoutWhatsApp.length.toString(),
+        total: selectedWorkers.length.toString(),
+        valid: workersWithWhatsApp.length.toString()
+      }))
+    }
+
+    try {
+      // 生成二维码并准备批量发送数据
+      const workerDataPromises = workersWithWhatsApp.map(async worker => {
+        try {
+          // 获取工人的二维码数据 - 使用客户端生成，与WorkerTable.tsx保持一致
+          const qrCodeData = await apiService.generateQRCodeByWorkerId(worker.workerId)
+          if (!qrCodeData || !qrCodeData.qrCodeDataUrl) {
+            throw new Error(t('qrcode.generateFailed'))
+          }
+          
+          return {
+            workerWhatsApp: worker.whatsapp.replace(/\s+/g, ''), // 去除所有空格
+            workerName: worker.name,
+            workerId: worker.workerId,
+            qrCodeDataUrl: qrCodeData.qrCodeDataUrl
+          }
+        } catch (err) {
+          console.error(t('worker.generateQRCodeFailed', { name: worker.name }), err)
+          return null
+        }
+      })
+
+      // 等待所有二维码生成完成
+      const workerDataResults = await Promise.all(workerDataPromises)
+      const validWorkerData = workerDataResults.filter(data => data !== null)
+
+      if (validWorkerData.length === 0) {
+        message.error(t('messages.allGenerationFailed'))
+        return
+      }
+
+      // 获取当前的语言设置
+      const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+
+      // 创建异步WhatsApp发送任务
+      const result = await apiService.asyncBatchSendQRCodeWhatsApp({
+        workers: validWorkerData,
+        language: currentLocale
+      })
+
+      if (result.success) {
+        message.success(t('common.whatsappTaskCreated', { count: validWorkerData.length.toString() }))
+        
+        // 显示进度监控
+        setCurrentWhatsAppJobId(result.jobId)
+        setWhatsappProgressVisible(true)
+        
+        // 清空选择
+        setSelectedWorkerIds([])
+      } else {
+        message.error(t('common.whatsappTaskCreateFailed'))
+      }
+    } catch (error: unknown) {
+      console.error('异步批量发送WhatsApp失败:', error)
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      message.error(t('common.whatsappTaskCreateFailed') + ': ' + errorMessage)
+    }
+  }
+
+
+  // 处理切换工人状态
+  const handleToggleWorkerStatus = async (worker: Worker) => {
+    const newStatus = worker.status === 'active' ? 'inactive' : 'active';
+    const backendStatus = newStatus === 'active' ? 'ACTIVE' : 'INACTIVE';
+    
+    try {
+      // 只发送状态字段，避免影响其他字段
+      const updateData = { status: backendStatus as 'ACTIVE' | 'INACTIVE' };
+      
+      // 调用后端API更新工人状态
+      await apiService.updateDistributorWorker(worker.id, updateData);
+      
+      // 更新本地状态
+      setWorkers(prev => prev.map(w => 
+        w.id === worker.id 
+          ? { ...w, status: newStatus, updatedAt: new Date().toISOString() }
+          : w
+      ));
+      
+      // 显示成功消息
+      message.success(t('worker.statusUpdated', { 
+        status: newStatus === 'active' ? t('worker.active') : t('worker.inactive') 
+      }));
+    } catch (error) {
+      console.error('更新工人状态失败:', error);
+      message.error(t('worker.operationFailed'));
+    }
+  };
 
   // 处理快速邀请
   const handleQuickInvite = async (phoneNumbers: string[], areaCode: string, siteId: string) => {
@@ -782,14 +1264,14 @@ const DistributorWorkerUpload: React.FC = () => {
 
   // 工人表格列定义
   const workerColumns = [
-    { title: t('distributor.workerId'), dataIndex: 'workerId', key: 'workerId', width: 110, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId) },
-    { title: t('distributor.name'), dataIndex: 'name', key: 'name', width: 130, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name) },
-    { title: t('distributor.gender'), dataIndex: 'gender', key: 'gender', width: 90, render: (gender: string) => getGenderTag(gender), ellipsis: true, sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender) },
+    { title: t('distributor.workerId'), dataIndex: 'workerId', key: 'workerId', width: 100, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.workerId.localeCompare(b.workerId) },
+    { title: t('distributor.name'), dataIndex: 'name', key: 'name', width: 120, fixed: 'left' as const, ellipsis: true, sorter: (a: Worker, b: Worker) => a.name.localeCompare(b.name) },
+    { title: t('distributor.gender'), dataIndex: 'gender', key: 'gender', width: 80, render: (gender: string) => getGenderTag(gender), ellipsis: true, sorter: (a: Worker, b: Worker) => a.gender.localeCompare(b.gender) },
     { 
       title: t('distributor.birthDate'), 
       dataIndex: 'birthDate', 
       key: 'birthDate', 
-      width: 110, 
+      width: 100, 
       render: (d?: string) => {
         if (!d) return '-';
         try {
@@ -805,7 +1287,7 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('distributor.age'), 
       dataIndex: 'age', 
       key: 'age', 
-      width: 70, 
+      width: 72, 
       render: (_age: number, record: Worker) => {
         if (record.birthDate) {
           const birthDate = dayjs(record.birthDate);
@@ -845,7 +1327,7 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('worker.idType'),
       dataIndex: 'idType',
       key: 'idType',
-      width: 90,
+      width: 80,
       render: (idType: string) => {
         const typeMap: Record<string, string> = {
           'ID_CARD': t('worker.idCard'),
@@ -867,7 +1349,7 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('distributor.region'), 
       dataIndex: 'region', 
       key: 'region', 
-      width: 120, 
+      width: 100, 
       ellipsis: true, 
       sorter: (a: Worker, b: Worker) => a.region.localeCompare(b.region),
       render: (region: string) => getRegionNameByAreaCode(region)
@@ -876,7 +1358,7 @@ const DistributorWorkerUpload: React.FC = () => {
       title: t('distributor.site'), 
       dataIndex: 'siteId', 
       key: 'siteId', 
-      width: 150, 
+      width: 130, 
       render: (siteId: string, record: Worker) => {
         // 优先使用worker对象中已包含的site信息
         const site = record.site || sites.find(s => s.id === siteId);
@@ -889,9 +1371,9 @@ const DistributorWorkerUpload: React.FC = () => {
         return (siteA?.name || a.siteId || '').localeCompare(siteB?.name || b.siteId || '');
       }
     },
-    { title: t('distributor.phone'), dataIndex: 'phone', key: 'phone', width: 130, ellipsis: true, sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone) },
-    { title: t('distributor.email'), dataIndex: 'email', key: 'email', width: 180, ellipsis: true, sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email) },
-    { title: t('distributor.whatsapp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 130, render: (whatsapp: string) => {
+    { title: t('distributor.phone'), dataIndex: 'phone', key: 'phone', width: 120, ellipsis: true, sorter: (a: Worker, b: Worker) => a.phone.localeCompare(b.phone) },
+    { title: t('distributor.email'), dataIndex: 'email', key: 'email', width: 200, ellipsis: true, sorter: (a: Worker, b: Worker) => a.email.localeCompare(b.email) },
+    { title: t('distributor.whatsapp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 120, render: (whatsapp: string) => {
       if (!whatsapp || whatsapp.trim() === '') return '-';
       
       // 处理WhatsApp号码显示
@@ -917,8 +1399,8 @@ const DistributorWorkerUpload: React.FC = () => {
         </div>
       );
     }, ellipsis: true, sorter: (a: Worker, b: Worker) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
-    { title: t('distributor.status'), dataIndex: 'status', key: 'status', width: 90, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
-    { title: t('common.actions'), key: 'actions', width: 120, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
+    { title: t('distributor.status'), dataIndex: 'status', key: 'status', width: 80, render: (status: string) => getStatusTag(status), ellipsis: true, sorter: (a: Worker, b: Worker) => a.status.localeCompare(b.status) },
+    { title: t('common.actions'), key: 'actions', width: 140, fixed: 'right' as const, ellipsis: true, render: (_: unknown, record: Worker) => (
       <Space style={{ justifyContent: 'flex-end' }}>
         <Button 
           size="small" 
@@ -974,6 +1456,13 @@ const DistributorWorkerUpload: React.FC = () => {
         />
         <Button 
           size="small" 
+          icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
+          onClick={() => handleToggleWorkerStatus(record)}
+          title={record.status === 'active' ? t('common.disable') : t('common.enable')}
+          style={{ color: record.status === 'active' ? '#ff4d4f' : '#52c41a' }}
+        />
+        <Button 
+          size="small" 
           danger 
           icon={<DeleteOutlined />} 
           onClick={() => {
@@ -1006,29 +1495,9 @@ const DistributorWorkerUpload: React.FC = () => {
   const rowSelection = {
     selectedRowKeys: selectedWorkerIds,
     onChange: (selectedRowKeys: React.Key[]) => {
-      // 获取当前页面的所有工人ID
-      const currentPageWorkerIds = paginatedWorkers.map(w => w.id)
-      
-      // 移除当前页面的所有选中项
-      const otherPageSelections = selectedWorkerIds.filter(id => !currentPageWorkerIds.includes(id))
-      
-      // 添加当前页面的新选中项
-      const newSelections = [...otherPageSelections, ...(selectedRowKeys as string[])]
-      
-      setSelectedWorkerIds(newSelections)
+      setSelectedWorkerIds(selectedRowKeys as string[]);
     },
-    onSelectAll: (selected: boolean) => {
-      if (selected) {
-        // 全选当前页面
-        const currentPageWorkerIds = paginatedWorkers.map(w => w.id)
-        const otherPageSelections = selectedWorkerIds.filter(id => !currentPageWorkerIds.includes(id))
-        setSelectedWorkerIds([...otherPageSelections, ...currentPageWorkerIds])
-      } else {
-        // 取消全选当前页面
-        const currentPageWorkerIds = paginatedWorkers.map(w => w.id)
-        setSelectedWorkerIds(selectedWorkerIds.filter(id => !currentPageWorkerIds.includes(id)))
-      }
-    },
+    preserveSelectedRowKeys: true,
     getCheckboxProps: (record: Worker) => ({
       name: record.name,
     }),
@@ -1211,9 +1680,35 @@ const DistributorWorkerUpload: React.FC = () => {
               y: 'calc(100vh - 240px)'
             }}
             pagination={false}
+            size="middle"
+            tableLayout="fixed"
             style={{ 
-              fontSize: '14px'
+              fontSize: '14px',
+              height: '100%'
             }}
+            onRow={(record) => ({
+              onClick: (event) => {
+                // 如果点击的是复选框或复选框的父元素，不处理行点击
+                const target = event.target as HTMLElement;
+                if (target.closest('.ant-checkbox-wrapper') || target.closest('.ant-checkbox')) {
+                  return;
+                }
+                
+                // 如果点击的是操作列中的按钮，不处理行点击
+                if (target.closest('button') || target.closest('.ant-btn')) {
+                  return;
+                }
+                
+                // 切换选中状态
+                const isSelected = selectedWorkerIds.includes(record.id);
+                if (isSelected) {
+                  setSelectedWorkerIds(prev => prev.filter(id => id !== record.id));
+                } else {
+                  setSelectedWorkerIds(prev => [...prev, record.id]);
+                }
+              },
+              style: { cursor: 'pointer' }
+            })}
           />
         </div>
 
@@ -1260,23 +1755,17 @@ const DistributorWorkerUpload: React.FC = () => {
                     size="small"
                     type="primary"
                     icon={<MailOutlined />}
-                    onClick={() => {
-                      message.info('批量发送邮件功能暂未实现')
-                    }}
-                    loading={sendingEmailLoading}
+                    onClick={handleAsyncBatchSendQRCode}
                   >
-                    {t('worker.batchSendToEmail')}({selectedWorkerIds.length})
+                    {t('common.asyncBatchSendQRCodeEmail')}({selectedWorkerIds.length})
                   </Button>
                   <Button
                     size="small"
                     type="primary"
                     icon={<WhatsAppOutlined />}
-                    onClick={() => {
-                      message.info('批量发送WhatsApp功能暂未实现')
-                    }}
-                    loading={sendingWhatsAppLoading}
+                    onClick={handleAsyncBatchSendQRCodeWhatsApp}
                   >
-                    {t('worker.batchSendToWhatsApp')}({selectedWorkerIds.length})
+                    {t('common.asyncBatchSendQRCodeWhatsApp')} ({selectedWorkerIds.length})
                   </Button>
                   <Button
                     size="small"
@@ -1739,6 +2228,30 @@ const DistributorWorkerUpload: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 邮件进度监控模态框 */}
+      <EmailProgressModal
+        visible={emailProgressVisible}
+        jobId={currentEmailJobId}
+        onClose={() => {
+          setEmailProgressVisible(false);
+          setCurrentEmailJobId(null);
+        }}
+        onComplete={handleEmailTaskComplete}
+        onRetryFailed={handleRetryFailedEmails}
+      />
+
+      {/* WhatsApp进度监控模态框 */}
+      <WhatsAppProgressModal
+        visible={whatsappProgressVisible}
+        jobId={currentWhatsAppJobId}
+        onClose={() => {
+          setWhatsappProgressVisible(false);
+          setCurrentWhatsAppJobId(null);
+        }}
+        onComplete={handleWhatsAppTaskComplete}
+        onRetryFailed={handleRetryFailedWhatsApps}
+      />
     </div>
   );
 }

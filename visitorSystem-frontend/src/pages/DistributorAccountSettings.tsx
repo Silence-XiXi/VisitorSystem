@@ -209,7 +209,7 @@ const DistributorAccountSettings: React.FC = () => {
                         </Form.Item>
                       </Col>
                     </Row>
-                    <Row gutter={16}>
+                    <Row gutter={16} style={{ display: 'none' }}>
                       <Col span={12}>
                         <Form.Item name="whatsapp" label={t('distributor.whatsapp')}>
                           <Input placeholder={t('distributor.whatsappPlaceholder')} />

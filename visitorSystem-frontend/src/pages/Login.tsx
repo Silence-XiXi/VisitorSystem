@@ -74,7 +74,7 @@ const Login: React.FC = () => {
   // 语言切换
   const handleLanguageChange = (newLocale: string) => {
     setLocale(newLocale as 'zh-CN' | 'zh-TW' | 'en-US')
-    message.success(t('login.languageChanged'))
+    // message.success(t('login.languageChanged'))
   }
 
   // 稳定用户角色计算

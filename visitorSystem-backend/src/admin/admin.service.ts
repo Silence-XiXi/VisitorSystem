@@ -1,12 +1,18 @@
 import { Injectable, ForbiddenException, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { EmailService } from '../email/email.service';
+import { SystemConfigService } from '../system-config/system-config.service';
 import * as bcrypt from 'bcryptjs';
 import * as XLSX from 'xlsx';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+    private systemConfigService: SystemConfigService
+  ) {}
 
   // 获取系统统计数据
   async getSystemStats(user: CurrentUser) {
@@ -1048,7 +1054,7 @@ export class AdminService {
   }
 
   // 重置分判商密码
-  async resetDistributorPassword(user: CurrentUser, distributorId: string) {
+  async resetDistributorPassword(user: CurrentUser, distributorId: string, language?: string) {
     if (user.role !== 'ADMIN') {
       throw new ForbiddenException('只有管理员可以重置分判商密码');
     }
@@ -1077,16 +1083,51 @@ export class AdminService {
       data: { password: hashedPassword }
     });
 
+    // 发送密码重置邮件
+    if (distributor.email) {
+      try {
+        // 构建登录链接（参考账号密码邮件的设置）
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3002';
+        const loginUrl = `${frontendUrl}/login`;
+        
+        // 优先使用传入的语言参数，否则从系统配置获取语言设置，默认为中文简体
+        const systemLanguage = language || await this.systemConfigService.getConfigValue('SYSTEM_LANGUAGE') || 'zh-CN';
+        
+        // 发送密码重置邮件
+        const emailSent = await this.emailService.sendDistributorPasswordResetEmail(
+          distributor.email,
+          distributor.name,
+          distributor.contactName || distributor.name,
+          distributor.user.username,
+          newPassword,
+          loginUrl,
+          systemLanguage
+        );
+
+        if (emailSent) {
+          console.log(`密码重置邮件已发送到: ${distributor.email}`);
+        } else {
+          console.warn(`密码重置邮件发送失败: ${distributor.email}`);
+        }
+      } catch (error) {
+        console.error('发送密码重置邮件时出错:', error);
+        // 邮件发送失败不影响密码重置操作
+      }
+    } else {
+      console.warn(`分判商 ${distributor.name} 没有邮箱地址，无法发送密码重置邮件`);
+    }
+
     return {
       distributorId: distributor.id,
       distributorName: distributor.name,
       username: distributor.user.username,
-      newPassword: newPassword
+      newPassword: newPassword,
+      emailSent: distributor.email ? true : false
     };
   }
 
   // 重置门卫密码
-  async resetGuardPassword(user: CurrentUser, guardId: string) {
+  async resetGuardPassword(user: CurrentUser, guardId: string, language?: string) {
     if (user.role !== 'ADMIN') {
       throw new ForbiddenException('只有管理员可以重置门卫密码');
     }
@@ -1115,11 +1156,30 @@ export class AdminService {
       data: { password: hashedPassword }
     });
 
+    // 构建登录链接（参考账号密码邮件的设置）
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3002';
+    const loginUrl = `${frontendUrl}/login`;
+    
+    // 优先使用传入的语言参数，否则从系统配置获取语言设置，默认为中文简体
+    const systemLanguage = language || await this.systemConfigService.getConfigValue('SYSTEM_LANGUAGE') || 'zh-CN';
+    
+    // 发送密码重置邮件
+    const emailSent = await this.emailService.sendGuardPasswordResetEmail(
+      guard.email,
+      guard.name,
+      guard.name, // 门卫使用姓名作为联系人
+      guard.user.username,
+      newPassword,
+      loginUrl,
+      systemLanguage
+    );
+
     return {
       guardId: guard.id,
       guardName: guard.name,
       username: guard.user.username,
-      newPassword: newPassword
+      newPassword: newPassword,
+      emailSent: guard.email ? emailSent : false
     };
   }
 

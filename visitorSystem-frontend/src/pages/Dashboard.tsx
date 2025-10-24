@@ -20,15 +20,12 @@ import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
 import LocaleSwitcher from '../components/LocaleSwitcher'
-import WorkerManagement from '../components/WorkerManagement'
-
+import Reports from './Reports'
+import AccountSettings from './AccountSettings'
 import AdminSites from './AdminSites'
 import ItemCategoryManagement from './ItemCategoryManagement'
 import ItemBorrowRecords from './ItemBorrowRecords'
-
-import AccountSettings from './AccountSettings'
-
-import Reports from './Reports'
+import WorkerManagement from './WorkerManagement'
 import dayjs from 'dayjs'
 
 const { Header, Sider, Content } = Layout

@@ -206,11 +206,11 @@ export class WhatsAppService implements OnModuleInit {
       try {
         // 2. 上传媒体文件到YCloud
         const mediaId = await this.uploadMediaToYCloud(tempFilePath);
-        this.logger.log(`媒体文件已上传到YCloud, media ID: ${mediaId}`);
+        // this.logger.log(`媒体文件已上传到YCloud, media ID: ${mediaId}`);
         
         // 3. 发送WhatsApp消息
         const result = await this.sendWhatsAppMessage(workerWhatsApp, workerName, mediaId);
-        this.logger.log(`WhatsApp消息已发送: ${JSON.stringify(result)}`);
+        // this.logger.log(`WhatsApp消息已发送: ${JSON.stringify(result)}`);
         
         return { 
           success: true, 

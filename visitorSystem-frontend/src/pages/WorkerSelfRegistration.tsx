@@ -101,7 +101,7 @@ const WorkerSelfRegistration: React.FC = () => {
   const handleLanguageChange = (e: RadioChangeEvent) => {
     const newLocale = e.target.value as 'zh-CN' | 'zh-TW' | 'en-US';
     setLocale(newLocale);
-    message.success(t('login.languageChanged') || '语言已切换');
+    // message.success(t('login.languageChanged') || '语言已切换');
   };
 
   // 联系电话变化时自动填入WhatsApp（带防抖）

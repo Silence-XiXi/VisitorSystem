@@ -14,8 +14,7 @@ import {
   DownloadOutlined, 
   SendOutlined, 
   CloseOutlined, 
-  ReloadOutlined,
-  SettingOutlined
+  ReloadOutlined
 } from '@ant-design/icons'
 import { Site, Distributor, Guard } from '../types/worker'
 import { mockSites, mockDistributors, mockGuards } from '../data/mockData'
@@ -33,6 +32,310 @@ import {
 import { useLocale } from '../contexts/LocaleContext'
 import { useSiteFilter } from '../contexts/SiteFilterContext'
 import { apiService } from '../services/api'
+import EmailProgressModal from '../components/EmailProgressModal'
+
+// 失败项内容组件，支持选择和重新发送
+interface FailedDistributorItemsContentProps {
+  failedItems: Array<{
+    email: string;
+    name: string;
+    contactName: string;
+    username: string;
+    success: boolean;
+    message?: string;
+  }>;
+  onResend: (selectedItems: Array<{
+    email: string;
+    name: string;
+    contactName: string;
+    username: string;
+    success: boolean;
+    message?: string;
+  }>) => void;
+  t: (key: string, params?: Record<string, string>) => string;
+}
+
+const FailedDistributorItemsContent: React.FC<FailedDistributorItemsContentProps> = ({ failedItems, onResend, t }) => {
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isResending, setIsResending] = useState(false);
+
+  // 表格行选择配置
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (selectedKeys: React.Key[]) => {
+      setSelectedRowKeys(selectedKeys);
+    }
+  };
+
+  // 处理重新发送
+  const handleResend = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning(t('messages.pleaseSelectItemsToResend') || '请选择要重新发送的项目');
+      return;
+    }
+
+    const selectedItems = failedItems.filter((item, index) => selectedRowKeys.includes(`${item.email}-${index}`));
+    
+    // 立即显示开始重发的消息
+    message.loading({
+      content: `正在准备重新发送 ${selectedItems.length} 个分判商邮件...`,
+      key: 'resendDistributorPrepare',
+      duration: 2 // 显示2秒
+    });
+    
+    // 设置重发状态
+    setIsResending(true);
+    
+    try {
+      await onResend(selectedItems);
+    } finally {
+      // 无论成功失败都重置状态
+      setIsResending(false);
+    }
+  };
+
+  // 全选
+  const handleSelectAll = () => {
+    setSelectedRowKeys(failedItems.map((item, index) => `${item.email}-${index}`));
+  };
+
+  // 取消全选
+  const handleDeselectAll = () => {
+    setSelectedRowKeys([]);
+  };
+
+  return (
+    <div>
+      <p style={{ marginBottom: 16 }}>
+        {t('admin.sendFailureExplanationDistributor') || '以下分判商邮件发送失败，您可以选择要重新发送的项目：'}
+      </p>
+      
+      {/* 操作工具栏 */}
+      <div style={{ 
+        marginBottom: 16, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center'
+      }}>
+        <Space>
+          <Button 
+            size="small" 
+            onClick={handleSelectAll}
+            disabled={isResending}
+          >
+            {t('common.selectAll') || '全选'}
+          </Button>
+          <Button 
+            size="small" 
+            onClick={handleDeselectAll}
+            disabled={isResending}
+          >
+            {t('common.deselectAll') || '取消全选'}
+          </Button>
+        </Space>
+
+        <Button 
+          type="primary" 
+          icon={<ReloadOutlined />} 
+          onClick={handleResend}
+          disabled={selectedRowKeys.length === 0 || isResending}
+          loading={isResending}
+        >
+          {isResending 
+            ? (t('common.resending') || '正在重新发送...') 
+            : `${t('common.resendSelected') || '重新发送选中项'} (${selectedRowKeys.length})`
+          }
+        </Button>
+      </div>
+
+      <Table
+        rowSelection={rowSelection}
+        size="small"
+        dataSource={failedItems}
+        columns={[
+          {
+            title: t('admin.distributorName') || '分判商名称',
+            dataIndex: 'name',
+            key: 'name',
+            render: (text: string) => text || '-'
+          },
+          {
+            title: t('admin.distributorContact') || '联系人',
+            dataIndex: 'contactName',
+            key: 'contactName',
+            render: (text: string) => text || '-'
+          },
+          {
+            title: t('admin.distributorEmail') || '邮箱',
+            dataIndex: 'email',
+            key: 'email',
+            width: 150
+          },
+          {
+            title: t('common.error') || '错误信息',
+            dataIndex: 'message',
+            key: 'message',
+            render: (text: string) => text || '-',
+            width: 300
+          }
+        ]}
+        pagination={false}
+        rowKey={(record, index) => `${record.email}-${index}`}
+        scroll={{ y: 200 }}
+      />
+    </div>
+  );
+};
+
+// 失败项内容组件，支持选择和重新发送（门卫）
+interface FailedGuardItemsContentProps {
+  failedItems: Array<{
+    guardEmail: string;
+    guardName: string;
+    phone: string;
+    username: string;
+    success: boolean;
+    message?: string;
+  }>;
+  onResend: (selectedItems: Array<{
+    guardEmail: string;
+    guardName: string;
+    phone: string;
+    username: string;
+    success: boolean;
+    message?: string;
+  }>) => void;
+  t: (key: string, params?: Record<string, string>) => string;
+}
+
+const FailedGuardItemsContent: React.FC<FailedGuardItemsContentProps> = ({ failedItems, onResend, t }) => {
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isResending, setIsResending] = useState(false);
+
+  // 表格行选择配置
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (selectedKeys: React.Key[]) => {
+      setSelectedRowKeys(selectedKeys);
+    }
+  };
+
+  // 处理重新发送
+  const handleResend = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning(t('messages.pleaseSelectItemsToResend') || '请选择要重新发送的项目');
+      return;
+    }
+
+    const selectedItems = failedItems.filter((item, index) => selectedRowKeys.includes(`${item.guardEmail}-${index}`));
+    
+    // 立即显示开始重发的消息
+    message.loading({
+      content: `正在准备重新发送 ${selectedItems.length} 个门卫邮件...`,
+      key: 'resendGuardPrepare',
+      duration: 2 // 显示2秒
+    });
+    
+    // 设置重发状态
+    setIsResending(true);
+    
+    try {
+      await onResend(selectedItems);
+    } finally {
+      // 无论成功失败都重置状态
+      setIsResending(false);
+    }
+  };
+
+  // 全选
+  const handleSelectAll = () => {
+    setSelectedRowKeys(failedItems.map((item, index) => `${item.guardEmail}-${index}`));
+  };
+
+  // 取消全选
+  const handleDeselectAll = () => {
+    setSelectedRowKeys([]);
+  };
+
+  return (
+    <div>
+      <p style={{ marginBottom: 16 }}>
+        {t('admin.sendFailureExplanationGuard') || '以下门卫邮件发送失败，您可以选择要重新发送的项目：'}
+      </p>
+      
+      {/* 操作工具栏 */}
+      <div style={{ 
+        marginBottom: 16, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center'
+      }}>
+        <Space>
+          <Button 
+            size="small" 
+            onClick={handleSelectAll}
+            disabled={isResending}
+          >
+            {t('common.selectAll') || '全选'}
+          </Button>
+          <Button 
+            size="small" 
+            onClick={handleDeselectAll}
+            disabled={isResending}
+          >
+            {t('common.deselectAll') || '取消全选'}
+          </Button>
+        </Space>
+
+        <Button 
+          type="primary" 
+          icon={<ReloadOutlined />} 
+          onClick={handleResend}
+          disabled={selectedRowKeys.length === 0 || isResending}
+          loading={isResending}
+        >
+          {isResending 
+            ? (t('common.resending') || '正在重新发送...') 
+            : `${t('common.resendSelected') || '重新发送选中项'} (${selectedRowKeys.length})`
+          }
+        </Button>
+      </div>
+
+      <Table
+        rowSelection={rowSelection}
+        size="small"
+        dataSource={failedItems}
+        columns={[
+          {
+            title: t('admin.guardName') || '门卫姓名',
+            dataIndex: 'guardName',
+            key: 'guardName',
+          },
+          {
+            title: t('admin.guardPhone') || '联系电话',
+            dataIndex: 'phone',
+            key: 'phone',
+          },
+          {
+            title: t('admin.guardEmail') || '邮箱',
+            dataIndex: 'guardEmail',
+            key: 'guardEmail',
+            width: 150
+          },
+          {
+            title: t('common.error') || '错误信息',
+            dataIndex: 'message',
+            key: 'message',
+            width: 300
+          }
+        ]}
+        pagination={false}
+        rowKey={(record, index) => `${record.guardEmail}-${index}`}
+        scroll={{ y: 200 }}
+      />
+    </div>
+  );
+};
 
 const AdminSites: React.FC = () => {
   const { t, locale, messages } = useLocale()
@@ -105,6 +408,11 @@ const AdminSites: React.FC = () => {
   
   // 加载状态
   const [loading, setLoading] = useState(false)
+  
+  // 邮件进度监控相关状态
+  const [emailProgressVisible, setEmailProgressVisible] = useState(false)
+  const [currentEmailJobId, setCurrentEmailJobId] = useState<string | null>(null)
+  const [currentEmailDataType, setCurrentEmailDataType] = useState<'distributor' | 'guard'>('distributor')
 
   // 加载数据
   useEffect(() => {
@@ -144,8 +452,8 @@ const AdminSites: React.FC = () => {
   }
 
   // 状态转换辅助函数
-  const transformSiteStatus = (status: string) => {
-    return status === 'ACTIVE' ? 'active' : 'inactive'
+  const transformSiteStatus = (status: string): 'active' | 'inactive' | 'suspended' => {
+    return status === 'ACTIVE' ? 'active' : status === 'SUSPENDED' ? 'suspended' : 'inactive'
   }
 
   const loadData = async () => {
@@ -235,6 +543,7 @@ const AdminSites: React.FC = () => {
         const requestData = {
           distributorEmail: distributor.email || '',
           distributorName: distributor.name,
+          contactName: distributor.contactName || '',
           username: distributor.accountUsername || '',
           password: password,
           loginUrl: loginUrl,
@@ -337,7 +646,90 @@ const AdminSites: React.FC = () => {
     })
   }
 
-
+  // 显示发送方式选择对话框（新增门卫时使用）
+  const showGuardSendMethodModal = (guard: Guard, password: string) => {
+    const hasEmail = guard.email && guard.email.trim()
+    const hasWhatsApp = guard.whatsapp && guard.whatsapp.trim()
+    
+    // 获取系统登录链接
+    const frontendUrl = window.location.origin
+    const loginUrl = `${frontendUrl}/login`
+    
+    // 获取当前语言
+    const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+    
+    // 发送邮件的方法
+    const sendEmail = async () => {
+      if (!hasEmail) {
+        message.error(t('admin.noEmailAddress'))
+        return
+      }
+      
+      try {
+        const requestData = {
+          guardEmail: guard.email || '',
+          guardName: guard.name,
+          contactName: guard.name, // 门卫使用姓名作为联系人
+          username: guard.accountUsername || '',
+          password: password,
+          loginUrl: loginUrl,
+          language: currentLocale
+        }
+        
+        // 检查必填字段
+        if (!requestData.guardEmail) {
+          message.error(t('admin.noEmailAddress'))
+          return
+        }
+        
+        // 发送邮件
+        const result = await apiService.sendGuardAccountEmail(requestData)
+        
+        if (result.success) {
+          message.success({ content: t('admin.sendByEmailSuccess').replace('{name}', guard.name), key: 'sendEmail' })
+        } else {
+          // 显示详细的错误信息
+          let errorMsg = result.message || t('common.operationFailed')
+          if (result.error) {
+            errorMsg += `\n\n错误详情: ${result.error}`
+          }
+          if (result.step) {
+            errorMsg += `\n失败步骤: ${result.step}`
+          }
+          
+          message.error({ 
+            content: errorMsg, 
+            duration: 8,
+            key: 'sendEmailError' 
+          })
+        }
+      } catch (error) {
+        console.error('发送门卫账号邮件失败:', error)
+        message.error(t('admin.sendEmailFailed'))
+      }
+    }
+    
+    Modal.success({
+      title: t('admin.guardCreatedSuccess'),
+      content: (
+        <div>
+          <p>{t('admin.accountInfo').replace('{username}', guard.accountUsername || '')}</p>
+          <p>{t('admin.passwordInfo').replace('{password}', password)}</p>
+          {hasEmail && <p style={{ marginTop: '16px', color: '#666' }}>{t('admin.emailSendTip')}</p>}
+        </div>
+      ),
+      okText: hasEmail ? t('admin.sendByEmail') : t('common.ok'),
+      cancelText: t('common.cancel'),
+      cancelButtonProps: { style: { display: 'none' } }, // 隐藏Cancel按钮
+      okButtonProps: { disabled: !hasEmail },
+      onOk: () => {
+        // 发送Email
+        if (hasEmail) {
+          sendEmail()
+        }
+      }
+    })
+  }
 
   // 重置分判商密码
   const handleResetPassword = (record: Distributor) => {
@@ -353,7 +745,7 @@ const AdminSites: React.FC = () => {
       cancelText: t('admin.cancel'),
       onOk: async () => {
         try {
-          const result = await apiService.resetDistributorPassword(record.id)
+          const result = await apiService.resetDistributorPassword(record.id, locale)
           // console.log('密码重置成功:', result)
           
           // 显示成功消息，包含新密码信息
@@ -363,13 +755,18 @@ const AdminSites: React.FC = () => {
               <div>
                 <p>{t('admin.resetPasswordSuccessMessage').replace('{name}', result.distributorName)}</p>
                 <p><strong>{t('admin.newPassword')}: {result.newPassword}</strong></p>
-                <p style={{ color: '#ff4d4f', fontSize: '12px' }}>{t('admin.passwordSecurityTip')}</p>
+                {result.emailSent && (
+                  <p style={{ color: '#52c41a', fontSize: '14px' }}>
+                    ✅ {t('admin.passwordResetEmailSent')}
+                  </p>
+                )}
+                {/* <p style={{ color: '#ff4d4f', fontSize: '12px' }}>{t('admin.passwordSecurityTip')}</p> */}
               </div>
             ),
             width: 400
           })
         } catch (error: unknown) {
-          console.error('重置密码失败:', error)
+          // console.error('重置密码失败:', error)
           let errorMessage = '重置密码失败'
           if (error && typeof error === 'object' && 'response' in error) {
             const apiError = error as { response?: { data?: { message?: string } } }
@@ -532,9 +929,9 @@ const AdminSites: React.FC = () => {
         <Button 
           size="small" 
           icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-          type={record.status === 'active' ? 'default' : 'primary'}
           onClick={() => handleToggleSiteStatus(record)}
           title={record.status === 'active' ? t('admin.disableTooltip') : t('admin.enableTooltip')}
+          style={{ color: record.status === 'active' ? '#ff4d4f' : '#52c41a' }}
         />
         <Button 
           danger 
@@ -550,11 +947,11 @@ const AdminSites: React.FC = () => {
   // 分判商表格列定义
   const distributorColumns = [
     { title: t('admin.distributorId'), dataIndex: 'distributorId', key: 'distributorId', width: 100 },
-    { title: t('admin.distributorName'), dataIndex: 'name', key: 'name', width: 160 },
+    { title: t('admin.distributorName'), dataIndex: 'name', key: 'name', width: 200 },
     { title: t('admin.distributorContact'), dataIndex: 'contactName', key: 'contactName', width: 120 },
     { title: t('admin.distributorPhone'), dataIndex: 'phone', key: 'phone', width: 140 },
     { title: t('admin.distributorEmail'), dataIndex: 'email', key: 'email', width: 200 },
-    { title: t('admin.distributorWhatsapp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 160 },
+    // { title: t('admin.distributorWhatsapp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 160 },
     { title: t('admin.distributorSite'), dataIndex: 'siteIds', key: 'siteIds', width: 200, render: (siteIds?: string[]) => {
       if (!siteIds || siteIds.length === 0) return '-'
       return (
@@ -590,9 +987,9 @@ const AdminSites: React.FC = () => {
          <Button 
            size="small" 
            icon={record.accountStatus === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-           type={record.accountStatus === 'active' ? 'default' : 'primary'}
            onClick={() => handleToggleDistributorStatus(record)}
            title={record.accountStatus === 'active' ? t('admin.disableAccountTooltip') : t('admin.enableAccountTooltip')}
+           style={{ color: record.accountStatus === 'active' ? '#ff4d4f' : '#52c41a' }}
          />
                    <Button 
             size="small" 
@@ -768,8 +1165,8 @@ const AdminSites: React.FC = () => {
     }
   }
 
-  // 批量发送账号密码到Email
-  const handleBatchSendEmail = () => {
+  // 异步批量发送分判商账号密码到Email
+  const handleBatchSendEmail = async () => {
     if (selectedDistributorIds.length === 0) {
       message.warning(t('messages.pleaseSelectDistributorsToSend'))
       return
@@ -784,79 +1181,171 @@ const AdminSites: React.FC = () => {
       return
     }
 
-    Modal.confirm({
-      title: t('admin.batchSendEmailTitle'),
-      icon: <ExclamationCircleOutlined />,
-      content: (
-        <div>
-          <p>{t('admin.batchSendEmailConfirm')}</p>
-          <p style={{ marginTop: '8px', color: '#1890ff' }}>
-            {t('admin.willSendTo').replace('{count}', hasEmailDistributors.length.toString())}
-          </p>
-          {noEmailDistributors.length > 0 && (
-            <p style={{ marginTop: '8px', color: '#ff4d4f' }}>
-              {t('admin.noEmailWarning').replace('{count}', noEmailDistributors.length.toString())}
-            </p>
-          )}
-        </div>
-      ),
-      okText: t('admin.confirm'),
-      cancelText: t('admin.cancel'),
-      onOk: async () => {
-        try {
-          // 显示加载中
-          message.loading({ content: t('common.processing'), key: 'batchSendEmail' })
-          
-          // 获取系统配置中的登录链接
-          const frontendUrl = window.location.origin
-          const loginUrl = `${frontendUrl}/login`
-          
-          // 获取当前语言
-          const currentLocale = localStorage.getItem('locale') || 'zh-CN'
-          
-          // 准备数据
-          const distributorsData = hasEmailDistributors.map(d => ({
-            email: d.email || '',  // 增加空字符串默认值处理类型错误
-            name: d.name,
-            username: d.accountUsername || '',
-            password: 'Pass@123' // 默认密码，在实际应用中可能需要使用重置密码获取
-          }))
-          
-          // 调用批量发送API
-          const result = await apiService.batchSendDistributorAccountEmails({
-            distributors: distributorsData,
-            loginUrl: loginUrl,
-            language: currentLocale
-          })
-          
-          // 处理结果
-          if (result.success) {
-            message.success({ 
-              content: t('admin.batchSendEmailSuccess').replace('{count}', result.results?.success.toString() || '0'), 
-              key: 'batchSendEmail' 
-            })
-            
-            if (result.results?.failed > 0) {
-              message.warning(t('common.someEmailsFailed').replace('{count}', result.results?.failed.toString() || '0'))
-            }
-            
-            if (noEmailDistributors.length > 0) {
-              message.warning(t('admin.noEmailSkipped').replace('{count}', noEmailDistributors.length.toString()))
-            }
-          } else {
-            message.error({ content: result.message, key: 'batchSendEmail' })
-          }
-        } catch (error) {
-          console.error('发送失败:', error)
-          message.error({ 
-            content: t('common.operationFailed') + ': ' + (error.message || t('common.unknownError')),
-            key: 'batchSendEmail'
-          })
-        }
+    // 如果有部分分判商没有邮箱，显示提示信息
+    if (noEmailDistributors.length > 0) {
+      message.info(t('messages.skippedDistributorsWithoutEmail', { 
+        skipped: noEmailDistributors.length.toString(),
+        total: selectedDistributors.length.toString(),
+        valid: hasEmailDistributors.length.toString()
+      }))
+    }
+
+    try {
+      // 获取系统配置中的登录链接
+      const frontendUrl = window.location.origin
+      const loginUrl = `${frontendUrl}/login`
+      
+      // 获取当前语言
+      const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+      
+      // 准备数据
+      const distributorsData = hasEmailDistributors.map(d => ({
+        email: d.email || '',
+        name: d.name,
+        contactName: d.contactName || '',
+        username: d.accountUsername || '',
+        password: 'Pass@123'
+      }))
+
+      // 创建异步邮件发送任务
+      const result = await apiService.asyncBatchSendDistributorAccountEmails({
+        distributors: distributorsData,
+        loginUrl: loginUrl,
+        language: currentLocale
+      })
+
+      if (result.success) {
+        message.success(t('common.emailTaskCreated', { count: distributorsData.length.toString() }))
+        
+        // 显示进度监控
+        setCurrentEmailJobId(result.jobId)
+        setCurrentEmailDataType('distributor')
+        setEmailProgressVisible(true)
+        
+        // 清空选择
+        setSelectedDistributorIds([])
+      } else {
+        message.error(t('common.emailTaskCreateFailed'))
       }
-    })
+    } catch (error: any) {
+      console.error('异步批量发送分判商邮件失败:', error)
+      message.error(t('common.emailTaskCreateFailed') + ': ' + (error.message || '未知错误'))
+    }
   }
 
+  // 异步批量发送门卫账号密码到Email
+  const handleBatchSendGuardEmail = async () => {
+    if (selectedGuardIds.length === 0) {
+      message.warning(t('admin.pleaseSelectGuardsToSend'))
+      return
+    }
+
+    const selectedGuards = guards.filter(g => selectedGuardIds.includes(g.id))
+    const hasEmailGuards = selectedGuards.filter(g => g.email && g.email.trim())
+    const noEmailGuards = selectedGuards.filter(g => !g.email || !g.email.trim())
+
+    if (hasEmailGuards.length === 0) {
+      message.warning(t('admin.noEmailGuards'))
+      return
+    }
+
+    // 如果有部分门卫没有邮箱，显示提示信息
+    if (noEmailGuards.length > 0) {
+      message.info(t('messages.skippedGuardsWithoutEmail', { 
+        skipped: noEmailGuards.length.toString(),
+        total: selectedGuards.length.toString(),
+        valid: hasEmailGuards.length.toString()
+      }))
+    }
+
+    try {
+      // 获取系统配置中的登录链接
+      const frontendUrl = window.location.origin
+      const loginUrl = `${frontendUrl}/login`
+      
+      // 获取当前语言
+      const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+      
+      // 准备数据
+      const guardsData = hasEmailGuards.map(g => ({
+        guardEmail: g.email || '',
+        guardName: g.name,
+        contactName: g.name, // 门卫使用姓名作为联系人
+        username: g.accountUsername || '',
+        password: 'Pass@123'
+      }))
+
+      // 创建异步邮件发送任务
+      const result = await apiService.asyncBatchSendGuardAccountEmails({
+        guards: guardsData,
+        loginUrl: loginUrl,
+        language: currentLocale
+      })
+
+      if (result.success) {
+        message.success(t('common.emailTaskCreated', { count: guardsData.length.toString() }))
+        
+        // 显示进度监控
+        setCurrentEmailJobId(result.jobId)
+        setCurrentEmailDataType('guard')
+        setEmailProgressVisible(true)
+        
+        // 清空选择
+        setSelectedGuardIds([])
+      } else {
+        message.error(t('common.emailTaskCreateFailed'))
+      }
+    } catch (error: any) {
+      console.error('异步批量发送门卫邮件失败:', error)
+      message.error(t('common.emailTaskCreateFailed') + ': ' + (error.message || '未知错误'))
+    }
+  }
+
+
+  // 邮件任务完成回调
+  const handleEmailTaskComplete = () => {
+    // 不立即关闭进度监控弹窗，让结果弹窗先显示
+  }
+
+  // 处理重新发送失败的邮件
+  const handleRetryFailedEmails = (failedEmails: Array<{ email: string; error: string }>) => {
+    // 从失败的邮件中提取分判商或门卫信息，重新发送
+    const failedDistributorEmails = failedEmails.filter(failed => {
+      const distributor = distributors.find(d => d.email === failed.email);
+      return distributor !== undefined;
+    });
+
+    const failedGuardEmails = failedEmails.filter(failed => {
+      const guard = guards.find(g => g.email === failed.email);
+      return guard !== undefined;
+    });
+
+    if (failedDistributorEmails.length > 0) {
+      // 重新发送分判商邮件
+      const failedDistributorIds = failedDistributorEmails.map(failed => {
+        const distributor = distributors.find(d => d.email === failed.email);
+        return distributor?.id;
+      }).filter(Boolean) as string[];
+
+      if (failedDistributorIds.length > 0) {
+        setSelectedDistributorIds(failedDistributorIds);
+        handleBatchSendEmail();
+      }
+    }
+
+    if (failedGuardEmails.length > 0) {
+      // 重新发送门卫邮件
+      const failedGuardIds = failedGuardEmails.map(failed => {
+        const guard = guards.find(g => g.email === failed.email);
+        return guard?.id;
+      }).filter(Boolean) as string[];
+
+      if (failedGuardIds.length > 0) {
+        setSelectedGuardIds(failedGuardIds);
+        handleBatchSendGuardEmail();
+      }
+    }
+  }
 
   // 工地表单提交
   const onSiteSubmit = async () => {
@@ -1154,7 +1643,8 @@ const AdminSites: React.FC = () => {
         
         setGuards(prev => [transformedGuard, ...prev])
         
-        message.success(t('admin.guardAddedSuccess').replace('{username}', v.accountUsername || newGuard.guardId).replace('{password}', defaultPwd))
+        // 显示发送方式选择对话框
+        showGuardSendMethodModal(transformedGuard, defaultPwd)
       }
       
       setGuardModalOpen(false)
@@ -1445,13 +1935,15 @@ const AdminSites: React.FC = () => {
           }
 
           // 如果没有编号，不发送code字段，让后端自动生成
+          let finalImportData = importData
           if (!importData.code) {
-            delete importData.code
+            const { code, ...dataWithoutCode } = importData
+            finalImportData = dataWithoutCode
           }
 
           try {
             // 先尝试创建，如果编号已存在会返回409错误
-            const newSite = await apiService.createSite(importData)
+            const newSite = await apiService.createSite(finalImportData)
             
             // 转换数据格式以匹配前端期望
             const transformedSite = {
@@ -1771,7 +2263,7 @@ const AdminSites: React.FC = () => {
           // 准备导入数据
           const importData = {
             name: String(guardData.name || ''),
-            siteId: guardData.siteId || (selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.code : '') || '',
+            siteId: String(guardData.siteId || (selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.code : '') || ''),
             phone: String(guardData.phone || ''),
             email: String(guardData.email || ''),
             whatsapp: String(guardData.whatsapp || ''),
@@ -2460,23 +2952,43 @@ const AdminSites: React.FC = () => {
   // 重置门卫密码
   const handleResetGuardPassword = (record: Guard) => {
     Modal.confirm({
-      title: t('admin.resetGuardPasswordTitle'),
-      content: t('admin.resetGuardPasswordConfirm').replace('{name}', record.name),
+      title: t('admin.resetPasswordTitle'),
+      content: (
+        <div>
+          <p>{t('admin.resetGuardPasswordConfirm').replace('{name}', record.name)}</p>
+          <p style={{ color: '#999' }}>{t('admin.resetPasswordTip')}</p>
+        </div>
+      ),
       okText: t('admin.confirm'),
       cancelText: t('admin.cancel'),
       onOk: async () => {
         try {
-          const result = await apiService.resetGuardPassword(record.id)
+          const result = await apiService.resetGuardPassword(record.id, locale)
           // console.log('门卫密码重置成功:', result)
           
-          // 显示成功消息，包含新密码信息
+          // 显示成功消息，包含新密码信息和邮件发送状态
           Modal.success({
             title: t('admin.resetGuardPasswordSuccess'),
             content: (
               <div>
                 <p>{t('admin.resetGuardPasswordSuccessMessage').replace('{name}', result.guardName)}</p>
                 <p><strong>{t('admin.newPassword')}: {result.newPassword}</strong></p>
-                <p style={{ color: '#ff4d4f', fontSize: '12px' }}>{t('admin.passwordSecurityTip')}</p>
+                {result.emailSent && (
+                  <p style={{ color: '#52c41a', fontSize: '12px' }}>
+                    ✅ {t('admin.passwordResetEmailSent')}
+                  </p>
+                )}
+                {!result.emailSent && record.email && (
+                  <p style={{ color: '#fa8c16', fontSize: '12px' }}>
+                    ⚠️ {t('admin.passwordResetEmailFailed')}
+                  </p>
+                )}
+                {!record.email && (
+                  <p style={{ color: '#999', fontSize: '12px' }}>
+                    ℹ️ {t('admin.noEmailForPasswordReset')}
+                  </p>
+                )}
+                {/* <p style={{ color: '#ff4d4f', fontSize: '12px' }}>{t('admin.passwordSecurityTip')}</p> */}
               </div>
             ),
             width: 400
@@ -2516,7 +3028,7 @@ const AdminSites: React.FC = () => {
     },
     { title: t('admin.guardPhone'), dataIndex: 'phone', key: 'phone', width: 130, sorter: (a: Guard, b: Guard) => a.phone.localeCompare(b.phone) },
     { title: t('admin.guardEmail'), dataIndex: 'email', key: 'email', width: 180, sorter: (a: Guard, b: Guard) => (a.email || '').localeCompare(b.email || '') },
-    { title: t('admin.guardWhatsApp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 130, sorter: (a: Guard, b: Guard) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
+    // { title: t('admin.guardWhatsApp'), dataIndex: 'whatsapp', key: 'whatsapp', width: 130, sorter: (a: Guard, b: Guard) => (a.whatsapp || '').localeCompare(b.whatsapp || '') },
     { title: t('admin.guardAccount'), dataIndex: 'accountUsername', key: 'accountUsername', width: 120, sorter: (a: Guard, b: Guard) => (a.accountUsername || '').localeCompare(b.accountUsername || '') },
     { title: t('admin.guardAccountStatus'), dataIndex: 'accountStatus', key: 'accountStatus', width: 100,
       render: (status: string) => (
@@ -2536,16 +3048,16 @@ const AdminSites: React.FC = () => {
         />
         <Button 
           size="small" 
-          icon={<KeyOutlined />}
-          onClick={() => handleResetGuardPassword(record)}
-          title={t('admin.resetPasswordTooltip')}
+          icon={record.accountStatus === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
+          onClick={() => handleToggleGuardAccountStatus(record)}
+          title={record.accountStatus === 'active' ? t('admin.disableAccountTooltip') : t('admin.enableAccountTooltip')}
+          style={{ color: record.accountStatus === 'active' ? '#ff4d4f' : '#52c41a' }}
         />
         <Button 
           size="small" 
-          icon={record.accountStatus === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-          type={record.accountStatus === 'active' ? 'default' : 'primary'}
-          onClick={() => handleToggleGuardAccountStatus(record)}
-          title={record.accountStatus === 'active' ? t('admin.disableAccountTooltip') : t('admin.enableAccountTooltip')}
+          icon={<KeyOutlined />}
+          onClick={() => handleResetGuardPassword(record)}
+          title={t('admin.resetPasswordTooltip')}
         />
         <Button 
           danger 
@@ -2710,53 +3222,6 @@ const AdminSites: React.FC = () => {
         )}
       </div>
       
-      {/* 选择状态显示 */}
-      {selectedSiteIds.length > 0 && (
-        <div style={{ 
-          marginBottom: 8, 
-          padding: '8px 16px', 
-          backgroundColor: '#f6ffed', 
-          border: '1px solid #b7eb8f',
-          borderRadius: '4px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0
-        }}>
-          <span>
-            {t('admin.selectedSites').replace('{count}', selectedSiteIds.length.toString())}
-            {selectedSiteIds.length > 0 && (
-              <span style={{ color: '#999', marginLeft: '8px' }}>
-                / {t('admin.totalSites').replace('{count}', filteredSites.length.toString())}
-              </span>
-            )}
-          </span>
-          <Space>
-            <Button 
-              size="small"
-              icon={<CheckCircleOutlined />} 
-              onClick={() => handleBatchUpdateStatus('sites')}
-            >
-              {t('admin.batchUpdateSiteStatus')}({selectedSiteIds.length})
-            </Button>
-            <Button 
-              size="small"
-              danger
-              icon={<DeleteOutlined />} 
-              onClick={handleBatchDeleteSites}
-            >
-              {t('admin.batchDeleteSites')}({selectedSiteIds.length})
-            </Button>
-            <Button 
-              onClick={() => setSelectedSiteIds([])}
-              size="small"
-            >
-              {t('admin.clearSelection')}({selectedSiteIds.length})
-            </Button>
-          </Space>
-        </div>
-      )}
-      
       {/* 表格容器 */}
       <Card style={{ 
         margin: 0,
@@ -2779,13 +3244,60 @@ const AdminSites: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
+          {/* 选择状态显示 */}
+          {selectedSiteIds.length > 0 && (
+            <div style={{ 
+              marginBottom: 1,
+              padding: '8px 16px', 
+              backgroundColor: '#f6ffed', 
+              border: '1px solid #b7eb8f',
+              borderRadius: '4px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0
+            }}>
+              <span>
+                {t('admin.selectedSites').replace('{count}', selectedSiteIds.length.toString())}
+                {selectedSiteIds.length > 0 && (
+                  <span style={{ color: '#999', marginLeft: '8px' }}>
+                    / {t('admin.totalSites').replace('{count}', filteredSites.length.toString())}
+                  </span>
+                )}
+              </span>
+              <Space>
+                <Button 
+                  size="small"
+                  icon={<CheckCircleOutlined />} 
+                  onClick={() => handleBatchUpdateStatus('sites')}
+                >
+                  {t('admin.batchUpdateSiteStatus')}({selectedSiteIds.length})
+                </Button>
+                <Button 
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />} 
+                  onClick={handleBatchDeleteSites}
+                >
+                  {t('admin.batchDeleteSites')}({selectedSiteIds.length})
+                </Button>
+                <Button 
+                  onClick={() => setSelectedSiteIds([])}
+                  size="small"
+                >
+                  {t('admin.clearSelection')}({selectedSiteIds.length})
+                </Button>
+              </Space>
+            </div>
+          )}
+
           {/* 表格容器 */}
           <div style={{ 
             flex: 1, 
             display: 'flex', 
             flexDirection: 'column', 
             minHeight: 0, 
-            padding: '8px 16px 0 16px', // 顶部添加8px间距
+            padding: selectedSiteIds.length > 0 ? '2px 16px 0 16px' : '8px 16px 0 16px', // 有多选状态栏时减少顶部间距
             marginBottom: selectedSiteIds.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
           }}>
             <Table 
@@ -2814,6 +3326,29 @@ const AdminSites: React.FC = () => {
                   name: record.name,
                 }),
               }}
+              onRow={(record) => ({
+                onClick: (event) => {
+                  // 如果点击的是复选框或复选框的父元素，不处理行点击
+                  const target = event.target as HTMLElement;
+                  if (target.closest('.ant-checkbox-wrapper') || target.closest('.ant-checkbox')) {
+                    return;
+                  }
+                  
+                  // 如果点击的是操作列中的按钮，不处理行点击
+                  if (target.closest('button') || target.closest('.ant-btn')) {
+                    return;
+                  }
+                  
+                  // 切换选中状态
+                  const isSelected = selectedSiteIds.includes(record.id);
+                  if (isSelected) {
+                    setSelectedSiteIds(prev => prev.filter(id => id !== record.id));
+                  } else {
+                    setSelectedSiteIds(prev => [...prev, record.id]);
+                  }
+                },
+                style: { cursor: 'pointer' }
+              })}
             />
           </div>
 
@@ -2932,62 +3467,6 @@ const AdminSites: React.FC = () => {
         )}
       </div>
       
-      {/* 选择状态显示 */}
-      {selectedDistributorIds.length > 0 && (
-        <div style={{ 
-          marginBottom: 8, 
-          padding: '8px 16px', 
-          backgroundColor: '#f6ffed', 
-          border: '1px solid #b7eb8f',
-          borderRadius: '4px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0
-        }}>
-          <span>
-            {t('admin.selectedDistributors').replace('{count}', selectedDistributorIds.length.toString())}
-            {selectedDistributorIds.length > 0 && (
-              <span style={{ color: '#999', marginLeft: '8px' }}>
-                / {t('admin.totalDistributors').replace('{count}', filteredDistributors.length.toString())}
-              </span>
-            )}
-          </span>
-          <Space>
-            <Button 
-              size="small" 
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={() => handleBatchSendEmail()}
-              title={t('admin.batchSendEmailTitle')}
-            >
-              {t('admin.batchSendToEmail')}({selectedDistributorIds.length})
-            </Button>
-            <Button 
-              size="small"
-              icon={<CheckCircleOutlined />} 
-              onClick={() => handleBatchUpdateStatus('distributors')}
-            >
-              {t('admin.batchUpdateDistributorStatus')}({selectedDistributorIds.length})
-            </Button>
-            <Button 
-              size="small"
-              danger
-              icon={<DeleteOutlined />} 
-              onClick={handleBatchDeleteDistributors}
-            >
-              {t('admin.batchDeleteDistributors')}({selectedDistributorIds.length})
-            </Button>
-            <Button 
-              onClick={() => setSelectedDistributorIds([])}
-              size="small"
-            >
-              {t('admin.clearSelection')}({selectedDistributorIds.length})
-            </Button>
-          </Space>
-        </div>
-      )}
-      
       {/* 表格容器 */}
       <Card style={{ 
         margin: 0,
@@ -3010,13 +3489,69 @@ const AdminSites: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
+          {/* 选择状态显示 */}
+          {selectedDistributorIds.length > 0 && (
+            <div style={{ 
+              marginBottom: 1,
+              padding: '8px 16px', 
+              backgroundColor: '#f6ffed', 
+              border: '1px solid #b7eb8f',
+              borderRadius: '4px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0
+            }}>
+              <span>
+                {t('admin.selectedDistributors').replace('{count}', selectedDistributorIds.length.toString())}
+                {selectedDistributorIds.length > 0 && (
+                  <span style={{ color: '#999', marginLeft: '8px' }}>
+                    / {t('admin.totalDistributors').replace('{count}', filteredDistributors.length.toString())}
+                  </span>
+                )}
+              </span>
+              <Space>
+                <Button 
+                  size="small" 
+                  type="primary"
+                  icon={<SendOutlined />}
+                  onClick={() => handleBatchSendEmail()}
+                  title={t('common.asyncBatchSendEmailTitle') || '异步批量发送邮件'}
+                >
+                  {t('common.asyncBatchSendToEmail') || '异步批量发送邮件'}({selectedDistributorIds.length})
+                </Button>
+                <Button 
+                  size="small"
+                  icon={<CheckCircleOutlined />} 
+                  onClick={() => handleBatchUpdateStatus('distributors')}
+                >
+                  {t('admin.batchUpdateDistributorStatus')}({selectedDistributorIds.length})
+                </Button>
+                <Button 
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />} 
+                  onClick={handleBatchDeleteDistributors}
+                >
+                  {t('admin.batchDeleteDistributors')}({selectedDistributorIds.length})
+                </Button>
+                <Button 
+                  onClick={() => setSelectedDistributorIds([])}
+                  size="small"
+                >
+                  {t('admin.clearSelection')}({selectedDistributorIds.length})
+                </Button>
+              </Space>
+            </div>
+          )}
+
           {/* 表格容器 */}
           <div style={{ 
             flex: 1, 
             display: 'flex', 
             flexDirection: 'column', 
             minHeight: 0, 
-            padding: '8px 16px 0 16px', // 顶部添加8px间距
+            padding: selectedDistributorIds.length > 0 ? '2px 16px 0 16px' : '8px 16px 0 16px', // 有多选状态栏时减少顶部间距
             marginBottom: selectedDistributorIds.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
           }}>
             <Table 
@@ -3045,6 +3580,29 @@ const AdminSites: React.FC = () => {
                   name: record.name,
                 }),
               }}
+              onRow={(record) => ({
+                onClick: (event) => {
+                  // 如果点击的是复选框或复选框的父元素，不处理行点击
+                  const target = event.target as HTMLElement;
+                  if (target.closest('.ant-checkbox-wrapper') || target.closest('.ant-checkbox')) {
+                    return;
+                  }
+                  
+                  // 如果点击的是操作列中的按钮，不处理行点击
+                  if (target.closest('button') || target.closest('.ant-btn')) {
+                    return;
+                  }
+                  
+                  // 切换选中状态
+                  const isSelected = selectedDistributorIds.includes(record.id);
+                  if (isSelected) {
+                    setSelectedDistributorIds(prev => prev.filter(id => id !== record.id));
+                  } else {
+                    setSelectedDistributorIds(prev => [...prev, record.id]);
+                  }
+                },
+                style: { cursor: 'pointer' }
+              })}
             />
           </div>
 
@@ -3165,53 +3723,6 @@ const AdminSites: React.FC = () => {
         )}
       </div>
       
-      {/* 选择状态显示 */}
-      {selectedGuardIds.length > 0 && (
-        <div style={{ 
-          marginBottom: 8, 
-          padding: '8px 16px', 
-          backgroundColor: '#f6ffed', 
-          border: '1px solid #b7eb8f',
-          borderRadius: '4px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0
-        }}>
-          <span>
-            {t('admin.selectedGuards').replace('{count}', selectedGuardIds.length.toString())}
-            {selectedGuardIds.length > 0 && (
-              <span style={{ color: '#999', marginLeft: '8px' }}>
-                / {t('admin.totalGuards').replace('{count}', filteredGuards.length.toString())}
-              </span>
-            )}
-          </span>
-          <Space>
-            <Button 
-              size="small"
-              icon={<CheckCircleOutlined />} 
-              onClick={() => handleBatchUpdateStatus('guards')}
-            >
-              {t('admin.batchUpdateGuardStatus')}({selectedGuardIds.length})
-            </Button>
-            <Button 
-              size="small"
-              danger
-              icon={<DeleteOutlined />} 
-              onClick={handleBatchDeleteGuards}
-            >
-              {t('admin.batchDeleteGuards')}({selectedGuardIds.length})
-            </Button>
-            <Button 
-              onClick={() => setSelectedGuardIds([])}
-              size="small"
-            >
-              {t('admin.clearSelection')}({selectedGuardIds.length})
-            </Button>
-          </Space>
-        </div>
-      )}
-      
       {/* 表格容器 */}
       <Card style={{ 
         margin: 0,
@@ -3234,13 +3745,69 @@ const AdminSites: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
+          {/* 选择状态显示 */}
+          {selectedGuardIds.length > 0 && (
+            <div style={{ 
+              marginBottom: 1,
+              padding: '8px 16px', 
+              backgroundColor: '#f6ffed', 
+              border: '1px solid #b7eb8f',
+              borderRadius: '4px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0
+            }}>
+              <span>
+                {t('admin.selectedGuards').replace('{count}', selectedGuardIds.length.toString())}
+                {selectedGuardIds.length > 0 && (
+                  <span style={{ color: '#999', marginLeft: '8px' }}>
+                    / {t('admin.totalGuards').replace('{count}', filteredGuards.length.toString())}
+                  </span>
+                )}
+              </span>
+              <Space>
+                <Button 
+                  size="small" 
+                  type="primary"
+                  icon={<SendOutlined />}
+                  onClick={() => handleBatchSendGuardEmail()}
+                  title={t('common.asyncBatchSendEmailTitle') || '异步批量发送邮件'}
+                >
+                  {t('common.asyncBatchSendToEmail') || '异步批量发送邮件'}({selectedGuardIds.length})
+                </Button>
+                <Button 
+                  size="small"
+                  icon={<CheckCircleOutlined />} 
+                  onClick={() => handleBatchUpdateStatus('guards')}
+                >
+                  {t('admin.batchUpdateGuardStatus')}({selectedGuardIds.length})
+                </Button>
+                <Button 
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />} 
+                  onClick={handleBatchDeleteGuards}
+                >
+                  {t('admin.batchDeleteGuards')}({selectedGuardIds.length})
+                </Button>
+                <Button 
+                  onClick={() => setSelectedGuardIds([])}
+                  size="small"
+                >
+                  {t('admin.clearSelection')}({selectedGuardIds.length})
+                </Button>
+              </Space>
+            </div>
+          )}
+
           {/* 表格容器 */}
           <div style={{ 
             flex: 1, 
             display: 'flex', 
             flexDirection: 'column', 
             minHeight: 0, 
-            padding: '8px 16px 0 16px', // 顶部添加8px间距
+            padding: selectedGuardIds.length > 0 ? '2px 16px 0 16px' : '8px 16px 0 16px', // 有多选状态栏时减少顶部间距
             marginBottom: selectedGuardIds.length > 0 ? 0 : 0 // 根据是否有批量操作栏调整底部间距
           }}>
             <Table 
@@ -3269,6 +3836,29 @@ const AdminSites: React.FC = () => {
                   name: record.name,
                 }),
               }}
+              onRow={(record) => ({
+                onClick: (event) => {
+                  // 如果点击的是复选框或复选框的父元素，不处理行点击
+                  const target = event.target as HTMLElement;
+                  if (target.closest('.ant-checkbox-wrapper') || target.closest('.ant-checkbox')) {
+                    return;
+                  }
+                  
+                  // 如果点击的是操作列中的按钮，不处理行点击
+                  if (target.closest('button') || target.closest('.ant-btn')) {
+                    return;
+                  }
+                  
+                  // 切换选中状态
+                  const isSelected = selectedGuardIds.includes(record.id);
+                  if (isSelected) {
+                    setSelectedGuardIds(prev => prev.filter(id => id !== record.id));
+                  } else {
+                    setSelectedGuardIds(prev => [...prev, record.id]);
+                  }
+                },
+                style: { cursor: 'pointer' }
+              })}
             />
           </div>
 
@@ -3519,9 +4109,9 @@ const AdminSites: React.FC = () => {
           <Form.Item name="email" label={t('admin.emailLabel')}>
             <Input placeholder={t('admin.emailPlaceholder')} />
           </Form.Item>
-          <Form.Item name="whatsapp" label={t('admin.whatsAppLabel')}>
+          {/* <Form.Item name="whatsapp" label={t('admin.whatsAppLabel')}>
             <Input placeholder={t('admin.whatsAppPlaceholder')} />
-          </Form.Item>
+          </Form.Item> */}
           <Form.Item name="accountUsername" label={t('admin.accountLabel')}>
             <Input placeholder={t('admin.accountPlaceholder')} />
           </Form.Item>
@@ -3594,9 +4184,9 @@ const AdminSites: React.FC = () => {
           <Form.Item name="email" label={t('admin.emailLabel')}>
             <Input placeholder={t('admin.emailPlaceholder')} />
           </Form.Item>
-          <Form.Item name="whatsapp" label={t('admin.whatsAppLabel')}>
+          {/* <Form.Item name="whatsapp" label={t('admin.whatsAppLabel')}>
             <Input placeholder={t('admin.whatsAppPlaceholder')} />
-          </Form.Item>
+          </Form.Item> */}
           <Form.Item name="accountUsername" label={t('admin.accountLabel')}>
             <Input placeholder={t('admin.accountPlaceholder')} />
           </Form.Item>
@@ -3662,6 +4252,19 @@ const AdminSites: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 邮件进度监控模态框 */}
+      <EmailProgressModal
+        visible={emailProgressVisible}
+        jobId={currentEmailJobId}
+        dataType={currentEmailDataType}
+        onClose={() => {
+          setEmailProgressVisible(false);
+          setCurrentEmailJobId(null);
+        }}
+        onComplete={handleEmailTaskComplete}
+        onRetryFailed={handleRetryFailedEmails}
+      />
     </div>
   )
 }

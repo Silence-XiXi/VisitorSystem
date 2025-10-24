@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Upload, Select, Pagination, Tooltip, Radio } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, PlayCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, UploadOutlined, DownloadOutlined, StopOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useLocale } from '../contexts/LocaleContext'
 import { apiService } from '../services/api'
 import * as XLSX from 'xlsx'
@@ -280,7 +280,7 @@ const ItemCategoryManagement: React.FC = () => {
       title: t('itemCategory.categoryCode'), 
       dataIndex: 'code', 
       key: 'code', 
-      width: 120,
+      width: 100,
       fixed: 'left' as const,
       sorter: (a: ItemCategory, b: ItemCategory) => a.code.localeCompare(b.code)
     },
@@ -333,7 +333,7 @@ const ItemCategoryManagement: React.FC = () => {
     { 
       title: t('common.actions'), 
       key: 'actions', 
-      width: 120,
+      width: 80,
       fixed: 'right' as const,
       render: (_: any, record: ItemCategory) => (
         <Space size="small">
@@ -348,14 +348,13 @@ const ItemCategoryManagement: React.FC = () => {
               }}
             />
           </Tooltip>
-          <Tooltip title={record.status === 'ACTIVE' ? t('itemCategory.disable') : t('itemCategory.enable')}>
-            <Button 
-              size="small" 
-              icon={record.status === 'ACTIVE' ? <StopOutlined /> : <PlayCircleOutlined />}
-              type={record.status === 'ACTIVE' ? 'default' : 'primary'}
-              onClick={() => handleToggleStatus(record)}
-            />
-          </Tooltip>
+          <Button 
+            size="small" 
+            icon={record.status === 'ACTIVE' ? <StopOutlined /> : <CheckCircleOutlined />}
+            onClick={() => handleToggleStatus(record)}
+            title={record.status === 'ACTIVE' ? t('itemCategory.disable') : t('itemCategory.enable')}
+            style={{ color: record.status === 'ACTIVE' ? '#ff4d4f' : '#52c41a' }}
+          />
           <Tooltip title={t('common.delete')}>
             <Button 
               danger 
@@ -915,7 +914,7 @@ const ItemCategoryManagement: React.FC = () => {
               onClick={() => handleExport(selectedCategoryIds.length === 0)}
               size="small"
             >
-              {selectedCategoryIds.length === 0 ? t('itemCategory.exportAll') : t('itemCategory.exportSelected').replace('{count}', selectedCategoryIds.length.toString())}
+              {selectedCategoryIds.length === 0 ? t('itemCategory.exportAll') : `${t('itemCategory.exportSelected')}(${selectedCategoryIds.length})`}
             </Button>
             <Button 
               icon={<ReloadOutlined />} 
@@ -1001,7 +1000,7 @@ const ItemCategoryManagement: React.FC = () => {
           {/* 选择状态显示 */}
           {selectedCategoryIds.length > 0 && (
             <div style={{ 
-              marginBottom: 8, 
+              marginBottom: 1, 
               padding: '8px 16px', 
               backgroundColor: '#f6ffed', 
               border: '1px solid #b7eb8f',
@@ -1080,6 +1079,29 @@ const ItemCategoryManagement: React.FC = () => {
                   name: record.name,
                 }),
               }}
+              onRow={(record) => ({
+                onClick: (event) => {
+                  // 如果点击的是复选框或复选框的父元素，不处理行点击
+                  const target = event.target as HTMLElement;
+                  if (target.closest('.ant-checkbox-wrapper') || target.closest('.ant-checkbox')) {
+                    return;
+                  }
+                  
+                  // 如果点击的是操作列中的按钮，不处理行点击
+                  if (target.closest('button') || target.closest('.ant-btn')) {
+                    return;
+                  }
+                  
+                  // 切换选中状态
+                  const isSelected = selectedCategoryIds.includes(record.id);
+                  if (isSelected) {
+                    setSelectedCategoryIds(prev => prev.filter(id => id !== record.id));
+                  } else {
+                    setSelectedCategoryIds(prev => [...prev, record.id]);
+                  }
+                },
+                style: { cursor: 'pointer' }
+              })}
             />
           </div>
 

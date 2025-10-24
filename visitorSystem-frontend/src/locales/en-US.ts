@@ -48,6 +48,128 @@ export default {
     hours: 'hours',
     minute: 'minute',
     minutes: 'minutes',
+    second: 'second',
+    seconds: 'seconds',
+    
+    // Batch sending modal related
+    emailSending: 'Email Sending',
+    emailSendingProgress: 'Email Sending Progress',
+    emailSendingResult: 'Email Sending Result',
+    emailSendingComplete: 'Email Sending Complete',
+    emailSendingFailed: 'Email Sending Failed',
+    emailSendingCancelled: 'Email Sending Cancelled',
+    emailSendingSuccess: 'Email Sending Success',
+    emailSendingError: 'Email Sending Error',
+    
+    // WhatsApp sending related
+    whatsappSending: 'WhatsApp Sending',
+    whatsappSendingProgress: 'WhatsApp Sending Progress',
+    whatsappSendingResult: 'WhatsApp Sending Result',
+    whatsappSendingComplete: 'WhatsApp Sending Complete',
+    whatsappSendingFailed: 'WhatsApp Sending Failed',
+    whatsappSendingCancelled: 'WhatsApp Sending Cancelled',
+    whatsappSendingError: 'WhatsApp Sending Error',
+    
+    // Sending status
+    pending: 'Pending',
+    // processing: 'Sending',
+    completed: 'Completed',
+    failed: 'Failed',
+    cancelled: 'Cancelled',
+    
+    // Sending statistics
+    sendStatistics: 'Sending Statistics',
+    successCount: 'Success',
+    failedCount: 'Failed',
+    totalCount: 'Total',
+    successSent: 'Successfully Sent',
+    failedSent: 'Failed',
+    totalSent: 'Total',
+    unit: '',
+    successEmails: 'Success: {count} emails',
+    failedEmails: 'Failed: {count} emails',
+    successWhatsApp: 'Success: {count} messages',
+    failedWhatsApp: 'Failed: {count} messages',
+    totalEmails: 'Total: {count} emails',
+    
+    // Progress information
+    progress: 'Progress',
+    estimatedTimeRemaining: 'Estimated Time Remaining',
+    currentBatch: 'Current Batch',
+    totalBatches: 'Total Batches',
+    batchProgress: 'Batch Progress: {current}/{total}',
+    
+    // Action buttons
+    cancelSending: 'Cancel Sending',
+    retryFailed: 'Retry Failed Emails',
+    testConnection: 'Test Connection',
+    viewDetails: 'View Details',
+    hideDetails: 'Hide Details',
+    
+    // Progress monitoring
+    taskStatus: 'Task Status',
+    sendingProgress: 'Sending Progress',
+    
+    // Failure details
+    failureDetails: 'Failure Details',
+    failureDetailsCount: 'Failed Emails ({count})',
+    viewFailureDetails: 'View Failure Details ({count})',
+    failureEmailAddress: 'Failed Email Address',
+    failureReason: 'Failure Reason',
+    moreFailures: 'There are {count} more failed emails...',
+    
+    // Connection test
+    testSMTPConnection: 'Test SMTP Connection',
+    connectionTestSuccess: 'Connection Test Success',
+    connectionTestFailed: 'Connection Test Failed',
+    connectionTestSuccessMessage: 'Connection test successful: {host}:{port}',
+    connectionTestFailedMessage: 'Connection test failed: {error}',
+    
+    // Async batch sending related
+    asyncBatchSendQRCodeEmail: 'Send Email', // 'Async Batch Send Email',
+    asyncBatchSendQRCodeWhatsApp: 'Send WhatsApp', // 'Async Batch Send WhatsApp',
+    asyncBatchSendEmailTitle: 'Send Email', // 'Async Batch Send Email',
+    asyncBatchSendToEmail: 'Send Email', // 'Async Batch Send Email',
+    
+    // Task creation and status
+    emailTaskCreated: 'Email sending task created, {count} workers',
+    whatsappTaskCreated: 'WhatsApp sending task created, {count} workers',
+    emailTaskCreateFailed: 'Email sending task creation failed',
+    whatsappTaskCreateFailed: 'WhatsApp sending task creation failed',
+    
+    // Task cancellation
+    emailTaskCancelFailed: 'Email sending task cancellation failed',
+    whatsappTaskCancelFailed: 'WhatsApp sending task cancellation failed',
+    emailTaskCancelled: 'Email sending task cancelled',
+    whatsappTaskCancelled: 'WhatsApp sending task cancelled',
+    
+    // Task status
+    emailTaskNotFound: 'Email sending task not found',
+    whatsappTaskNotFound: 'WhatsApp sending task not found',
+    emailTaskCompleted: 'Email sending task completed',
+    whatsappTaskCompleted: 'WhatsApp sending task completed',
+    emailTaskFailed: 'Email sending task failed',
+    whatsappTaskFailed: 'WhatsApp sending task failed',
+    
+    // Time formatting
+    formatTime: '{hours}h {minutes}m {seconds}s',
+    formatTimeShort: '{minutes}m {seconds}s',
+    // 重新发送相关
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+    resendSelected: 'Resend Selected',
+    batchSendFailed: 'Batch {current} send failed: {message}',
+    // batchProgress: 'Completed {current}/{total} batches, {success} succeeded, {failed} failed',
+    resendProgress: 'Resend progress: {current}/{total} batches',
+    pleaseSelectItemsToResend: 'Please select items to resend',
+    resendingEmails: 'Resending QR code emails to {count} workers...',
+    resendingWhatsApp: 'Resending QR codes to {count} workers\' WhatsApp...',
+    resendComplete: 'Resend completed, success: {count}/{total}',
+    resendSuccess: 'Resend successful, {count} workers total',
+    resendFailed: 'Resend failed',
+    resendError: 'Error occurred during resend',
+    resendPartialFailure: 'Partial resend failure ({failed}/{total})',
+    resendFailureExplanation: 'QR code emails still failed to send to the following workers. Please try again later or contact system administrator:',
   },
   worker: {
     phoneNumberExists: 'Phone number already exists, please check your input',
@@ -199,8 +321,11 @@ export default {
     resendSelected: 'Resend Selected',
     pleaseSelectItemsToResend: 'Please select items to resend',
     resendingEmails: 'Resending QR code emails to {count} workers...',
+    resendingWhatsApp: 'Resending QR codes to {count} workers\' WhatsApp...',
     resendComplete: 'Resend completed, success: {count}/{total}',
+    resendSuccess: 'Resend successful, {count} workers total',
     resendFailed: 'Resend failed',
+    resendError: 'Error occurred during resend',
     resendPartialFailure: 'Partial resend failure ({failed}/{total})',
     resendFailureExplanation: 'QR code emails still failed to send to the following workers. Please try again later or contact system administrator:',
     // 缺失的键
@@ -223,6 +348,9 @@ export default {
     batchUpdateStatusSuccess: 'Batch update status successful, updated {count} workers',
     batchUpdateStatusFailed: 'Batch update status failed',
     allWorkersAlreadyInSelectedStatus: 'All selected workers are already in the target status, no changes needed',
+    // Async batch send email related
+    asyncBatchSendQRCodeEmail: 'Async Send Email',
+    emailTaskCreated: 'Email task created for {count} workers',
   },
   qrcode: {
     title: 'Worker QR Code',
@@ -305,7 +433,7 @@ export default {
     username: 'Username',
     password: 'Password',
     captcha: 'Security Verification',
-    usernamePlaceholder: 'Please enter username',
+    usernamePlaceholder: 'Please enter username, case-sensitive',
     passwordPlaceholder: 'Please enter password',
     captchaPlaceholder: 'Please enter captcha',
     loginButton: 'Login',
@@ -354,6 +482,8 @@ export default {
     // 其他
     parsingUserDataError: 'Error occurred while parsing user data',
     tokenExpired: 'Login has expired, please login again',
+    invalidCredentials: 'Invalid username or password',
+    accountDisabled: 'Account has been disabled',
   },
   guard: {
     title: 'Guard Management System',
@@ -718,6 +848,11 @@ export default {
     importCompleted: 'Import completed',
     importTotalProcessed: 'Total {total} records processed',
     batchSendToEmail: 'Send Email',
+    processingBatchDistributor: 'Processing batch {current}/{total} ({count} subcontractors)',
+    processingBatchGuard: 'Processing batch {current}/{total} ({count} guards)',
+    partialSendFailure: 'Partial send failure ({failed}/{total})',
+    sendFailureExplanationDistributor: 'The following distributor emails failed to send, you can select the items to resend:',
+    sendFailureExplanationGuard: 'The following guard emails failed to send, you can select the items to resend:',
     // 工地导入相关
     siteImportConfirm: 'Confirm Site Import',
     siteImportRulesMessage: 'Import Rules: Site code must be unique, existing codes will be skipped, new sites will be created, and site code will be automatically generated if not provided',
@@ -809,7 +944,8 @@ export default {
     resetPassword: 'Reset Password',
     resetPasswordTitle: 'Reset Default Password',
     resetPasswordConfirm: 'Are you sure you want to reset the password for subcontractor "{name}"?',
-    resetPasswordTip: 'The default password will be set to Pass@123, please notify the other party to change the password as soon as possible',
+    resetGuardPasswordConfirm: 'Are you sure you want to reset the password for guard "{name}"?',
+    resetPasswordTip: 'The default password will be set to Pass@123',
     resetPasswordSuccess: 'Password reset successfully',
     resetPasswordSuccessMessage: 'Password reset successfully for {name}',
     passwordSecurityTip: 'Please notify the other party to change the password as soon as possible for account security',
@@ -927,8 +1063,7 @@ export default {
     guardUpdated: 'Guard Updated',
     guardAdded: 'Guard Added',
     // 重置密码相关
-    resetGuardPasswordTitle: 'Reset Guard Password',
-    resetGuardPasswordConfirm: 'Are you sure you want to reset the password for guard "{name}"?',
+    resetGuardPasswordTitle: 'Reset Default Password',
     resetGuardPasswordSuccess: 'Guard Password Reset Success',
     resetGuardPasswordSuccessMessage: 'Guard "{name}" Password Reset Success',
     // 门卫删除相关
@@ -960,7 +1095,7 @@ export default {
     disableGuardSuccess: 'Guard "{name}" Disabled',
     // 发送方式选择
     selectSendMethod: 'Select Send Method',
-    distributorAddedSuccess: 'Distributor "{name}" Added Success',
+    distributorAddedSuccess: 'Distributor Added Success', // 'Distributor "{name}" Added Success',
     accountInfo: 'Account: {username}',
     passwordInfo: 'Password: {password}',
     selectSendMethodTip: 'Please select the method to send account information: ',
@@ -981,14 +1116,21 @@ export default {
     batchSendEmailSuccess: 'Account password sent to {count} distributors by Email',
     batchSendWhatsAppSuccess: 'Account password sent to {count} distributors by WhatsApp',
     noEmailSkipped: '{count} distributors skipped due to no Email contact information',
+    batchSendGuardEmailSuccess: 'Account password sent to {count} guards by Email',
+    noEmailGuards: 'Selected guards have no Email contact information, cannot send email',
+    pleaseSelectGuardsToSend: 'Please select guards to send emails to',
+    noEmailGuardsSkipped: '{count} guards skipped due to no Email contact information',
+    passwordResetEmailSent: 'Password reset email has been sent',
+    passwordResetEmailFailed: 'Password reset email sending failed',
+    noEmailForPasswordReset: 'This guard has no email address, cannot send password reset email',
     noWhatsAppSkipped: '{count} distributors skipped due to no WhatsApp contact information',
     // 导入导出
     pleaseSelectSitesToExport: 'Please select sites to export',
     pleaseSelectDistributorsToExport: 'Please select distributors to export',
     pleaseSelectGuardsToExport: 'Please select guards to export',
     pleaseSelectDistributorsToSend: 'Please select distributors to send',
-    noEmailDistributors: 'Selected distributors have no Email contact information',
-    noWhatsAppDistributors: 'Selected distributors have no WhatsApp contact information',
+    noEmailDistributors: 'Selected distributors have no Email contact information, cannot send email',
+    noWhatsAppDistributors: 'Selected distributors have no WhatsApp contact information, cannot send WhatsApp',
     sitesExported: 'Exported {count} site records',
     distributorsExported: 'Exported {count} distributor records',
     guardsExported: 'Exported {count} guard records',
@@ -1052,7 +1194,7 @@ export default {
     downloadTemplate: 'Download Template',
     importCategories: 'Import Categories',
     exportAll: 'Export All',
-    exportSelected: 'Export Selected ({count})',
+    exportSelected: 'Export Selected',
     addCategory: 'Add Category',
     editCategory: 'Edit Item Category',
     selectedCategories: 'Selected {count} categories',
@@ -1316,6 +1458,18 @@ export default {
     qrCodeSentToWhatsapp: 'QR code sent to {whatsapp}',
     pleaseSelectWorkers: 'Please select workers to send QR code',
     qrCodeBatchSent: 'QR code batch sent to {count} workers',
+    noEmailWorkers: 'Selected workers have no email contact information',
+    noWhatsAppWorkers: 'Selected workers have no WhatsApp contact information',
+    noEmailWorkersSkipped: '{count} workers skipped due to no email contact information',
+    noWhatsAppWorkersSkipped: '{count} workers skipped due to no WhatsApp contact information',
+    batchSendEmailSuccess: 'QR code batch sent to {count} workers by email',
+    batchSendWhatsAppSuccess: 'QR code batch sent to {count} workers by WhatsApp',
+    batchSendEmailFailed: 'Batch send email failed',
+    batchSendWhatsAppFailed: 'Batch send WhatsApp failed',
+    batchSendEmailError: 'Error occurred during batch send email',
+    batchSendWhatsAppError: 'Error occurred during batch send WhatsApp',
+    batchSendEmailPartialFailure: 'Partial email sending failed, success: {succeeded}, failed: {failed}',
+    batchSendWhatsAppPartialFailure: 'Partial WhatsApp sending failed, success: {succeeded}, failed: {failed}',
     pleaseSelectWorkersToExport: 'Please select workers to export',
     exportedWorkers: 'Exported {count} worker records',
     templateDownloaded: 'Worker import template downloaded',
@@ -1410,7 +1564,6 @@ export default {
     left: 'Left',
     pending: 'Pending',
     noRecords: 'No visitor records',
-    viewDetails: 'View Details',
     checkOut: 'Check Out',
     confirmCheckOut: 'Confirm Check Out',
     checkOutSuccess: 'Check out successful',
@@ -1521,6 +1674,12 @@ export default {
     emailAddressRequired: 'Email address cannot be empty',
     emailSendFailed: 'Email sending failed',
     emailSendSuccess: 'Email sent successfully',
+    noValidEmailWarning: 'All workers have no email contact information, cannot send email',
+    noValidWhatsappWarning: 'All workers have no WhatsApp contact information, cannot send WhatsApp',
+    skippedWorkersWithoutEmail: 'Skipped {skipped} workers without email, will send email to {valid} valid workers (selected {total} workers total)',
+    skippedWorkersWithoutWhatsApp: 'Skipped {skipped} workers without WhatsApp, will send WhatsApp to {valid} valid workers (selected {total} workers total)',
+    skippedDistributorsWithoutEmail: 'Skipped {skipped} distributors without email, will send email to {valid} valid distributors (selected {total} distributors total)',
+    skippedGuardsWithoutEmail: 'Skipped {skipped} guards without email, will send email to {valid} valid guards (selected {total} guards total)',
     
     // Site management related
     siteNameOrCodeExists: 'Site name or code already exists, please use a different name or code',
@@ -1537,8 +1696,8 @@ export default {
     pleaseSelectDistributorsToExport: 'Please select distributors to export first',
     pleaseSelectGuardsToExport: 'Please select guards to export first',
     pleaseSelectDistributorsToSend: 'Please select distributors to send to first',
-    noEmailDistributors: 'Selected distributors have no email contact information',
-    noWhatsAppDistributors: 'Selected distributors have no WhatsApp contact information',
+    noEmailDistributors: 'Selected distributors have no email contact information, cannot send email',
+    noWhatsAppDistributors: 'Selected distributors have no WhatsApp contact information, cannot send WhatsApp',
     
     // File upload related
     onlyExcelFiles: 'Only Excel files can be uploaded!',
