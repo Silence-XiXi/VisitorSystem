@@ -7,6 +7,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend/Dockerfile
+    image: visitorsystem-backend-blue:latest
     container_name: visitor-backend-blue
     restart: unless-stopped
     environment:
@@ -48,6 +49,7 @@ services:
         - NODE_ENV=${NODE_ENV:-production}
         # ✅ 防缓存参数：每次构建都会变化
         - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-$(date +%s)}
+    image: visitorsystem-frontend-blue:latest
     container_name: visitor-frontend-blue
     restart: unless-stopped
     ports:

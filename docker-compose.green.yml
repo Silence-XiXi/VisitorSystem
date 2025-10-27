@@ -1,5 +1,5 @@
 # 绿环境应用配置
-# version: '3.8'
+version: '3.8'
 
 services:
   # 绿环境后端服务
@@ -7,6 +7,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend/Dockerfile
+    image: visitorsystem-backend-green:latest
     container_name: visitor-backend-green
     restart: unless-stopped
     environment:
@@ -48,6 +49,7 @@ services:
         - NODE_ENV=${NODE_ENV:-production}
         # ✅ 防缓存参数：每次构建都会变化
         - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-$(date +%s)}
+    image: visitorsystem-frontend-green:latest
     container_name: visitor-frontend-green
     restart: unless-stopped
     ports:
