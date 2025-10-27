@@ -17,8 +17,8 @@ const API_BASE_URL = (() => {
     href: window.location.href
   });
   
-  // 检测是否通过nginx代理访问（端口9017、8081、8082等）
-  const proxyPorts = ['80', '443', '9017', '8081', '8082'];
+  // 检测是否通过nginx代理访问（端口9017、8081、8082、8086等）
+  const proxyPorts = ['80', '443', '9017', '8081', '8082', '8086'];
   if (proxyPorts.includes(currentPort) || !currentPort) {
     // 使用相对路径，让Nginx代理处理
     const url = '/api';

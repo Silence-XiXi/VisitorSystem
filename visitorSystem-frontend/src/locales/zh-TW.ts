@@ -953,6 +953,8 @@ export default {
     distributorUpdated: '分判商已更新',
     distributorAdded: '分判商已新增',
     distributorDeleted: '分判商已刪除',
+    // 门卫管理
+    guardCreatedSuccess: '門衛已新增成功！',
     // 表单标签和占位符
     nameLabel: '名稱',
     namePlaceholder: '請輸入名稱',

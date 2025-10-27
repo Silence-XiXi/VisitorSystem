@@ -953,6 +953,8 @@ export default {
     distributorUpdated: 'Distributor Updated',
     distributorAdded: 'Distributor Added',
     distributorDeleted: 'Distributor Deleted',
+    // 门卫管理
+    guardCreatedSuccess: 'Guard Added Success!',
     // 表单标签和占位符
     nameLabel: 'Name',
     namePlaceholder: 'Please enter distributor name',
