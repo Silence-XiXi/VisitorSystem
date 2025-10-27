@@ -109,18 +109,18 @@ build_app_images() {
     log_info "构建应用镜像..."
     
     # 构建前端镜像
-    if ! docker images | grep -q "visitor-frontend-blue"; then
+    if ! docker images | grep -q "visitorsystem-frontend-blue"; then
         log_info "构建前端镜像..."
-        docker build -f docker/frontend/Dockerfile -t visitor-frontend-blue .
+        docker build -f docker/frontend/Dockerfile -t visitorsystem-frontend-blue:latest .
         log_success "前端镜像构建完成"
     else
         log_success "前端镜像已存在"
     fi
     
     # 构建后端镜像
-    if ! docker images | grep -q "visitor-backend-blue"; then
+    if ! docker images | grep -q "visitorsystem-backend-blue"; then
         log_info "构建后端镜像..."
-        docker build -f docker/backend/Dockerfile -t visitor-backend-blue .
+        docker build -f docker/backend/Dockerfile -t visitorsystem-backend-blue:latest .
         log_success "后端镜像构建完成"
     else
         log_success "后端镜像已存在"
@@ -151,7 +151,7 @@ start_app_services() {
             -e EMAIL_PASSWORD=jv7VSByIRIl2lhM5 \
             -e WHATSAPP_API_KEY=1e673379256fe1b0385c97d8120fbb30 \
             -e WHATSAPP_PHONE_NUMBER=+85261606103 \
-            visitor-backend-blue
+            visitorsystem-backend-blue:latest
         log_success "后端服务启动成功"
     else
         log_success "后端服务已在运行"
@@ -164,7 +164,7 @@ start_app_services() {
             --name visitor-frontend-blue \
             --network visitorsystem-network \
             -p 3002:80 \
-            visitor-frontend-blue
+            visitorsystem-frontend-blue:latest
         log_success "前端服务启动成功"
     else
         log_success "前端服务已在运行"
