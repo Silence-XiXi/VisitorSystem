@@ -89,11 +89,15 @@ start_base_services() {
     # Adminer数据库管理
     if ! docker ps | grep -q "visitor-adminer"; then
         log_info "启动Adminer数据库管理..."
+        # 先构建自定义 Adminer 镜像（如果需要）
+        if ! docker images | grep -q "visitor-adminer"; then
+            docker build -f docker/adminer/Dockerfile -t visitor-adminer .
+        fi
         docker run -d \
             --name visitor-adminer \
             --network visitorsystem-network \
             -p 8089:8089 \
-            adminer:latest
+            visitor-adminer
         log_success "Adminer启动成功"
     else
         log_success "Adminer已在运行"
