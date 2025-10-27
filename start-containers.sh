@@ -135,11 +135,11 @@ start_app_services() {
             --network visitorsystem-network \
             -p 3001:3000 \
             -e NODE_ENV=production \
-            -e DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/visitor_system \
-            -e REDIS_HOST=redis \
+            -e DATABASE_URL=postgresql://postgres:postgres123@visitor-postgres:5432/visitor_system \
+            -e REDIS_HOST=visitor-redis \
             -e REDIS_PORT=6379 \
             -e REDIS_PASSWORD=redis123 \
-            -e REDIS_URL=redis://:redis123@redis:6379 \
+            -e REDIS_URL=redis://:redis123@visitor-redis:6379 \
             -e JWT_SECRET=19391a718294795aa6a61a3e9eb837b9644888c0c35ffbe70cea1a57fc097c16 \
             -e EMAIL_HOST=mail.wisesystemtech.com \
             -e EMAIL_PORT=587 \
