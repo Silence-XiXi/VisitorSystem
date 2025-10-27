@@ -77,6 +77,7 @@ start_base_services() {
         docker run -d \
             --name visitor-redis \
             --network visitorsystem-network \
+            --network-alias redis \
             -p 6379:6379 \
             -e REDIS_PASSWORD=redis123 \
             redis:7-alpine redis-server --requirepass redis123
