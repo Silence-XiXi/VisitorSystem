@@ -42,9 +42,8 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/health-check.js ./health-check.js
-
-# 生成 Prisma client
-RUN npx prisma generate
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
 # 切换到非 root 用户
 USER nestjs
