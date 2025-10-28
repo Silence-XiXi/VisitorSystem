@@ -47,7 +47,6 @@ services:
     build:
       context: .
       dockerfile: docker/adminer/Dockerfile
-    image: visitorsystem-adminer:latest
     container_name: visitor-adminer
     restart: unless-stopped
     ports:

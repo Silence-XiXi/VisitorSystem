@@ -77,7 +77,6 @@ start_base_services() {
         docker run -d \
             --name visitor-redis \
             --network visitorsystem-network \
-            --network-alias redis \
             -p 6379:6379 \
             -e REDIS_PASSWORD=redis123 \
             redis:7-alpine redis-server --requirepass redis123
@@ -89,15 +88,11 @@ start_base_services() {
     # Adminer数据库管理
     if ! docker ps | grep -q "visitor-adminer"; then
         log_info "启动Adminer数据库管理..."
-        # 先构建自定义 Adminer 镜像（如果需要）
-        if ! docker images | grep -q "visitorsystem-adminer"; then
-            docker build -f docker/adminer/Dockerfile -t visitorsystem-adminer:latest .
-        fi
         docker run -d \
             --name visitor-adminer \
             --network visitorsystem-network \
             -p 8089:8089 \
-            visitorsystem-adminer:latest
+            adminer:latest
         log_success "Adminer启动成功"
     else
         log_success "Adminer已在运行"
@@ -109,18 +104,18 @@ build_app_images() {
     log_info "构建应用镜像..."
     
     # 构建前端镜像
-    if ! docker images | grep -q "visitorsystem-frontend-blue"; then
+    if ! docker images | grep -q "visitor-frontend-blue"; then
         log_info "构建前端镜像..."
-        docker build -f docker/frontend/Dockerfile -t visitorsystem-frontend-blue:latest .
+        docker build -f docker/frontend/Dockerfile -t visitor-frontend-blue .
         log_success "前端镜像构建完成"
     else
         log_success "前端镜像已存在"
     fi
     
     # 构建后端镜像
-    if ! docker images | grep -q "visitorsystem-backend-blue"; then
+    if ! docker images | grep -q "visitor-backend-blue"; then
         log_info "构建后端镜像..."
-        docker build -f docker/backend/Dockerfile -t visitorsystem-backend-blue:latest .
+        docker build -f docker/backend/Dockerfile -t visitor-backend-blue .
         log_success "后端镜像构建完成"
     else
         log_success "后端镜像已存在"
@@ -151,7 +146,7 @@ start_app_services() {
             -e EMAIL_PASSWORD=jv7VSByIRIl2lhM5 \
             -e WHATSAPP_API_KEY=1e673379256fe1b0385c97d8120fbb30 \
             -e WHATSAPP_PHONE_NUMBER=+85261606103 \
-            visitorsystem-backend-blue:latest
+            visitor-backend-blue
         log_success "后端服务启动成功"
     else
         log_success "后端服务已在运行"
@@ -164,7 +159,7 @@ start_app_services() {
             --name visitor-frontend-blue \
             --network visitorsystem-network \
             -p 3002:80 \
-            visitorsystem-frontend-blue:latest
+            visitor-frontend-blue
         log_success "前端服务启动成功"
     else
         log_success "前端服务已在运行"
