@@ -1,5 +1,5 @@
 # 基础服务配置 - 数据库、Redis等共享服务
-version: '3.8'
+# version: '3.8'
 
 services:
   # PostgreSQL 数据库
