@@ -10,6 +10,7 @@ export default {
     refresh: '刷新',
     loading: '加载中...',
     confirm: '确认',
+    sending: '发送中...',
     ok: '确定',
     close: '关闭',
     download: '下载',

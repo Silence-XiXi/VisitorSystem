@@ -10,6 +10,7 @@ export default {
     refresh: 'Refresh',
     loading: 'Loading...',
     confirm: 'Confirm',
+    sending: 'Sending...',
     ok: 'OK',
     close: 'Close',
     download: 'Download',
