@@ -3094,8 +3094,6 @@ const AdminSites: React.FC = () => {
       loading={loading}
       loadData={loadData}
       setLoading={setLoading}
-      setBatchUpdateStatusModalOpen={setBatchUpdateStatusModalOpen}
-      setBatchUpdateStatusType={setBatchUpdateStatusType}
     />
   )
 

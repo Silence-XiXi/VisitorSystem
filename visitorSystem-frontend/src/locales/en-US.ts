@@ -1049,6 +1049,7 @@ export default {
     editGuard: 'Edit Guard',
     // 表单标签
     whatsAppLabel: 'WhatsApp',
+    usernameLabel: 'Username',
     initialPasswordLabel: 'Initial Password',
     siteIdsLabel: 'Site IDs',
     distributorIdsLabel: 'Distributor IDs',
