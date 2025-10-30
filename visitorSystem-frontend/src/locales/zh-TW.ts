@@ -967,7 +967,7 @@ export default {
     codeAutoGeneratePlaceholder: '系統將自動生成編號',
     distributorCodePlaceholder: '請輸入編號',
     addressLabel: '地址',
-    addressPlaceholder: '請輸入分判商地址',
+    addressPlaceholder: '請輸入工地地址',
     managerLabel: '負責人',
     managerPlaceholder: '責任人姓名',
     phoneLabel: '電話',

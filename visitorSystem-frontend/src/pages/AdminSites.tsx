@@ -474,7 +474,7 @@ const AdminSites: React.FC = () => {
         manager: site.manager,
         phone: site.phone,
         status: transformSiteStatus(site.status),
-        distributorIds: site.distributorIds || []
+        distributorIds: site.distributors?.map(d => d.distributor.id) || site.distributorIds || []
       }))
       
       const transformedDistributors = distributorsData.map(distributor => ({
@@ -889,7 +889,7 @@ const AdminSites: React.FC = () => {
   // 工地表格列定义
   const siteColumns = [
     { title: t('admin.siteCode'), dataIndex: 'code', key: 'code', width: 120 },
-    { title: t('admin.siteName'), dataIndex: 'name', key: 'name', width: 160 },
+    { title: t('admin.siteName'), dataIndex: 'name', key: 'name', width: 240 },
     { title: t('admin.siteAddress'), dataIndex: 'address', key: 'address' },
     { title: t('admin.siteManager'), dataIndex: 'manager', key: 'manager', width: 120 },
     { title: t('admin.sitePhone'), dataIndex: 'phone', key: 'phone', width: 140 },
@@ -923,7 +923,15 @@ const AdminSites: React.FC = () => {
         <Button 
           size="small" 
           icon={<EditOutlined />} 
-          onClick={() => { setEditingSite(record); siteForm.setFieldsValue(record); setSiteModalOpen(true) }}
+          onClick={() => { 
+            setEditingSite(record); 
+            // 确保表单中包含工地关联的分判商ID列表
+            siteForm.setFieldsValue({
+              ...record,
+              distributorIds: record.distributorIds || []
+            }); 
+            setSiteModalOpen(true) 
+          }}
           title={t('admin.editTooltip')}
         />
         <Button 
@@ -1373,7 +1381,9 @@ const AdminSites: React.FC = () => {
         }
         
         // 更新本地状态
-        setSites(prev => prev.map(s => s.id === editingSite.id ? transformedUpdatedSite : s))
+        // setSites(prev => prev.map(s => s.id === editingSite.id ? transformedUpdatedSite : s))
+        // 重新加载所有数据以确保分判商与工地的关联关系同步
+        await loadData()
         
         // 刷新全局工地筛选器
         await refreshSites()
@@ -3097,15 +3107,15 @@ const AdminSites: React.FC = () => {
 
   // 监听筛选数据变化，更新分页总数
   useEffect(() => {
-    setSitePagination(prev => ({ ...prev, total: filteredSites.length, current: 1 }))
+    setSitePagination(prev => ({ ...prev, total: filteredSites.length }))
   }, [filteredSites])
 
   useEffect(() => {
-    setDistributorPagination(prev => ({ ...prev, total: filteredDistributors.length, current: 1 }))
+    setDistributorPagination(prev => ({ ...prev, total: filteredDistributors.length }))
   }, [filteredDistributors])
 
   useEffect(() => {
-    setGuardPagination(prev => ({ ...prev, total: filteredGuards.length, current: 1 }))
+    setGuardPagination(prev => ({ ...prev, total: filteredGuards.length }))
   }, [filteredGuards])
 
   // 分页数据切片
@@ -3995,7 +4005,7 @@ const AdminSites: React.FC = () => {
             <Input placeholder={t('admin.siteNamePlaceholder')} />
           </Form.Item>
           <Form.Item name="address" label={t('admin.addressLabel')} rules={[{ required: true, message: t('form.required') }]}>
-            <Input placeholder={t('admin.addressPlaceholder')} />
+            <Input.TextArea placeholder={t('admin.addressPlaceholder')} autoSize={{ minRows: 2, maxRows: 4 }} />
           </Form.Item>
           <Form.Item name="manager" label={t('admin.managerLabel')}>
             <Input placeholder={t('admin.managerPlaceholder')} />

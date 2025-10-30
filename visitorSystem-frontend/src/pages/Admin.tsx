@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { Card, Tabs, Table, Button, Space, Modal, Form, Input, Select, Tag, message } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Distributor, Site } from '../types/worker'

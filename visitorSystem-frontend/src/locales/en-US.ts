@@ -967,7 +967,7 @@ export default {
     codeAutoGeneratePlaceholder: 'The distributor code will be automatically generated',
     distributorCodePlaceholder: 'Please enter distributor code',
     addressLabel: 'Address',
-    addressPlaceholder: 'Please enter distributor address',
+    addressPlaceholder: 'Please enter site address',
     managerLabel: 'Manager',
     managerPlaceholder: 'Please enter distributor manager',
     phoneLabel: 'Phone',
